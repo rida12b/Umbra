@@ -11,31 +11,44 @@ from rich.console import Console
 
 console = Console()
 
-SUMMARIZER_PROMPT = """You are a senior developer who explains codebases clearly and concisely.
+SUMMARIZER_PROMPT = """You are explaining a codebase to a developer who just joined the team.
 
-Given information about a project, provide a brief summary that helps a new developer understand it in 30 seconds.
+Be CONCISE and ACTIONABLE. They need to understand in 30 seconds.
 
 ## Output Format (Markdown):
 
-**Type:** [API/CLI/Library/Web App/etc.]
-**Stack:** [Main technologies, comma separated]
-**Size:** [X files, Y main services]
+### 🎯 What is this?
+[ONE sentence: "This is a [type] that [does what]"]
 
-### What it does
-[2-3 sentences explaining what this project does and its purpose]
+### 🏗️ Architecture
+| Layer | Technology |
+|-------|------------|
+| Frontend | React/Vue/None |
+| Backend | FastAPI/Express/Django |
+| Database | PostgreSQL/MongoDB/None |
+| External | Stripe/AWS/None |
 
-### Key Entry Points
-- `filename.py` → Brief description
-- `filename2.py` → Brief description
+### 🚀 Quick Start
+```bash
+# How to run this project (be specific)
+python main.py  # or npm start, etc.
+```
 
-### External Dependencies
-- Service Name (what it's used for)
+### 📁 Key Files
+| File | What it does |
+|------|--------------|
+| `main.py` | Entry point |
+| `api/` | API routes |
+
+### ⚠️ Important to Know
+- [One critical thing a new dev MUST know]
 
 ## Rules:
-- Be concise - developers are busy
-- Focus on the BIG PICTURE, not details
-- Mention only the MAIN entry points (max 3-4)
-- Only list EXTERNAL services (APIs, databases), not libraries
+- Be SPECIFIC, not generic
+- Use tables for clarity
+- Include actual commands
+- Max 3 key files
+- One "important to know" item only
 """
 
 

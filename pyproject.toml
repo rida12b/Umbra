@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "umbra-architect"
-version = "0.2.0"
+version = "0.3.0"
 description = "The Shadow Architect - AI-powered live architecture diagrams that update as you code"
 authors = ["Your Name <you@example.com>"]
 readme = "README.md"

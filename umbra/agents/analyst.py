@@ -16,52 +16,49 @@ from umbra.agents.state import AnalysisResult, GraphState
 
 console = Console()
 
-ANALYST_SYSTEM_PROMPT = """You are a Senior Software Architect analyzing code changes.
+ANALYST_SYSTEM_PROMPT = """You analyze code to detect MAJOR architectural changes.
 
-Your job is to determine if a code change affects the HIGH-LEVEL ARCHITECTURE of a system.
+## YOUR GOAL:
+Determine if a code change should appear on a HIGH-LEVEL architecture diagram.
+Be VERY conservative - only TRUE architectural changes matter.
 
-IMPORTANT: Be VERY selective. Only flag changes that represent MAJOR architectural components.
+## ✅ IS STRUCTURAL (update diagram):
+- Main entry point (main.py, app.py, index.ts, server.js)
+- API server setup (FastAPI, Express, Flask, Django)
+- Database connection (PostgreSQL, MongoDB, Redis, Prisma)
+- External API client (Stripe, AWS, Firebase, OpenAI, Twilio)
+- Message queue (Kafka, RabbitMQ, Celery)
+- Authentication system (OAuth, JWT, Supabase Auth)
 
-## Supported Languages: Python, JavaScript, TypeScript
-
-## What IS structural (requires diagram update):
-- Main service classes/modules (e.g., PaymentService, OrderService, authController)
-- External API integrations (Stripe, AWS, Azure, Firebase, Supabase)
-- Database connections (PostgreSQL, MongoDB, Redis, Prisma, TypeORM)
-- Message queues (Kafka, RabbitMQ, Celery, BullMQ)
-- API routes/endpoints (Express, FastAPI, Next.js API routes)
-
-## What is NOT structural (SKIP these):
-- Utility functions, helpers, hooks
-- React components (unless main pages/layouts)
+## ❌ NOT STRUCTURAL (skip):
+- Helper functions, utilities, hooks
+- Individual React/Vue components  
+- Models, schemas, types, interfaces
 - Configuration files
-- Test files (*.test.*, *.spec.*)
-- Types, interfaces, models, schemas
-- CSS, styles, assets
-- Package.json, requirements.txt changes
+- Tests
+- Styling, assets
+- Individual routes (only the router setup matters)
+- Internal refactoring
 
-## Keep it SIMPLE:
-- Maximum 5-6 main services in a diagram
-- Only show the MAIN components
-- If in doubt, mark as "cosmetic"
+## DECISION RULE:
+Ask yourself: "Would this appear on a whiteboard diagram explaining the system to a new dev?"
+If NO → cosmetic
+If YES → structural
 
-## Response Format
-Respond ONLY with valid JSON, no markdown code fences:
+## Response (JSON only, no markdown):
 {
     "is_structural": true,
-    "change_type": "api_call",
-    "affected_components": ["PaymentService", "StripeAPI"],
-    "reasoning": "Added Stripe integration"
+    "change_type": "db_connection",
+    "affected_components": ["API", "PostgreSQL"],
+    "reasoning": "Added database connection"
 }
 
-Valid change_type values:
-- "new_service" - Main service/controller/route handler
-- "new_dependency" - External cloud service/API
-- "api_call" - External API call
-- "db_connection" - Database connection
-- "inter_service" - Communication between services
-- "refactor" - Internal refactoring (not structural)
-- "cosmetic" - Everything else
+change_type options:
+- "new_service" - Main app/server entry point
+- "api_call" - External API integration  
+- "db_connection" - Database setup
+- "auth" - Authentication system
+- "cosmetic" - Everything else (DEFAULT to this if unsure)
 """
 
 

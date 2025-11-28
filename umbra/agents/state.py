@@ -56,15 +56,15 @@ class GraphState(TypedDict, total=False):
 
 
 # Initial diagram template
-INITIAL_DIAGRAM = """graph LR
-    subgraph Core["Core Services"]
+INITIAL_DIAGRAM = """graph TB
+    subgraph Core["⚙️ Backend"]
         App[Application]
     end
 
-    subgraph External["External APIs"]
+    subgraph External["🌐 External"]
     end
 
-    subgraph Data["Data Stores"]
+    subgraph Data["💾 Data"]
     end
 """
 
