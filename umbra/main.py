@@ -8,6 +8,9 @@ import os
 import signal
 import sys
 import time
+import threading
+import webbrowser
+from datetime import datetime
 from pathlib import Path
 
 import click
@@ -24,6 +27,13 @@ from umbra.watcher import FileChangeEvent, start_watching
 load_dotenv()
 
 console = Console(force_terminal=True)
+
+# Global state for recent changes
+recent_changes = []
+MAX_RECENT_CHANGES = 10
+
+# Store previous file contents for diff
+file_cache = {}
 
 
 @click.group()
@@ -65,11 +75,16 @@ def do_initial_scan(path: str, output_file: str, graph) -> str:
     current_mermaid = INITIAL_DIAGRAM
     
     # Process each file
+    global file_cache
+    
     for i, file_path in enumerate(code_files, 1):
         console.print(f"[dim]({i}/{len(code_files)}) {file_path.name}[/dim]", end=" ")
         
         try:
             content = file_path.read_text(encoding="utf-8", errors="ignore")
+            
+            # Cache file content for future diff comparisons (use absolute path)
+            file_cache[str(file_path.resolve())] = content
             
             result = graph.invoke({
                 "file_path": str(file_path),
@@ -124,6 +139,170 @@ def do_initial_scan(path: str, output_file: str, graph) -> str:
     return current_mermaid
 
 
+def start_chat_server_background(project_path: str, port: int = 8765):
+    """Start the chat server in a background thread."""
+    from umbra.server import UmbraRequestHandler
+    from http.server import HTTPServer
+    
+    UmbraRequestHandler.project_path = project_path
+    UmbraRequestHandler.project_data = None
+    
+    server = HTTPServer(('localhost', port), UmbraRequestHandler)
+    
+    def serve():
+        try:
+            server.serve_forever()
+        except Exception:
+            pass
+    
+    thread = threading.Thread(target=serve, daemon=True)
+    thread.start()
+    return server
+
+
+def regenerate_dashboard(path: str, output_file: str, dashboard_file: str):
+    """Regenerate the HTML dashboard."""
+    global recent_changes
+    
+    from umbra.export import export_html
+    from umbra.agents.insights import run_full_analysis
+    
+    try:
+        # Get analysis data
+        analysis = run_full_analysis(path)
+        
+        # Add recent changes to analysis
+        analysis['recent_changes'] = recent_changes
+        
+        # Export dashboard
+        project_name = Path(path).absolute().name
+        export_html(output_file, dashboard_file, project_name, analysis)
+        
+    except Exception as e:
+        console.print(f"[dim]Dashboard update failed: {e}[/dim]")
+
+
+def add_recent_change(file_path: str, change_type: str = "modified", description: str = ""):
+    """Track a recent change with AI-generated description."""
+    global recent_changes
+    
+    recent_changes.insert(0, {
+        "time": datetime.now().strftime("%H:%M:%S"),
+        "file": Path(file_path).name if "/" in file_path or "\\" in file_path else file_path,
+        "type": change_type,
+        "description": description
+    })
+    
+    # Keep only last N changes
+    recent_changes = recent_changes[:MAX_RECENT_CHANGES]
+
+
+def compute_diff(old_content: str, new_content: str) -> str:
+    """Compute a simple diff between old and new content."""
+    import difflib
+    
+    old_lines = old_content.splitlines() if old_content else []
+    new_lines = new_content.splitlines() if new_content else []
+    
+    diff = list(difflib.unified_diff(old_lines, new_lines, lineterm='', n=1))
+    
+    added = []
+    removed = []
+    
+    for line in diff[2:]:  # Skip the header lines
+        if line.startswith('+') and not line.startswith('+++'):
+            added.append(line[1:].strip())
+        elif line.startswith('-') and not line.startswith('---'):
+            removed.append(line[1:].strip())
+    
+    result = []
+    if added:
+        result.append(f"ADDED:\n" + "\n".join(added[:10]))  # Max 10 lines
+    if removed:
+        result.append(f"REMOVED:\n" + "\n".join(removed[:10]))
+    
+    return "\n\n".join(result) if result else "Minor changes"
+
+
+def generate_change_description(file_name: str, content: str, change_type: str, diff_text: str = "") -> str:
+    """Generate a short AI description of what ACTUALLY changed."""
+    from langchain_google_genai import ChatGoogleGenerativeAI
+    from langchain_core.messages import HumanMessage
+    import os
+    
+    try:
+        api_key = os.getenv("GOOGLE_API_KEY")
+        if not api_key:
+            return f"File {change_type}"
+        
+        # If we have a diff, use it - otherwise use content preview
+        if diff_text and diff_text != "Minor changes":
+            context = diff_text[:1000]
+            prompt_type = "DIFF"
+        else:
+            context = content[:600] if content else ""
+            prompt_type = "FULL"
+        
+        if not context.strip():
+            return f"New empty file created"
+        
+        llm = ChatGoogleGenerativeAI(
+            model="models/gemini-flash-latest",
+            google_api_key=api_key,
+            temperature=0.1,
+            max_tokens=100
+        )
+        
+        if prompt_type == "DIFF":
+            prompt = f"""Describe EXACTLY what changed in this code diff. Be specific about the actual change.
+
+File: {file_name}
+Change type: {change_type}
+
+{context}
+
+Describe the change in 8-15 words. Focus on WHAT was added/removed/modified.
+Examples:
+- "Added print('test') debug statement"
+- "Removed unused import statement" 
+- "Changed timeout from 5s to 10s"
+- "Added new validate_user() function"
+- "Fixed typo in error message"
+
+Your description:"""
+        else:
+            prompt = f"""This is a NEW file. Describe what it does in 8-15 words.
+
+File: {file_name}
+
+```
+{context}
+```
+
+Describe what this file does:"""
+
+        response = llm.invoke([HumanMessage(content=prompt)])
+        
+        desc = response.content.strip().strip('"').strip("'").strip()
+        
+        # Clean up
+        desc = desc.replace('\n', ' ').replace('  ', ' ')
+        
+        if len(desc) > 80:
+            desc = desc[:77] + "..."
+        
+        return desc if desc else f"Updated {file_name}"
+        print("test ")
+    except Exception as e:
+        # Fallback: show what was added/removed
+        if diff_text and "ADDED:" in diff_text:
+            lines = diff_text.split("ADDED:")[1].split("\n")[:2]
+            preview = lines[0][:50] if lines else ""
+            if preview:
+                return f"Added: {preview}..."
+        return f"Modified {file_name}"
+
+
 @cli.command()
 @click.argument("path", default=".", type=click.Path(exists=True))
 @click.option("--verbose", "-v", is_flag=True, help="Enable debug logging")
@@ -145,13 +324,42 @@ def do_initial_scan(path: str, output_file: str, graph) -> str:
     is_flag=True,
     help="Skip initial project scan",
 )
-def watch(path: str, verbose: bool, output: str | None, debounce: float, no_scan: bool):
-    """Watch a directory for Python file changes."""
+@click.option(
+    "--dashboard/--no-dashboard",
+    default=True,
+    help="Auto-generate dashboard (default: enabled)",
+)
+@click.option(
+    "--open",
+    "open_browser",
+    is_flag=True,
+    help="Open dashboard in browser",
+)
+@click.option(
+    "--port",
+    "-p",
+    default=8765,
+    type=int,
+    help="Chat server port (default: 8765)",
+)
+def watch(path: str, verbose: bool, output: str | None, debounce: float, no_scan: bool, dashboard: bool, open_browser: bool, port: int):
+    """Watch a directory for Python file changes.
+    
+    This command does everything:
+    - Scans your project
+    - Generates architecture diagram
+    - Starts the chat server
+    - Auto-updates dashboard on changes
+    """
+    global recent_changes
+    recent_changes = []
+    
     # Set output path in environment if provided
     if output:
         os.environ["OUTPUT_FILE"] = output
 
     output_file = os.getenv("OUTPUT_FILE", "./output/LIVE_ARCHITECTURE.md")
+    dashboard_file = str(Path(output_file).parent / "dashboard.html")
 
     # Check for API key
     if not os.getenv("GOOGLE_API_KEY"):
@@ -160,13 +368,24 @@ def watch(path: str, verbose: bool, output: str | None, debounce: float, no_scan
         )
         sys.exit(1)
 
+    # Start chat server in background
+    chat_server = None
+    if dashboard:
+        try:
+            chat_server = start_chat_server_background(path, port)
+            console.print(f"[green]✓[/green] Chat server started on port {port}")
+        except Exception as e:
+            console.print(f"[yellow]⚠ Could not start chat server: {e}[/yellow]")
+
     # Display startup banner
     console.print(
         Panel.fit(
-            "[bold cyan]UMBRA[/bold cyan] - The Shadow Architect\n"
-            f"Watching: [green]{Path(path).absolute()}[/green]\n"
-            f"Output: [yellow]{output_file}[/yellow]\n"
-            f"Model: [dim]{os.getenv('GEMINI_MODEL', 'models/gemini-flash-latest')}[/dim]",
+            "[bold cyan]UMBRA[/bold cyan] - The Shadow Architect\n\n"
+            f"📁 Project: [green]{Path(path).absolute()}[/green]\n"
+            f"📄 Output: [yellow]{output_file}[/yellow]\n"
+            f"🎨 Dashboard: [blue]{dashboard_file}[/blue]\n"
+            f"💬 Chat: [magenta]http://localhost:{port}[/magenta]\n"
+            f"🤖 Model: [dim]{os.getenv('GEMINI_MODEL', 'models/gemini-flash-latest')}[/dim]",
             border_style="cyan",
         )
     )
@@ -177,11 +396,36 @@ def watch(path: str, verbose: bool, output: str | None, debounce: float, no_scan
     # Ensure output directory exists
     Path(output_file).parent.mkdir(parents=True, exist_ok=True)
 
+    # Pre-fill file cache for diff tracking
+    def prefill_cache():
+        """Load all code files into cache for diff comparison."""
+        global file_cache
+        extensions = ["*.py", "*.js", "*.jsx", "*.ts", "*.tsx"]
+        ignore_patterns = {"__pycache__", ".git", ".venv", "venv", "node_modules", ".pytest_cache", "test", "tests", "dist", "build", ".next", "output"}
+        
+        for ext in extensions:
+            for file_path in Path(path).rglob(ext):
+                if not any(p in file_path.parts for p in ignore_patterns):
+                    try:
+                        content = file_path.read_text(encoding="utf-8", errors="ignore")
+                        # Use absolute path as key for consistency
+                        abs_path = str(file_path.resolve())
+                        file_cache[abs_path] = content
+                    except Exception:
+                        pass
+        
+        console.print(f"[dim]Cached {len(file_cache)} files for diff tracking[/dim]")
+    
     # Initial scan (unless --no-scan)
     if not no_scan:
         do_initial_scan(path, output_file, graph)
-    elif not Path(output_file).exists():
-        # Create empty diagram if no scan and file doesn't exist
+        add_recent_change("initial", "Full project scan", "Analyzed full project structure")
+    else:
+        # Even with --no-scan, we need to cache files for diff tracking
+        prefill_cache()
+    
+    if not Path(output_file).exists():
+        # Create empty diagram if file doesn't exist
         console.print("[dim]Creating initial architecture file...[/dim]")
         Path(output_file).write_text(
             f"""# Live Architecture
@@ -203,18 +447,90 @@ def watch(path: str, verbose: bool, output: str | None, debounce: float, no_scan
             encoding="utf-8",
         )
 
+    # Generate initial dashboard
+    if dashboard:
+        console.print("[dim]Generating dashboard...[/dim]")
+        regenerate_dashboard(path, output_file, dashboard_file)
+        console.print(f"[green]✓[/green] Dashboard ready: {dashboard_file}")
+        
+        if open_browser:
+            webbrowser.open(f"file://{Path(dashboard_file).absolute()}")
+
+    def remove_file_from_diagram(file_name: str, output_path: str):
+        """Remove a deleted file from the Mermaid diagram."""
+        try:
+            content = Path(output_path).read_text(encoding="utf-8")
+            
+            # Extract mermaid diagram
+            if "```mermaid" not in content:
+                return
+            
+            start = content.index("```mermaid") + len("```mermaid")
+            end = content.index("```", start)
+            mermaid = content[start:end]
+            
+            # Remove lines containing the file name
+            lines = mermaid.split('\n')
+            new_lines = []
+            for line in lines:
+                # Skip lines that reference this file
+                if file_name.lower() in line.lower():
+                    continue
+                new_lines.append(line)
+            
+            new_mermaid = '\n'.join(new_lines)
+            
+            # Rebuild content
+            new_content = content[:start] + new_mermaid + content[end:]
+            Path(output_path).write_text(new_content, encoding="utf-8")
+            
+        except Exception as e:
+            console.print(f"[dim]   Could not update diagram: {e}[/dim]")
+
     def process_change(event: FileChangeEvent):
         """Process a file change event through the graph (sync wrapper)."""
-        console.print(f"\n[bold]>> Change detected:[/bold] {event.file_path.name}")
+        file_name = event.file_path.name
+        event_type = event.event_type  # "created", "modified", or "deleted"
+        
+        # Display change with appropriate emoji
+        emoji = {"created": "➕", "modified": "✏️", "deleted": "🗑️"}.get(event_type, "📄")
+        console.print(f"\n[bold]>> {emoji} {event_type.upper()}:[/bold] {file_name}")
 
         try:
-            # Read file content
-            if event.file_path.exists():
-                content = event.file_path.read_text(encoding="utf-8")
-            else:
-                content = ""
-                console.print("[dim]   -> File deleted, skipping analysis[/dim]")
+            # Handle file deletion
+            if event_type == "deleted" or not event.file_path.exists():
+                console.print(f"[yellow]   Removing from architecture...[/yellow]")
+                
+                # Remove from diagram
+                remove_file_from_diagram(file_name, output_file)
+                console.print(f"[dim]   -> Removed from diagram[/dim]")
+                
+                # Track the deletion
+                add_recent_change(file_name, "deleted", f"Removed {file_name} from project")
+                
+                # Regenerate dashboard
+                if dashboard:
+                    regenerate_dashboard(path, output_file, dashboard_file)
+                    console.print(f"[dim]   Dashboard updated[/dim]")
                 return
+
+            # Read file content
+            content = event.file_path.read_text(encoding="utf-8")
+            
+            # Get previous content from cache for diff (use absolute path)
+            file_key = str(event.file_path.resolve())
+            old_content = file_cache.get(file_key, "")
+            
+            # Compute diff
+            if old_content:
+                diff_text = compute_diff(old_content, content)
+                console.print(f"[dim]   Diff: {len(diff_text)} chars[/dim]")
+            else:
+                diff_text = ""
+                console.print(f"[yellow]   ⚠ No cache for this file[/yellow]")
+            
+            # Update cache with new content
+            file_cache[file_key] = content
 
             # Load current architecture
             current_mermaid = load_current_mermaid(output_file)
@@ -230,10 +546,24 @@ def watch(path: str, verbose: bool, output: str | None, debounce: float, no_scan
                 }
             )
 
+            # Generate AI description based on actual diff
+            if diff_text and diff_text != "Minor changes":
+                console.print(f"[dim]   Diff preview: {diff_text[:100]}...[/dim]")
+            description = generate_change_description(file_name, content, event_type, diff_text)
+            console.print(f"[cyan]   → {description}[/cyan]")
+            
+            # Track the change with description
+            add_recent_change(file_name, event_type, description)
+
             if verbose:
                 if result.get("analysis_result"):
                     ar = result["analysis_result"]
                     console.print(f"[dim]   Analysis: {ar.reasoning}[/dim]")
+
+            # Regenerate dashboard
+            if dashboard:
+                regenerate_dashboard(path, output_file, dashboard_file)
+                console.print(f"[dim]   Dashboard updated[/dim]")
 
         except Exception as e:
             console.print(f"[red]   ERROR: {e}[/red]")
@@ -252,13 +582,16 @@ def watch(path: str, verbose: bool, output: str | None, debounce: float, no_scan
         console.print("\n[yellow]Shutting down gracefully...[/yellow]")
         if watcher:
             watcher.stop()
+        if chat_server:
+            chat_server.shutdown()
         sys.exit(0)
 
     signal.signal(signal.SIGINT, signal_handler)
     signal.signal(signal.SIGTERM, signal_handler)
 
     # Start watching
-    console.print("[dim]Watching for changes... (CTRL+C to stop)[/dim]\n")
+    console.print("\n[dim]Watching for changes... (CTRL+C to stop)[/dim]")
+    console.print(f"[dim]Open dashboard: [blue]file://{Path(dashboard_file).absolute()}[/blue][/dim]\n")
 
     watcher = start_watching(
         path=path,
@@ -275,6 +608,8 @@ def watch(path: str, verbose: bool, output: str | None, debounce: float, no_scan
     finally:
         if watcher:
             watcher.stop()
+        if chat_server:
+            chat_server.shutdown()
 
 
 @cli.command()
@@ -332,6 +667,7 @@ def scan(path: str, output: str):
     """Scan an existing project and generate architecture diagram."""
     from umbra.agents.orchestrator import build_graph
     from umbra.agents.state import INITIAL_DIAGRAM
+    from umbra.agents.summarizer import generate_summary
     
     # Check for API key
     if not os.getenv("GOOGLE_API_KEY"):
@@ -349,7 +685,7 @@ def scan(path: str, output: str):
         code_files.extend(Path(path).rglob(ext))
     
     # Filter out venv, __pycache__, node_modules, etc.
-    ignore_patterns = {"__pycache__", ".git", ".venv", "venv", "node_modules", ".pytest_cache", "dist", "build", ".next"}
+    ignore_patterns = {"__pycache__", ".git", ".venv", "venv", "node_modules", ".pytest_cache", "dist", "build", ".next", "output"}
     code_files = [
         f for f in code_files 
         if not any(p in f.parts for p in ignore_patterns)
@@ -358,7 +694,7 @@ def scan(path: str, output: str):
     console.print(f"[dim]Found {len(code_files)} code files[/dim]")
     
     if not code_files:
-        console.print("[yellow]No Python files found![/yellow]")
+        console.print("[yellow]No code files found![/yellow]")
         return
     
     # Build graph
@@ -393,13 +729,21 @@ def scan(path: str, output: str):
         except Exception as e:
             console.print(f"[red]   Error: {e}[/red]")
     
-    # Write final diagram
+    # Generate summary
+    console.print("\n[cyan]Generating project summary...[/cyan]")
+    summary = generate_summary(path, current_mermaid, code_files)
+    
+    # Write final diagram with summary
     from datetime import datetime
     final_content = f"""# Live Architecture
 
 > **Auto-generated by Umbra** - Do not edit manually
 > Last updated: {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
 > Scanned: {len(code_files)} files
+
+## Project Summary
+
+{summary}
 
 ## System Overview
 
@@ -476,6 +820,200 @@ def validate(file: str):
         console.print("[yellow]WARNINGS:[/yellow]")
         for warning in result.warnings:
             console.print(f"   - {warning}")
+
+
+@cli.command()
+@click.argument("path", default=".", type=click.Path(exists=True))
+@click.option("--question", "-q", default=None, help="Ask a single question (non-interactive)")
+def ask(path: str, question: str | None):
+    """Chat with your codebase using AI.
+    
+    Ask questions about your code in natural language.
+    
+    Examples:
+        umbra ask                    # Start interactive chat
+        umbra ask -q "How does auth work?"  # Single question
+    """
+    from umbra.agents.chat import ask_umbra, interactive_chat
+    
+    # Check for API key
+    if not os.getenv("GOOGLE_API_KEY"):
+        console.print(
+            "[red]ERROR: GOOGLE_API_KEY not set. Please set it in .env or environment.[/red]"
+        )
+        sys.exit(1)
+    
+    if question:
+        # Single question mode
+        console.print(f"[dim]Analyzing codebase...[/dim]")
+        answer = ask_umbra(question, path)
+        from rich.markdown import Markdown
+        console.print("\n")
+        console.print(Markdown(answer))
+    else:
+        # Interactive mode
+        interactive_chat(path)
+
+
+@cli.command()
+@click.argument("path", default=".", type=click.Path(exists=True))
+@click.option("--json", "output_json", is_flag=True, help="Output as JSON")
+def insights(path: str, output_json: bool):
+    """Analyze codebase and show architecture insights.
+    
+    Detects potential issues like:
+    - God files (too large)
+    - High coupling
+    - Missing __init__.py
+    - Deep nesting
+    """
+    from umbra.agents.insights import run_full_analysis, InsightSeverity
+    
+    console.print(f"[cyan]Analyzing {Path(path).absolute()}...[/cyan]\n")
+    
+    analysis = run_full_analysis(path)
+    
+    if output_json:
+        import json
+        # Convert insights to dicts
+        data = {
+            'health': analysis['health'],
+            'metrics': analysis['metrics'],
+            'insights': [
+                {
+                    'title': i.title,
+                    'description': i.description,
+                    'severity': i.severity.value,
+                    'affected_files': i.affected_files,
+                    'recommendation': i.recommendation
+                }
+                for i in analysis['insights']
+            ]
+        }
+        console.print(json.dumps(data, indent=2))
+        return
+    
+    # Health Score
+    health = analysis['health']
+    metrics = analysis['metrics']
+    
+    score_color = {
+        'A': 'green', 'B': 'green', 'C': 'yellow', 'D': 'red', 'F': 'red'
+    }.get(health['grade'], 'white')
+    
+    console.print(Panel.fit(
+        f"[bold {score_color}]{health['grade']}[/bold {score_color}] "
+        f"[{score_color}]{health['score']}/100[/{score_color}]\n"
+        f"[dim]{health['status']}[/dim]",
+        title="Health Score",
+        border_style=score_color
+    ))
+    
+    # Metrics
+    console.print("\n[bold]Metrics[/bold]")
+    console.print(f"  Files: {metrics['total_files']}")
+    console.print(f"  Lines: {metrics['total_lines']:,}")
+    console.print(f"  Avg lines/file: {metrics['total_lines'] // max(metrics['total_files'], 1)}")
+    
+    # Insights
+    console.print("\n[bold]Insights[/bold]")
+    
+    if not analysis['insights']:
+        console.print("  [green]No issues detected![/green]")
+    else:
+        for insight in analysis['insights']:
+            severity_icon = {
+                InsightSeverity.CRITICAL: "[red]",
+                InsightSeverity.WARNING: "[yellow]",
+                InsightSeverity.INFO: "[blue]"
+            }.get(insight.severity, "[white]")
+            
+            severity_close = severity_icon.replace("[", "[/")
+            console.print(f"  {severity_icon}{insight.title}{severity_close}")
+            console.print(f"    [dim]{insight.recommendation}[/dim]")
+    
+    # Largest files
+    if metrics['largest_files']:
+        console.print("\n[bold]Largest Files[/bold]")
+        for filepath, lines in metrics['largest_files'][:5]:
+            console.print(f"  {filepath}: {lines} lines")
+
+
+@cli.command()
+@click.argument("output_file", type=click.Path())
+@click.option(
+    "--input", "-i",
+    default="./output/LIVE_ARCHITECTURE.md",
+    help="Input markdown file",
+)
+@click.option(
+    "--name", "-n",
+    default=None,
+    help="Project name",
+)
+@click.option(
+    "--path", "-p",
+    default=".",
+    help="Project path for insights analysis",
+)
+def dashboard(output_file: str, input: str, name: str | None, path: str):
+    """Export beautiful interactive HTML dashboard.
+    
+    Includes:
+    - Architecture diagram
+    - Health score
+    - Code metrics
+    - Insights and recommendations
+    """
+    from umbra.export import export_html
+    from umbra.agents.insights import run_full_analysis
+    
+    # Determine project name
+    if name is None:
+        name = Path.cwd().name
+    
+    console.print(f"[cyan]Generating dashboard for {name}...[/cyan]")
+    
+    # Run insights analysis
+    console.print("[dim]Analyzing codebase...[/dim]")
+    analysis = run_full_analysis(path)
+    
+    try:
+        export_html(input, output_file, name, analysis)
+        console.print(f"\n[green]Dashboard exported to {output_file}[/green]")
+        console.print(f"[dim]Open in browser: file://{Path(output_file).absolute()}[/dim]")
+    except FileNotFoundError as e:
+        console.print(f"[red]ERROR: {e}[/red]")
+        console.print("[dim]Run 'umbra scan' first to generate architecture[/dim]")
+
+
+@cli.command()
+@click.argument("path", default=".", type=click.Path(exists=True))
+@click.option("--port", "-p", default=8765, help="Server port (default: 8765)")
+def serve(path: str, port: int):
+    """Start the Umbra API server for dashboard chat.
+    
+    This enables the chat functionality in the HTML dashboard.
+    Run this command, then open the dashboard in your browser.
+    """
+    from umbra.server import start_server
+    
+    # Check for API key
+    if not os.getenv("GOOGLE_API_KEY"):
+        console.print(
+            "[red]ERROR: GOOGLE_API_KEY not set. Please set it in .env or environment.[/red]"
+        )
+        sys.exit(1)
+    
+    console.print(Panel.fit(
+        "[bold cyan]UMBRA[/bold cyan] - Chat Server\n"
+        f"Project: [green]{Path(path).absolute()}[/green]\n"
+        f"API: [yellow]http://localhost:{port}[/yellow]\n\n"
+        "[dim]Open the dashboard HTML to chat with your codebase![/dim]",
+        border_style="cyan"
+    ))
+    
+    start_server(path, port)
 
 
 if __name__ == "__main__":

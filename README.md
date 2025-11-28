@@ -82,12 +82,16 @@ That's it! Open `output/LIVE_ARCHITECTURE.md` to see your architecture.
 |---------|-------------|
 | 🔍 **Smart Analysis** | AI understands semantic changes, not just syntax |
 | 📊 **Live Diagrams** | Mermaid.js diagrams update in real-time |
+| 💬 **Ask Umbra** | Chat with your codebase in natural language |
+| 🏥 **Health Score** | Get an A-F grade for your architecture |
+| ⚠️ **Auto Insights** | Detect god files, high coupling, issues |
+| 🎨 **Modern Dashboard** | Beautiful glassmorphism UI with Bento grid |
 | 📝 **Auto Summary** | Natural language project description |
-| 🌐 **HTML Export** | Share beautiful standalone reports |
+| 🕐 **Recent Changes** | AI-powered descriptions of code changes |
+| 🔎 **Search (Ctrl+K)** | Command palette to search your codebase |
+| 📥 **SVG Export** | Download diagrams in vector format |
 | 🐍 **Python Support** | Full Python codebase analysis |
 | ⚛️ **JS/TS Support** | React, Next.js, Express, and more |
-| ⚡ **Fast** | Under 5 seconds per analysis |
-| 🔒 **Read-Only** | Never modifies your code |
 
 ## 🎬 Demo
 
@@ -142,11 +146,15 @@ Plus a human-readable summary:
 
 | Command | Description |
 |---------|-------------|
-| `umbra watch .` | Scan project + watch for changes |
-| `umbra watch . --no-scan` | Watch only (skip initial scan) |
-| `umbra scan .` | One-time full scan |
-| `umbra export report.html` | Export to interactive HTML |
-| `umbra init` | Create empty architecture file |
+| `umbra watch .` | 🚀 **All-in-one**: Scan + Watch + Chat Server + Dashboard |
+| `umbra watch . --open` | Same as above, auto-opens dashboard in browser |
+| `umbra watch . --no-scan` | Skip initial scan, only watch for changes |
+| `umbra ask` | 💬 Chat with your codebase (interactive) |
+| `umbra ask -q "How does auth work?"` | Ask a single question |
+| `umbra insights` | 🏥 Show health score & issues |
+| `umbra dashboard report.html` | 🎨 Export stunning HTML dashboard |
+| `umbra scan .` | One-time full scan (no watch) |
+| `umbra export report.html` | Simple HTML export |
 
 ## 🛠️ Configuration
 
@@ -177,21 +185,30 @@ DEBOUNCE_SECONDS=2
 
 ## 🗺️ Roadmap
 
-### Current (v0.2)
+### Current (v0.5)
 - [x] Python support
 - [x] JavaScript/TypeScript support
 - [x] Project summaries
 - [x] HTML export
+- [x] **Ask Umbra** - Chat with your codebase
+- [x] **Health Score** - Architecture quality grading
+- [x] **Insights** - Automatic issue detection
+- [x] **Modern Dashboard** - Glassmorphism UI with Bento grid
+- [x] **Hybrid Mode** - Watch + Chat server + Auto-refresh
+- [x] **Recent Changes** - AI-powered change tracking
+- [x] **Search (Ctrl+K)** - Command palette search
+- [x] **SVG Export** - Download diagrams
 
 ### Coming Soon
 - [ ] VS Code extension
 - [ ] CI/CD integration (generate on PR)
+- [ ] More languages (Go, Rust, Java)
+- [ ] Click on diagram nodes to view file
 
 ### Future Vision
 - [ ] **AI Code Analysis** - Find bugs and issues automatically
 - [ ] **Auto-Fix Suggestions** - AI-powered code corrections
 - [ ] **Team Collaboration** - Share architecture across team
-- [ ] **Custom Rules** - Define what's "structural" for your project
 
 ## 🤝 Contributing
 

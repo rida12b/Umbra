@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "umbra-architect"
-version = "0.3.0"
+version = "0.5.0"
 description = "The Shadow Architect - AI-powered live architecture diagrams that update as you code"
 authors = ["Your Name <you@example.com>"]
 readme = "README.md"
@@ -30,6 +30,8 @@ langchain-google-genai = "^2.0.0"
 python-dotenv = "^1.0.0"
 rich = "^13.0.0"
 click = "^8.1.0"
+fastapi = "^0.115.0"
+uvicorn = "^0.32.0"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.0.0"

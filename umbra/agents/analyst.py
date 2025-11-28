@@ -16,49 +16,51 @@ from umbra.agents.state import AnalysisResult, GraphState
 
 console = Console()
 
-ANALYST_SYSTEM_PROMPT = """You analyze code to detect MAJOR architectural changes.
+ANALYST_SYSTEM_PROMPT = """You analyze code to determine if it should appear in an architecture diagram.
 
 ## YOUR GOAL:
-Determine if a code change should appear on a HIGH-LEVEL architecture diagram.
-Be VERY conservative - only TRUE architectural changes matter.
+Decide if this file is an IMPORTANT part of the system architecture.
+We want to show the REAL structure - files that do meaningful work.
 
-## ✅ IS STRUCTURAL (update diagram):
-- Main entry point (main.py, app.py, index.ts, server.js)
-- API server setup (FastAPI, Express, Flask, Django)
-- Database connection (PostgreSQL, MongoDB, Redis, Prisma)
-- External API client (Stripe, AWS, Firebase, OpenAI, Twilio)
-- Message queue (Kafka, RabbitMQ, Celery)
-- Authentication system (OAuth, JWT, Supabase Auth)
+## ✅ IS STRUCTURAL (show in diagram):
+- Main entry points (main.py, app.py, index.ts, server.js)
+- Service files (auth_service.py, payment.py, user_service.js)
+- API routes/controllers (routes.py, api.py, controllers/)
+- Database operations (db.py, repository.py, models with queries)
+- External API integrations (stripe.py, openai_client.py)
+- Core business logic files
+- Orchestration/workflow files
+- Agent/AI files
 
 ## ❌ NOT STRUCTURAL (skip):
-- Helper functions, utilities, hooks
-- Individual React/Vue components  
-- Models, schemas, types, interfaces
-- Configuration files
-- Tests
-- Styling, assets
-- Individual routes (only the router setup matters)
-- Internal refactoring
+- __init__.py files
+- Type definitions only (types.py, interfaces.ts)
+- Pure config files (config.py, settings.py)
+- Test files (*_test.py, *.spec.ts)
+- Utility helpers (utils.py, helpers.js)
+- Constants files
+- CSS/styling files
 
 ## DECISION RULE:
-Ask yourself: "Would this appear on a whiteboard diagram explaining the system to a new dev?"
-If NO → cosmetic
-If YES → structural
+"Does this file DO something important, or is it just supporting?"
+If it DOES something → structural
+If it just supports → cosmetic
 
 ## Response (JSON only, no markdown):
 {
     "is_structural": true,
-    "change_type": "db_connection",
-    "affected_components": ["API", "PostgreSQL"],
-    "reasoning": "Added database connection"
+    "change_type": "service",
+    "affected_components": ["auth.py", "UserService"],
+    "reasoning": "Core authentication service"
 }
 
 change_type options:
-- "new_service" - Main app/server entry point
+- "new_service" - Main service/module file
 - "api_call" - External API integration  
-- "db_connection" - Database setup
-- "auth" - Authentication system
-- "cosmetic" - Everything else (DEFAULT to this if unsure)
+- "db_connection" - Database operations
+- "api_route" - API endpoint definitions
+- "orchestration" - Workflow/pipeline files
+- "cosmetic" - Supporting files (DEFAULT if unsure)
 """
 
 

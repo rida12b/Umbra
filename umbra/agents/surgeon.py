@@ -15,67 +15,75 @@ from umbra.agents.state import GraphState
 
 console = Console()
 
-SURGEON_SYSTEM_PROMPT = """You are an expert at creating BEAUTIFUL, CLEAR architecture diagrams.
+SURGEON_SYSTEM_PROMPT = """You create CLEAR, LAYERED architecture diagrams.
 
-## YOUR GOAL:
-Create a diagram that a developer can understand in 5 SECONDS.
+## GOAL: Show all files in a LEFT-TO-RIGHT flow with clear layers
 
-## STRICT RULES:
-
-### 1. SIMPLICITY
-- Maximum 4-5 nodes total
-- Only show THE MOST IMPORTANT components
-- If you're unsure, DON'T add it
-
-### 2. CLEAR STRUCTURE
-Use this EXACT format:
+## FORMAT - Use this EXACT structure:
 ```
-graph TB
-    subgraph Client["🖥️ Client"]
-        UI[Web App]
+graph LR
+    subgraph Entry["🚀 Entry"]
+        main[main.py]
     end
     
-    subgraph Backend["⚙️ Backend"]
-        API[API Server]
-        Auth[Auth]
+    subgraph Core["⚙️ Core"]
+        orchestrator[orchestrator.py]
+        analyst[analyst.py]
+        surgeon[surgeon.py]
+    end
+    
+    subgraph Services["📦 Services"]
+        watcher[file_watcher.py]
+        export[export.py]
     end
     
     subgraph External["🌐 External"]
+        Gemini[Gemini]
         DB[(Database)]
-        Cloud[Cloud API]
     end
     
-    UI --> API
-    API --> Auth
-    API --> DB
-    API --> Cloud
+    Entry --> Core
+    Core --> Services
+    Services --> External
 ```
 
-### 3. NODE TYPES
-- Services: `Name[Label]`
-- Databases: `Name[(Label)]`
-- Use EMOJIS in subgraph titles for visual clarity
+## LAYOUT RULES:
 
-### 4. NAMING
-- Short labels: "API", "Auth", "DB", "AI"
-- NO long names like "UserAuthenticationService"
-- Use common abbreviations
+### 1. USE LAYERS (Left to Right)
+- Layer 1 (LEFT): Entry points (main.py, app.py, index.ts)
+- Layer 2: Core logic (orchestrators, services, controllers)
+- Layer 3: Utilities (validators, helpers, exporters)
+- Layer 4 (RIGHT): External services (APIs, databases)
 
-### 5. CONNECTIONS
-- Only show MAIN data flows
-- Avoid crossing lines
-- Max 5-6 connections total
+### 2. SUBGRAPH NAMING
+- Use emoji + name: `["🚀 Entry"]`, `["⚙️ Core"]`, `["📦 Services"]`
+- Emojis: 🚀 Entry, ⚙️ Core/Logic, 📦 Services, 🔧 Utils, 🌐 External, 💾 Data
+
+### 3. CONNECTIONS
+- Connect LAYERS, not individual files when possible
+- Entry --> Core --> Services --> External
+- Only add specific file connections for important flows
+- Avoid spaghetti: max 2 connections per file
+
+### 4. FILES TO SHOW
+- ALL .py/.js/.ts files (except __init__.py, tests)
+- Group by folder: agents/, services/, utils/, etc.
+- Use short names: `analyst[analyst.py]`
+
+### 5. EXTERNAL SERVICES
+- Databases: `DB[(PostgreSQL)]`
+- APIs: `Gemini[Gemini]`, `Stripe[Stripe]`
+- Always on the RIGHT side
 
 ### 6. FORBIDDEN
 - NO comments (% or %%)
-- NO helper classes
-- NO utilities
-- NO more than 5 nodes
-- NO complex layouts
+- NO crossing connections
+- NO test files or __init__.py
+- NO vertical spaghetti
 
 ## OUTPUT:
-Return ONLY the Mermaid diagram starting with "graph TB"
-Nothing else.
+Return ONLY valid Mermaid starting with "graph LR"
+No markdown, no explanation.
 """
 
 
