@@ -472,6 +472,161 @@ HTML_TEMPLATE = '''<!DOCTYPE html>
             line-height: 1.4;
         }}
 
+        /* Diff Stats Badge */
+        .diff-stats {{
+            margin-left: auto;
+            display: flex;
+            gap: 0.5rem;
+            font-family: var(--mono);
+            font-size: 10px;
+        }}
+
+        .stat-add {{
+            color: var(--accent-emerald);
+            font-weight: 600;
+        }}
+
+        .stat-remove {{
+            color: var(--accent-rose);
+            font-weight: 600;
+        }}
+
+        /* Diff Toggle & Content */
+        .diff-toggle {{
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.375rem 0.75rem;
+            margin-left: 2rem;
+            font-size: 11px;
+            color: var(--text-muted);
+            cursor: pointer;
+            border-radius: var(--radius-sm);
+            transition: all 0.2s;
+        }}
+
+        .diff-toggle:hover {{
+            background: var(--bg-glass);
+            color: var(--text-secondary);
+        }}
+
+        .diff-toggle-icon {{
+            font-size: 8px;
+            transition: transform 0.2s;
+        }}
+
+        .diff-toggle.active .diff-toggle-icon {{
+            transform: rotate(90deg);
+        }}
+
+        .diff-content {{
+            margin-left: 2rem;
+            margin-top: 0.5rem;
+            padding: 0.75rem;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: var(--radius-md);
+            font-family: var(--mono);
+            font-size: 11px;
+            overflow-x: auto;
+            border: 1px solid var(--border-subtle);
+        }}
+
+        .diff-line {{
+            padding: 2px 8px;
+            white-space: pre;
+            border-radius: 2px;
+        }}
+
+        .diff-add {{
+            background: rgba(16, 185, 129, 0.15);
+            color: #4ade80;
+        }}
+
+        .diff-remove {{
+            background: rgba(244, 63, 94, 0.15);
+            color: #fb7185;
+        }}
+
+        .diff-context {{
+            color: var(--text-muted);
+        }}
+
+        .diff-header {{
+            color: var(--accent-purple);
+            font-weight: 500;
+            margin-top: 0.5rem;
+        }}
+
+        .diff-more {{
+            color: var(--text-muted);
+            font-style: italic;
+            padding-top: 0.5rem;
+        }}
+
+        /* Intent badges */
+        .intent-badge {{
+            font-size: 9px;
+            font-weight: 600;
+            text-transform: uppercase;
+            padding: 2px 6px;
+            border-radius: 4px;
+            letter-spacing: 0.5px;
+        }}
+
+        /* Warnings box */
+        .warnings-box {{
+            background: rgba(244, 63, 94, 0.1);
+            border: 1px solid rgba(244, 63, 94, 0.3);
+            border-radius: var(--radius-sm);
+            padding: 0.5rem 0.75rem;
+            margin-top: 0.25rem;
+        }}
+
+        .warning-item {{
+            color: var(--accent-rose);
+            font-size: 11px;
+            font-weight: 500;
+        }}
+
+        .activity-item.has-warning {{
+            border-color: rgba(244, 63, 94, 0.4);
+            background: rgba(244, 63, 94, 0.05);
+        }}
+
+        /* Impact box */
+        .impact-box {{
+            background: rgba(245, 158, 11, 0.08);
+            border: 1px solid rgba(245, 158, 11, 0.2);
+            border-radius: var(--radius-sm);
+            padding: 0.5rem 0.75rem;
+            margin-top: 0.25rem;
+        }}
+
+        .impact-header {{
+            color: var(--accent-amber);
+            font-size: 11px;
+            font-weight: 600;
+            margin-bottom: 0.25rem;
+        }}
+
+        .impact-item {{
+            font-size: 10px;
+            color: var(--text-secondary);
+            padding: 2px 0;
+        }}
+
+        .impact-file {{
+            color: var(--accent-amber);
+            font-family: var(--mono);
+        }}
+
+        .impact-more {{
+            color: var(--text-muted);
+            font-size: 10px;
+            font-style: italic;
+            margin-top: 0.25rem;
+        }}
+
         .activity-empty {{
             text-align: center;
             padding: 2rem 1rem;
@@ -1115,6 +1270,21 @@ HTML_TEMPLATE = '''<!DOCTYPE html>
             }});
         }});
 
+        // ===== DIFF TOGGLE =====
+        function toggleDiff(diffId) {{
+            const diffEl = document.getElementById(diffId);
+            const toggle = diffEl.previousElementSibling;
+            
+            if (diffEl.style.display === 'none') {{
+                diffEl.style.display = 'block';
+                toggle.classList.add('active');
+                diffEl.style.animation = 'fade-in 0.2s ease';
+            }} else {{
+                diffEl.style.display = 'none';
+                toggle.classList.remove('active');
+            }}
+        }}
+
         // ===== RESIZE =====
         function setupResize(handleId, targetId, dim, min, max) {{
             const h = document.getElementById(handleId);
@@ -1355,7 +1525,7 @@ def generate_issues_html(insights: list) -> str:
 
 
 def generate_recent_changes_html(changes: list) -> str:
-    """Generate HTML for recent changes with AI descriptions."""
+    """Generate HTML for recent changes with AI descriptions, diffs, and impact analysis."""
     if not changes:
         return '''
         <div class="activity-empty">
@@ -1371,12 +1541,18 @@ def generate_recent_changes_html(changes: list) -> str:
     </div>
     '''
     
-    for change in changes[:10]:
+    for idx, change in enumerate(changes[:15]):  # Show more changes
         time_str = change.get('time', '')
         file_name = change.get('file', 'unknown')
         change_type = change.get('type', 'modified')
         description = change.get('description', '')
+        diff_lines = change.get('diff_lines', [])
+        stats = change.get('stats', {"added": 0, "removed": 0})
+        impact = change.get('impact', [])
+        warnings = change.get('warnings', [])
+        intent = change.get('intent', '')
         
+        # Icon and class based on type
         icon_class = 'modified'
         icon = '✏️'
         if change_type == 'created':
@@ -1386,17 +1562,95 @@ def generate_recent_changes_html(changes: list) -> str:
             icon_class = 'deleted'
             icon = '🗑️'
         
+        # Intent badge
+        intent_html = ''
+        if intent:
+            intent_colors = {
+                'feature': 'var(--accent-emerald)',
+                'bugfix': 'var(--accent-amber)',
+                'refactor': 'var(--accent-blue)',
+                'cleanup': 'var(--text-muted)',
+                'breaking': 'var(--accent-rose)',
+            }
+            intent_color = intent_colors.get(intent, 'var(--text-muted)')
+            intent_html = f'<span class="intent-badge" style="background:{intent_color}20;color:{intent_color};border:1px solid {intent_color}40;">{intent}</span>'
+        
+        # Build stats badge
+        stats_html = ''
+        if stats.get('added', 0) > 0 or stats.get('removed', 0) > 0:
+            stats_html = f'''<span class="diff-stats">
+                <span class="stat-add">+{stats.get('added', 0)}</span>
+                <span class="stat-remove">-{stats.get('removed', 0)}</span>
+            </span>'''
+        
         # Build description HTML
         desc_html = f'<div class="activity-desc">{description}</div>' if description else ''
         
+        # Build warnings HTML
+        warnings_html = ''
+        if warnings:
+            warnings_content = ''.join([f'<div class="warning-item">⚠️ {w}</div>' for w in warnings])
+            warnings_html = f'<div class="warnings-box">{warnings_content}</div>'
+        
+        # Build impact HTML
+        impact_html = ''
+        if impact:
+            impact_items = ''.join([
+                f'<div class="impact-item"><span class="impact-file">{i.get("file", "?")}</span> - {i.get("desc", "affected")}</div>'
+                for i in impact[:5]
+            ])
+            more = f'<div class="impact-more">+{len(impact) - 5} more</div>' if len(impact) > 5 else ''
+            impact_html = f'''
+            <div class="impact-box">
+                <div class="impact-header">📍 Impact: {len(impact)} file(s) affected</div>
+                {impact_items}
+                {more}
+            </div>
+            '''
+        
+        # Build diff preview HTML (collapsible)
+        diff_html = ''
+        if diff_lines:
+            diff_id = f"diff-{idx}"
+            diff_content = ''
+            for d in diff_lines[:15]:  # Max 15 lines
+                line_type = d.get('type', 'context')
+                line_text = d.get('line', '').replace('<', '&lt;').replace('>', '&gt;')
+                
+                if line_type == 'add':
+                    diff_content += f'<div class="diff-line diff-add">+ {line_text}</div>'
+                elif line_type == 'remove':
+                    diff_content += f'<div class="diff-line diff-remove">- {line_text}</div>'
+                elif line_type == 'header':
+                    diff_content += f'<div class="diff-line diff-header">{line_text}</div>'
+                else:
+                    diff_content += f'<div class="diff-line diff-context">  {line_text}</div>'
+            
+            if len(diff_lines) > 15:
+                diff_content += f'<div class="diff-line diff-more">... +{len(diff_lines) - 15} more lines</div>'
+            
+            diff_html = f'''
+            <div class="diff-toggle" onclick="toggleDiff('{diff_id}')">
+                <span class="diff-toggle-icon">▶</span> View diff
+            </div>
+            <div class="diff-content" id="{diff_id}" style="display:none;">
+                {diff_content}
+            </div>
+            '''
+        
         html += f'''
-        <div class="activity-item">
+        <div class="activity-item {'has-warning' if warnings else ''}">
             <div class="activity-header">
                 <div class="activity-time">{time_str}</div>
                 <div class="activity-icon {icon_class}">{icon}</div>
                 <div class="activity-file">{file_name}</div>
+                {intent_html}
+                {stats_html}
             </div>
             {desc_html}
+            {warnings_html}
+            {impact_html}
+            {diff_html}
         </div>
         '''
     
@@ -1442,8 +1696,39 @@ def export_html(
         }
     
     metrics = analysis.get('metrics', {})
-    health = analysis.get('health', {})
-    insights = analysis.get('insights', [])
+    health_data = analysis.get('health', {})
+    
+    # Handle new health monitor format
+    if health_data and 'issues' in health_data:
+        # New format from HealthMonitor
+        health = {
+            'score': health_data.get('score', 0),
+            'grade': health_data.get('grade', '?'),
+            'status': f"Grade {health_data.get('grade', '?')} - {health_data.get('metrics', {}).get('total_issues', 0)} issues",
+        }
+        # Convert health issues to insights format (with proper object structure)
+        health_issues = []
+        for i in health_data.get('issues', []):
+            # Create a simple object with the expected attributes
+            class Issue:
+                def __init__(self, severity, message, file, suggestion):
+                    self.severity = severity
+                    self.title = f"[{i.get('type', '?')}] {message}"
+                    self.recommendation = suggestion or "Review manually"
+                    self.message = message
+                    self.file = file
+                    self.suggestion = suggestion
+            health_issues.append(Issue(
+                severity=i.get('severity', 'info'),
+                message=i.get('message', ''),
+                file=i.get('file', ''),
+                suggestion=i.get('suggestion', ''),
+            ))
+    else:
+        health = health_data if health_data else {'score': 0, 'grade': '?', 'status': 'Unknown'}
+        health_issues = []
+    
+    insights = analysis.get('insights', []) + health_issues
     largest_files = metrics.get('largest_files', [])
     recent_changes = analysis.get('recent_changes', [])
     

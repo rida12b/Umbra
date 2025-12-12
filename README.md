@@ -80,14 +80,17 @@ That's it! Open `output/LIVE_ARCHITECTURE.md` to see your architecture.
 
 | Feature | Description |
 |---------|-------------|
+| 🧠 **Knowledge Base** | `UMBRA_KNOWLEDGE.md` - Single file = Full project context for any LLM |
 | 🔍 **Smart Analysis** | AI understands semantic changes, not just syntax |
 | 📊 **Live Diagrams** | Mermaid.js diagrams update in real-time |
 | 💬 **Ask Umbra** | Chat with your codebase in natural language |
 | 🏥 **Health Score** | Get an A-F grade for your architecture |
 | ⚠️ **Auto Insights** | Detect god files, high coupling, issues |
+| 🔐 **Security Scan** | Auto-detect vulnerabilities (SQL injection, secrets, etc.) |
+| 📚 **Auto-Docs** | Generate module documentation automatically |
 | 🎨 **Modern Dashboard** | Beautiful glassmorphism UI with Bento grid |
 | 📝 **Auto Summary** | Natural language project description |
-| 🕐 **Recent Changes** | AI-powered descriptions of code changes |
+| 🕐 **Recent Changes** | AI-powered descriptions with detailed diffs |
 | 🔎 **Search (Ctrl+K)** | Command palette to search your codebase |
 | 📥 **SVG Export** | Download diagrams in vector format |
 | 🐍 **Python Support** | Full Python codebase analysis |
@@ -146,15 +149,25 @@ Plus a human-readable summary:
 
 | Command | Description |
 |---------|-------------|
-| `umbra watch .` | 🚀 **All-in-one**: Scan + Watch + Chat Server + Dashboard |
+| `umbra watch .` | 🚀 **All-in-one**: Scan + Docs + Security + Watch + Chat Server + Dashboard |
 | `umbra watch . --open` | Same as above, auto-opens dashboard in browser |
 | `umbra watch . --no-scan` | Skip initial scan, only watch for changes |
+| `umbra watch . --no-docs` | Skip module documentation generation |
+| `umbra watch . --no-security` | Skip security vulnerability scan |
 | `umbra ask` | 💬 Chat with your codebase (interactive) |
 | `umbra ask -q "How does auth work?"` | Ask a single question |
 | `umbra insights` | 🏥 Show health score & issues |
 | `umbra dashboard report.html` | 🎨 Export stunning HTML dashboard |
 | `umbra scan .` | One-time full scan (no watch) |
 | `umbra export report.html` | Simple HTML export |
+
+### Output Files
+
+| File | Purpose |
+|------|---------|
+| `output/LIVE_ARCHITECTURE.md` | Architecture diagram + recent changes |
+| `output/UMBRA_KNOWLEDGE.md` | **Full project brain** - Everything an LLM needs |
+| `output/dashboard.html` | Interactive visualization dashboard |
 
 ## 🛠️ Configuration
 
@@ -185,7 +198,7 @@ DEBOUNCE_SECONDS=2
 
 ## 🗺️ Roadmap
 
-### Current (v0.5)
+### Current (v0.6) - "Second Brain" Release
 - [x] Python support
 - [x] JavaScript/TypeScript support
 - [x] Project summaries
@@ -195,19 +208,28 @@ DEBOUNCE_SECONDS=2
 - [x] **Insights** - Automatic issue detection
 - [x] **Modern Dashboard** - Glassmorphism UI with Bento grid
 - [x] **Hybrid Mode** - Watch + Chat server + Auto-refresh
-- [x] **Recent Changes** - AI-powered change tracking
+- [x] **Recent Changes** - AI-powered change tracking with detailed diffs
 - [x] **Search (Ctrl+K)** - Command palette search
 - [x] **SVG Export** - Download diagrams
+- [x] **Knowledge Base** - `UMBRA_KNOWLEDGE.md` = Full project brain for LLMs
+- [x] **Auto-Documentation** - Module docs generated automatically
+- [x] **Security Scanner** - Detect vulnerabilities automatically
+- [x] **API Reference** - Auto-generated function/class reference
 
 ### Coming Soon
+- [ ] **Intent Detection** - Classify changes as Bug Fix / Feature / Refactor
+- [ ] **Session Timeline** - Chronological view of coding sessions
+- [ ] **Quality Monitoring** - Track code metrics over time
+- [ ] **Pattern Detection** - Detect AI assistant patterns
+- [ ] **Git Integration** - AI analysis alongside git diff
 - [ ] VS Code extension
 - [ ] CI/CD integration (generate on PR)
 - [ ] More languages (Go, Rust, Java)
 - [ ] Click on diagram nodes to view file
 
 ### Future Vision
-- [ ] **AI Code Analysis** - Find bugs and issues automatically
-- [ ] **Auto-Fix Suggestions** - AI-powered code corrections
+- [ ] **Rollback Warnings** - "This change broke X tests"
+- [ ] **Dependency Alerts** - "New dependency added"
 - [ ] **Team Collaboration** - Share architecture across team
 
 ## 🤝 Contributing

@@ -34,7 +34,6 @@ TEMPLATE = """# 🏗️ Live Architecture
 
 
 def writer_node(state: GraphState) -> GraphState:
-    print("lol")
     """
     Write the updated architecture to file.
 
