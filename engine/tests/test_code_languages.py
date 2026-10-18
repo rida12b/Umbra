@@ -149,3 +149,37 @@ def test_store_files_are_under_the_umbra_home(settings, make_repo):
     with Registry(settings) as registry:
         project, _ = registry.add(root)
     assert Path(settings.projects_dir / project.id / "store.sqlite").is_file()
+
+
+@pytest.mark.parametrize(
+    ("rel_path", "text", "expected"),
+    [
+        (
+            "A.cs",
+            '/*\nusing Fake;\n*/\nusing System;\nclass X { string s = @"\nusing Y;\n"; }\n',
+            [("System", 4, 4)],
+        ),
+        ("x.cpp", 'auto s = R"(\n#include "x.h"\n)";\n#include <vector>\n', [("vector", 4, 4)]),
+        ("m.kt", 'package p\nimport a.b.C\nval s = """\nimport x.y\n"""\n', [("a.b.C", 2, 2)]),
+        (
+            "r.rb",
+            '=begin\nrequire "fake"\n=end\nrequire "json"\nx = <<~T\nrequire "h"\nT\n',
+            [("json", 4, 4)],
+        ),
+        (
+            "app.ex",
+            "defmodule App do\n  alias Shop.{Order, User}\nend\n",
+            [("Shop.Order", 2, 2), ("Shop.User", 2, 2)],
+        ),
+        ("App.java", "import java.util.Map\n    .Entry;\nclass App {}\n", [("java.util.Map.Entry", 1, 2)]),
+    ],
+)
+def test_imports_inside_comments_or_strings_are_ignored_and_groups_expand(
+    make_repo, rel_path, text, expected
+):
+    imports = [
+        (c.object, c.line_start, c.line_end)
+        for c in analyze(make_repo, rel_path, text)
+        if c.relation == IMPORTS
+    ]
+    assert imports == expected

@@ -18,7 +18,7 @@ _PY_IMPORT = re.compile(r"^\s*import\s+(.+)$", re.DOTALL)
 _JAVA = re.compile(r"^\s*import\s+(?:static\s+)?(\w+(?:\.\w+)*(?:\.\*)?)\s*;?")
 _CSHARP = re.compile(r"^\s*(?:global\s+)?using\s+(?:static\s+)?(?:\w+\s*=\s*)?([\w.]+)\s*;")
 _RUST = re.compile(r"^\s*(?:pub(?:\([^)]*\))?\s+)?use\s+((?:::)?[\w]+(?:::[\w]+)*)")
-_ELIXIR = re.compile(r"^\s*(?:alias|import|use|require)\s+([A-Z][\w.]*)")
+_ELIXIR = re.compile(r"^\s*(?:alias|import|use|require)\s+([A-Z][\w.]*?)(?:\.\{([^}]*)\})?(?:\s|,|$)")
 _PHP = re.compile(r"^\s*use\s+(?:function\s+|const\s+)?\\?([\w\\]+)")
 _C_INCLUDE = re.compile(r"""^\s*#\s*include\s*[<"]([^>"]+)[>"]""")
 _RUBY = re.compile(r"""^\s*(?:require|require_relative|load)\s*\(?\s*["']([^"']+)["']""")
@@ -39,13 +39,13 @@ def _targets(language: str, statement: str) -> list[str]:
     if language == "go":
         return _QUOTED.findall(statement)
     if language in {"java", "kotlin", "scala"}:
-        return _first(_JAVA, statement)
+        return _first(_JAVA, re.sub(r"\s*\.\s*", ".", statement))
     if language == "csharp":
         return _first(_CSHARP, statement)
     if language == "rust":
         return _first(_RUST, statement)
     if language == "elixir":
-        return _first(_ELIXIR, statement)
+        return _elixir(statement)
     if language == "php":
         return _first(_PHP, statement)
     if language in {"c", "cpp"}:
@@ -64,6 +64,17 @@ def _python(statement: str) -> list[str]:
         return []
     names = plain.group(1).replace("(", " ").replace(")", " ").replace("\\", " ")
     return [part.split(" as ")[0].strip() for part in names.split(",") if part.strip()]
+
+
+def _elixir(statement: str) -> list[str]:
+    """`alias Shop.{Order, User}` names Shop.Order and Shop.User."""
+    match = _ELIXIR.match(statement)
+    if match is None:
+        return []
+    base, group = match.group(1), match.group(2)
+    if group is None:
+        return [base]
+    return [f"{base}.{name.strip()}" for name in group.split(",") if name.strip()]
 
 
 def _first(pattern: re.Pattern[str], statement: str) -> list[str]:

@@ -6,8 +6,7 @@
   definition they reach (ADR-0001).
 """
 
-import re
-from collections.abc import Iterable
+from collections.abc import Iterable, Iterator
 
 import tree_sitter as ts
 import tree_sitter_language_pack as tslp
@@ -24,15 +23,15 @@ DATA_LANGUAGES = {
 }  # fmt: skip
 # The upstream TypeScript tags query only adds TS-specific rules on top of the JavaScript one.
 INHERITED_TAGS = {"typescript": ("javascript",), "tsx": ("javascript",)}
-# Languages whose import statements tree-sitter-language-pack does not report: read line by line.
-LINE_IMPORTS = {
-    # `[ \t]*`, not `\s*`: a leading `\s*` would swallow blank lines and shift the cited line.
-    "csharp": re.compile(r"^[ \t]*(?:global[ \t]+)?using[ \t]+[^;(\n]+;", re.MULTILINE),
-    "c": re.compile(r"^[ \t]*#[ \t]*include[ \t]*[<\"][^>\"\n]+[>\"]", re.MULTILINE),
-    "cpp": re.compile(r"^[ \t]*#[ \t]*include[ \t]*[<\"][^>\"\n]+[>\"]", re.MULTILINE),
-    "ruby": re.compile(r"""^[ \t]*(?:require|require_relative|load)\b[^\n]*""", re.MULTILINE),
-    "kotlin": re.compile(r"^[ \t]*import[ \t]+[\w.*]+", re.MULTILINE),
+# Languages whose import statements tree-sitter-language-pack does not report: taken from the syntax
+# tree, so that an import inside a comment or a string is never mistaken for a real one.
+TREE_IMPORTS = {
+    "csharp": {"using_directive"},
+    "c": {"preproc_include"},
+    "cpp": {"preproc_include"},
+    "kotlin": {"import_header"},
 }
+RUBY_LOADERS = {"require", "require_relative", "load"}
 NOT_CALLS = {"elixir": {"def", "defp", "defmodule", "defmacro", "alias", "import", "use", "require"}}
 
 
@@ -59,29 +58,30 @@ class CodeAnalyzer:
                 Claim(file.rel_path, "module", DEFINES, d.key, d.kind, status, d.start + 1, d.end + 1)
                 for d in found
             ]
-        claims += self._imports(language, file, result.imports)
-        claims += self._calls(language, file, found if status is not None else [])
+        tree = tslp.get_parser(language).parse(file.text.encode("utf-8"))
+        claims += self._imports(language, tree, result.imports, file.rel_path)
+        claims += self._calls(language, tree, found if status is not None else [], file.rel_path)
         return claims
 
-    def _imports(self, language: str, file: GuardedFile, reported: list[tslp.ImportInfo]) -> list[Claim]:
-        statements = [(i.source, i.span.start_line, i.span.end_line) for i in reported if i.span is not None]
-        if language in LINE_IMPORTS:
-            text = file.text
+    def _imports(
+        self, language: str, tree: ts.Tree, reported: list[tslp.ImportInfo], path: str
+    ) -> list[Claim]:
+        if language in TREE_IMPORTS or language == "ruby":
+            statements = [(_text(n), *_rows(n)) for n in _import_nodes(tree.root_node, language)]
+        else:
             statements = [
-                (m.group(0), text.count("\n", 0, m.start()), text.count("\n", 0, m.end()))
-                for m in LINE_IMPORTS[language].finditer(text)
+                (i.source, i.span.start_line, i.span.end_line) for i in reported if i.span is not None
             ]
         return [
-            Claim(file.rel_path, "module", IMPORTS, target, "import", "fact", start + 1, end + 1)
+            Claim(path, "module", IMPORTS, target, "import", "fact", start + 1, end + 1)
             for statement, start, end in statements
             for target in import_targets(language, statement)
         ]
 
-    def _calls(self, language: str, file: GuardedFile, found: list[Definition]) -> list[Claim]:
+    def _calls(self, language: str, tree: ts.Tree, found: list[Definition], path: str) -> list[Claim]:
         query = self._query(language)
         if query is None:
             return []
-        tree = tslp.get_parser(language).parse(file.text.encode("utf-8"))
         ignored = NOT_CALLS.get(language, set())
         claims = []
         for _, captures in ts.QueryCursor(query).matches(tree.root_node):
@@ -93,7 +93,7 @@ class CodeAnalyzer:
                 continue
             start, end = calls[0].start_point[0], calls[0].end_point[0]
             caller = innermost(found, start)
-            subject, kind = (caller.key, caller.kind) if caller else (file.rel_path, "module")
+            subject, kind = (caller.key, caller.kind) if caller else (path, "module")
             claims.append(Claim(subject, kind, CALLS, callee, "symbol", "hypothesis", start + 1, end + 1))
         return claims
 
@@ -103,6 +103,33 @@ class CodeAnalyzer:
             source = "\n".join(part for part in parts if part)
             self._queries[language] = ts.Query(tslp.get_language(language), source) if source else None
         return self._queries[language]
+
+
+def _import_nodes(node: ts.Node, language: str) -> Iterator[ts.Node]:
+    if language == "ruby":
+        method = node.child_by_field_name("method") if node.type == "call" else None
+        if (
+            method is not None
+            and _text(method) in RUBY_LOADERS
+            and node.child_by_field_name("receiver") is None
+        ):
+            yield node
+            return
+    elif node.type in TREE_IMPORTS[language]:
+        yield node
+        return
+    for child in node.children:
+        yield from _import_nodes(child, language)
+
+
+def _text(node: ts.Node) -> str:
+    return (node.text or b"").decode("utf-8", errors="replace")
+
+
+def _rows(node: ts.Node) -> tuple[int, int]:
+    """First and last row holding the node's text (a trailing newline ends on the next row, column 0)."""
+    end_row, end_col = node.end_point
+    return node.start_point[0], end_row - 1 if end_col == 0 and end_row > node.start_point[0] else end_row
 
 
 def language_of(rel_path: str) -> str | None:
