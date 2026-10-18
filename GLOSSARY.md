@@ -5,8 +5,12 @@ Umbra lets an engineer understand an unknown software system visually, then foll
 ## Scope
 
 **Project**:
-One software system registered in Umbra, analysed and stored in isolation from every other Project.
-_Avoid_: Repo (a Project may span several), workspace, app
+One software system registered in Umbra from one folder, analysed and stored in isolation from every other Project.
+_Avoid_: Repo, workspace, app
+
+**Validation Corpus**:
+The fixed set of public repositories of different project types on which every V1 acceptance criterion is measured.
+_Avoid_: Test repos, benchmark, samples
 
 ## Zoom levels
 
@@ -27,7 +31,7 @@ A unit of responsibility inside the Architecture, with its own dependencies, inp
 _Avoid_: Service (unless it is deployed alone), block, package
 
 **Module**:
-One source file or script, with its precise role and its interactions with other Modules.
+One source file, with its precise role and its interactions with other Modules.
 _Avoid_: File (when talking about the concept), script
 
 **Function**:
@@ -37,26 +41,42 @@ _Avoid_: Method (when talking about the concept), routine
 ## Behaviour
 
 **Journey**:
-One operation followed end to end through the system, with its inputs, processing steps, outputs and branches. It starts from an Entry Point of any kind: HTTP request, CLI command, event, pipeline run, deployment. French: *Parcours*.
+One operation followed end to end through the system, from an Entry Point to its final outputs, with its inputs, processing steps and branches. French: *Parcours*.
 _Avoid_: Execution path, flow, action, use case
 
+**Complete Journey**:
+A Journey whose every step, from its Entry Point to each final output, is either resolved with evidence or explicitly labelled Hypothesis or Coverage Gap; nothing is silently missing.
+_Avoid_: Full path, finished flow
+
 **Entry Point**:
-The place where a Journey starts: a route, a command, a screen action, an event handler, an async job, a queue consumer, an AI agent tool, a game loop, a pipeline source or a deployment trigger.
+The place where a Journey starts: an HTTP route, a CLI command, a screen action, a pipeline run, a deployment, an event handler, an async job, a message-queue consumer, an AI agent tool or a game loop.
 _Avoid_: Trigger, handler, main
 
-## Knowledge status
+## Knowledge
+
+**Claim**:
+One statement Umbra holds about the system (for example "this route calls this Function"), with exactly one knowledge status, its Evidence and the Analyzer or model that produced it.
+_Avoid_: Statement, fact (lower case), edge, finding
+
+**Evidence**:
+What a Claim rests on: a source location for a Fact, the producer and its inputs for a Hypothesis, an execution artifact for an Observation.
+_Avoid_: Proof (unless it is an Observation), source
 
 **Fact**:
-A statement derived deterministically from the source code and traceable to an exact location in it.
+A Claim derived deterministically from the code or the configuration files and traceable to an exact location in them.
 _Avoid_: Truth, analysis result
 
 **Hypothesis**:
-A statement produced by an AI or inferred indirectly; plausible but not proven by the code alone.
+A Claim produced by an AI or inferred indirectly; plausible but not proven by the code alone.
 _Avoid_: Guess, AI insight
 
 **Observation**:
-A statement proven by real execution: a trace, a test run, a log or a metric.
+A Claim proven by real execution: a trace, a test run, a log or a metric.
 _Avoid_: Verified path, runtime fact
+
+**Declaration**:
+A Fact about what configuration says should exist (a service in a compose file, a Terraform resource); never proof that it runs or is deployed.
+_Avoid_: Deployed resource, running service
 
 **Human Override**:
 A manual correction made by a user (e.g. moving a Module to another Component). It wins for display, is versioned and reversible, and never hides a contradicting Fact. It is not a knowledge status.
@@ -65,3 +85,17 @@ _Avoid_: Decision (as a status), manual fact, user claim
 **Coverage Gap**:
 A part of the system that Umbra does not understand yet, shown explicitly instead of being hidden or guessed.
 _Avoid_: Unsupported file, unknown, ignored
+
+## Engine
+
+**Analyzer**:
+A pluggable unit that recognises one kind of content (a language, a framework, a configuration format, a runtime trace) and produces Claims from files the Secret Guard has released.
+_Avoid_: Parser, plugin, scanner
+
+**Secret Guard**:
+The single gate through which Umbra reads Project files: it excludes sensitive files and redacts secrets before any content is used.
+_Avoid_: Filter, sanitizer
+
+**Event Journal**:
+The persistent, append-only local record of what happened in a Project's development sessions (edits, prompts, Claude's final messages), replayable without loss of order.
+_Avoid_: Log, spool, history

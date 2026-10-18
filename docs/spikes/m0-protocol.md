@@ -13,7 +13,7 @@ Targets are **experimental objectives, not guarantees**. The map measured here i
 | T-visible | Edit → updated structural map available to a client | file mtime | client got SSE `map.updated` **and** fetched a map containing the change (content check) | < 5 s |
 | T-hook-cost | Cost of our hooks on Claude Code | — | A/B: `duration_ms − duration_api_ms` of the same `claude -p` task, hooks on vs off; plus the hook process wall time | < 50 ms per tool call |
 | T-reparse | Analyzer time for one changed file | analyzer start | claims written | < 1 s |
-| C-child | `claude -p --safe-mode` works on the Team subscription login on Windows, without triggering our hooks | — | result returned, 0 hook events tagged as child | pass/fail |
+| C-child | `claude -p --safe-mode` works on the user's subscription login on Windows, without triggering our hooks | — | result returned, 0 hook events tagged as child | pass/fail |
 
 All timestamps come from one clock (`time.time_ns()` on the same machine). p50, p95 and max are reported; p95 needs ≥ 20 samples per scenario.
 

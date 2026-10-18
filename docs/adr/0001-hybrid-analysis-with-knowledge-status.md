@@ -1,8 +1,8 @@
-# Hybrid analysis, every statement carries a knowledge status
+# Hybrid analysis, every Claim carries a knowledge status
 
 Status: accepted (2026-10-18)
 
-Umbra builds its picture of a system from two kinds of sources: deterministic analysis of the code and artifacts, and AI inference. Mixing them silently is what makes existing tools untrustworthy (Understand Anything lets the LLM emit final edges; Graphify files resolver output and LLM output under the same `INFERRED` tag). We decided that every statement Umbra shows carries exactly one status — **Fact**, **Hypothesis** or **Observation** — and the evidence behind it: a source span (file + line range) for a Fact, the producer (analyzer or model + version) and its inputs for a Hypothesis, and the execution artifact (trace, test run, log) for an Observation. A name-matched call that no resolver has confirmed is a Hypothesis, not a Fact.
+Umbra builds its picture of a system from two kinds of sources: deterministic analysis of the code and artifacts, and AI inference. When they are mixed silently, a reader cannot tell what is proven: in the versions we read on 2026-10-18, Understand Anything lets the LLM emit final edges, and Graphify files resolver output and LLM output under the same `INFERRED` tag. We decided that every Claim Umbra shows carries exactly one status — **Fact**, **Hypothesis** or **Observation** — and the evidence behind it: a source span (file + line range) for a Fact, the producer (analyzer or model + version) and its inputs for a Hypothesis, and the execution artifact (trace, test run, log) for an Observation. A name-matched call that no resolver has confirmed is a Hypothesis, not a Fact.
 
 ## Considered Options
 

@@ -2,7 +2,7 @@
 
 Status: accepted (2026-10-18)
 
-Umbra will later be embedded in a central dashboard that groups all of Rida's projects. So the engine runs as a single local daemon per machine and is reachable only through a versioned local API (REST `/v1` + SSE event stream, FastAPI). The Umbra UI, the MCP server used by Claude Code and the future dashboard are three clients of that same API; none reads the store directly. Each Project has its own SQLite store outside the repo (`~/.umbra/projects/<id>/`), listed in a registry, so Projects stay isolated. The API binds to 127.0.0.1 and requires a local token, because any web page in the browser can otherwise call localhost.
+Umbra will later be embedded in a central dashboard that groups all of the author's projects. So the engine runs as a single local daemon per machine and is reachable only through a versioned local API (REST `/v1` + SSE event stream, FastAPI). The Umbra UI, the MCP server used by Claude Code and the future dashboard are three clients of that same API; none reads the store directly. Each Project has its own SQLite store outside the repo (`~/.umbra/projects/<id>/`), listed in a registry, so Projects stay isolated. The API binds to 127.0.0.1 and requires a local token, because any web page in the browser can otherwise call localhost.
 
 ## Considered Options
 
