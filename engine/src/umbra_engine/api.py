@@ -11,6 +11,7 @@ from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from pydantic import BaseModel
 
 from umbra_engine import __version__
+from umbra_engine.indexer import IndexSummary, index_project
 from umbra_engine.registry import Project, ProjectIdCollisionError, ProjectPathError, Registry
 from umbra_engine.settings import LOOPBACK_HOSTS, Settings, load_or_create_token
 
@@ -73,11 +74,20 @@ def create_app(settings: Settings) -> FastAPI:
     def list_projects() -> list[ProjectOut]:
         return [ProjectOut.of(project) for project in registry.list()]
 
-    @app.get("/v1/projects/{project_id}", dependencies=authorized)
-    def get_project(project_id: str) -> ProjectOut:
+    def known_project(project_id: str) -> Project:
         project = registry.get(project_id)
         if project is None:
             raise HTTPException(status.HTTP_404_NOT_FOUND, f"unknown project: {project_id}")
-        return ProjectOut.of(project)
+        return project
+
+    @app.get("/v1/projects/{project_id}", dependencies=authorized)
+    def get_project(project_id: str) -> ProjectOut:
+        return ProjectOut.of(known_project(project_id))
+
+    @app.post("/v1/projects/{project_id}/index", dependencies=authorized)
+    def index(project_id: str) -> IndexSummary:
+        project = known_project(project_id)
+        with registry.open_store(project) as store:
+            return index_project(project, store)
 
     return app

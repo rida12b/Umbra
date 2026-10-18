@@ -109,6 +109,9 @@ class Registry:
         rows = self._db.execute("SELECT id, root, name, created_at FROM projects ORDER BY created_at, id")
         return [_to_project(row) for row in rows]
 
+    def open_store(self, project: Project) -> ProjectStore:
+        return ProjectStore.open(self._settings.projects_dir / project.id)
+
     def close(self) -> None:
         self._db.close()
 

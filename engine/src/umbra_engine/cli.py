@@ -18,6 +18,8 @@ def main(argv: list[str] | None = None) -> int:
     add = commands.add_parser("add", help="register a folder as a Project")
     add.add_argument("path")
     commands.add_parser("list", help="list registered Projects")
+    index = commands.add_parser("index", help="index a registered Project (id or path)")
+    index.add_argument("project")
     commands.add_parser("serve", help=f"run the local API on {API_HOST}")
     commands.add_parser("token", help="print the local API token")
     args = parser.parse_args(argv)
@@ -33,6 +35,8 @@ def _run(args: argparse.Namespace) -> int:
     settings = Settings.from_env()
     if args.command == "add":
         return _add(settings, args.path)
+    if args.command == "index":
+        return _index(settings, args.project)
     if args.command == "list":
         with Registry(settings) as registry:
             for project in registry.list():
@@ -60,6 +64,26 @@ def _add(settings: Settings, path: str) -> int:
         print(f"umbra-engine: {error}", file=sys.stderr)
         return 2
     print(f"{'added' if created else 'already registered'}: {project.id}\t{project.root}")
+    return 0
+
+
+def _index(settings: Settings, project_ref: str) -> int:
+    from umbra_engine.indexer import index_project
+
+    with Registry(settings) as registry:
+        project = registry.get(project_ref)
+        if project is None:
+            try:
+                project, _ = registry.add(project_ref)
+            except ProjectPathError as error:
+                print(f"umbra-engine: unknown project or path: {project_ref} ({error})", file=sys.stderr)
+                return 2
+        with registry.open_store(project) as store:
+            summary = index_project(project, store)
+    print(
+        f"indexed {project.id}: {summary.files} files, {summary.readable} readable "
+        f"({summary.redacted_secrets} secrets redacted), skipped {summary.skipped}"
+    )
     return 0
 
 
