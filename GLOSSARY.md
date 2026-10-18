@@ -44,8 +44,12 @@ _Avoid_: Method (when talking about the concept), routine
 One operation followed end to end through the system, from an Entry Point to its final outputs, with its inputs, processing steps and branches. French: *Parcours*.
 _Avoid_: Execution path, flow, action, use case
 
+**Essential Transition**:
+A step of a Journey without which it cannot go from its Entry Point to a final output (a call on the main path, a write to a data store, a call to another service).
+_Avoid_: Key step, main hop
+
 **Complete Journey**:
-A Journey whose every step, from its Entry Point to each final output, is either resolved with Evidence or explicitly labelled Hypothesis or Coverage Gap; nothing is silently missing.
+A Journey whose Entry Point, final outputs and every Essential Transition are backed by Facts or Observations. One Hypothesis or Coverage Gap on an Essential Transition makes it incomplete, and that uncertainty is shown.
 _Avoid_: Full path, finished flow
 
 **Entry Point**:

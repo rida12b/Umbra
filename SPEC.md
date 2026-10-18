@@ -61,7 +61,7 @@ Success conditions (all must hold):
 - **Trigger**: the user picks a Journey from the list (named by behaviour, e.g. "Login").
 - **Steps**: start at an Entry Point → follow calls → show inputs, processing, outputs and condition branches (`if`/`try`/`match`/early `return`) → mark each step Fact / Hypothesis / Observation → show alternative paths (error, empty result, missing rights) when the code has them.
 - **Done when**:
-  - ≥ 1 Complete Journey per Validation Corpus Project, checked by a reviewer other than its producer (an independent agent, then the author) against the code with a checklist: Entry Point exists, every step has Evidence or a label, every final output is reached, every branch in the code is listed, and at least half of the steps are Facts or Observations.
+  - ≥ 1 Complete Journey per Validation Corpus Project, checked by a reviewer other than its producer (an independent agent, then the author) against the code with a checklist: the Entry Point, each final output and every Essential Transition are Facts or Observations whose Evidence the reviewer confirms in the code; every other step has Evidence or a visible label; every branch in the code is listed. A Journey with any uncertain Essential Transition is shown as incomplete, with the uncertain transition highlighted, and does not count.
   - On ≥ 2 Validation Corpus Projects, Journey steps are confirmed as Observations by running the Project's tests with tracing.
   - Projects needing external keys are analysed statically only and say so.
   - Unresolved hops (queues, dependency injection, dynamic dispatch) appear as Hypothesis or Coverage Gap, never as Facts.
