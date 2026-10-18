@@ -38,7 +38,7 @@ def index_project(
             entries.append(FileEntry(result.rel_path, "skipped", result.reason, result.detail))
             continue
         redacted += len(result.redacted)
-        used, failures = [], []
+        used, failures, notes = [], [], []
         for analyzer in (a for a in analyzers if a.accepts(result)):
             try:
                 produced = [(result.rel_path, claim, analyzer.producer) for claim in analyzer.analyze(result)]
@@ -47,8 +47,9 @@ def index_project(
                 continue
             claims += produced
             used.append(analyzer.producer)
+            notes += analyzer.limits(result)
         entries.append(
-            FileEntry(result.rel_path, "readable", detail="; ".join(failures), analyzers=",".join(used))
+            FileEntry(result.rel_path, "readable", "", "; ".join(failures), ",".join(used), "; ".join(notes))
         )
 
     meta = {

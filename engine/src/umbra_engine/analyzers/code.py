@@ -12,7 +12,7 @@ import tree_sitter as ts
 import tree_sitter_language_pack as tslp
 
 from umbra_engine.analyzers.definitions import Definition, definition_status, definitions, innermost
-from umbra_engine.analyzers.imports import import_targets
+from umbra_engine.analyzers.imports import has_import_rule, import_targets
 from umbra_engine.claims import CALLS, DEFINES, IMPORTS, Claim
 from umbra_engine.guard import GuardedFile
 
@@ -62,6 +62,22 @@ class CodeAnalyzer:
         claims += self._imports(language, tree, result.imports, file.rel_path)
         claims += self._calls(language, tree, found if status is not None else [], file.rel_path)
         return claims
+
+    def limits(self, file: GuardedFile) -> list[str]:
+        language = language_of(file.rel_path)
+        if language is None:
+            return []
+        notes = []
+        status = definition_status(language)
+        if status is None:
+            notes.append(f"definitions not extracted for {language}")
+        elif status == "hypothesis":
+            notes.append(f"definitions unverified for {language} (Hypotheses)")
+        if not has_import_rule(language):
+            notes.append(f"imports not extracted for {language}")
+        if self._query(language) is None:
+            notes.append(f"calls not extracted for {language}")
+        return notes
 
     def _imports(
         self, language: str, tree: ts.Tree, reported: list[tslp.ImportInfo], path: str

@@ -21,6 +21,10 @@ class Analyzer(Protocol):
 
     def analyze(self, file: GuardedFile) -> Iterable[Claim]: ...
 
+    def limits(self, file: GuardedFile) -> list[str]:
+        """What this Analyzer cannot extract from this file (shown as partial coverage, never hidden)."""
+        ...
+
 
 def default_analyzers() -> list[Analyzer]:
     from umbra_engine.analyzers.code import CodeAnalyzer

@@ -12,6 +12,8 @@ from pydantic import BaseModel
 
 from umbra_engine import __version__
 from umbra_engine.claims import Relation, Status, StoredClaim
+from umbra_engine.coverage import CoverageReport, coverage_report
+from umbra_engine.coverage import State as CoverageState
 from umbra_engine.indexer import IndexSummary, index_project
 from umbra_engine.registry import Project, ProjectIdCollisionError, ProjectPathError, Registry
 from umbra_engine.settings import LOOPBACK_HOSTS, Settings, load_or_create_token
@@ -103,6 +105,11 @@ def create_app(settings: Settings) -> FastAPI:
         with registry.open_store(known_project(project_id)) as store:
             response.headers["X-Total-Count"] = str(store.count_claims_matching(**filters))
             return store.claims(limit, offset, **filters)
+
+    @app.get("/v1/projects/{project_id}/coverage", dependencies=authorized)
+    def coverage(project_id: str, state: CoverageState | None = None) -> CoverageReport:
+        with registry.open_store(known_project(project_id)) as store:
+            return coverage_report(store.files(), only=state)
 
     @app.post("/v1/projects/{project_id}/index", dependencies=authorized)
     def index(project_id: str) -> IndexSummary:

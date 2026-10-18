@@ -97,6 +97,9 @@ class _Broken:
     def analyze(self, file: GuardedFile) -> list:
         raise RuntimeError("grammar unavailable")
 
+    def limits(self, file: GuardedFile) -> list[str]:
+        return []
+
 
 def test_a_failing_analyzer_is_recorded_and_does_not_stop_the_index(settings, make_repo):
     root = write_repo(make_repo("broken"), {"a.py": "def f():\n    pass\n"}, git=False)
