@@ -23,3 +23,16 @@ def head_commit(root: Path) -> str | None:
         return None
     commit = redact_output(result.stdout.strip(), "git rev-parse")
     return commit if result.returncode == 0 and _COMMIT.match(commit) else None
+
+
+def has_uncommitted_changes(root: Path) -> bool | None:
+    """True when the working tree differs from HEAD, untracked files included."""
+    try:
+        result = subprocess.run(
+            ["git", "-C", str(root), "status", "--porcelain"],
+            capture_output=True,
+            timeout=GIT_TIMEOUT_S,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    return bool(result.stdout.strip()) if result.returncode == 0 else None

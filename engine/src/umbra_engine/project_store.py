@@ -9,7 +9,7 @@ from umbra_engine import sqlite_db
 from umbra_engine.claims import Claim, StoredClaim
 
 STORE_FILE = "store.sqlite"
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS meta (
     key TEXT PRIMARY KEY,
@@ -38,6 +38,7 @@ CREATE TABLE IF NOT EXISTS claims (
 );
 CREATE INDEX IF NOT EXISTS claims_by_file ON claims(file);
 CREATE INDEX IF NOT EXISTS claims_by_subject ON claims(subject);
+CREATE INDEX IF NOT EXISTS claims_by_object ON claims(object);
 """
 CLAIM_FIELDS = (
     "file", "subject", "subject_kind", "relation", "object", "object_kind", "status",
@@ -45,7 +46,7 @@ CLAIM_FIELDS = (
 )  # fmt: skip
 CLAIM_COLUMNS = ", ".join(("id", *CLAIM_FIELDS))
 INSERT_CLAIM = f"INSERT INTO claims({', '.join(CLAIM_FIELDS)}) VALUES ({', '.join('?' * len(CLAIM_FIELDS))})"
-CLAIM_FILTERS = ("file", "subject", "relation", "status")
+CLAIM_FILTERS = ("file", "subject", "object", "relation", "status")
 
 
 @dataclass(frozen=True)
@@ -61,6 +62,7 @@ class ProjectStore:
     def __init__(self, path: Path, *, create: bool = False) -> None:
         self.path = path
         self._db = sqlite_db.connect(path, SCHEMA)
+        self._migrate()
         if create:
             self._db.execute(
                 "INSERT OR IGNORE INTO meta(key, value) VALUES ('schema_version', ?)", (str(SCHEMA_VERSION),)
@@ -122,10 +124,7 @@ class ProjectStore:
 
     def claims(self, limit: int = 1000, offset: int = 0, **filters: str | None) -> list[StoredClaim]:
         """Claims matching every given filter (`file`, `subject`, `relation`, `status`), in id order."""
-        active = {key: value for key, value in filters.items() if value is not None}
-        unknown = set(active) - set(CLAIM_FILTERS)
-        if unknown:
-            raise ValueError(f"unknown claim filters: {sorted(unknown)}")
+        active = self._filters(filters)
         where = " AND ".join(f"{key} = ?" for key in active) or "1 = 1"
         rows = self._db.execute(
             f"SELECT {CLAIM_COLUMNS} FROM claims WHERE {where} ORDER BY id LIMIT ? OFFSET ?",
@@ -133,11 +132,47 @@ class ProjectStore:
         )
         return [StoredClaim(*row) for row in rows]
 
+    def claim_ids(self, **filters: str | None) -> list[int]:
+        active = self._filters(filters)
+        where = " AND ".join(f"{key} = ?" for key in active) or "1 = 1"
+        return [
+            row[0] for row in self._db.execute(f"SELECT id FROM claims WHERE {where}", tuple(active.values()))
+        ]
+
+    def claims_by_id(self, ids: list[int]) -> list[StoredClaim]:
+        rows = [
+            self._db.execute(f"SELECT {CLAIM_COLUMNS} FROM claims WHERE id = ?", (i,)).fetchone() for i in ids
+        ]
+        return [StoredClaim(*row) for row in rows if row]
+
+    def count_claims_matching(self, **filters: str | None) -> int:
+        active = self._filters(filters)
+        where = " AND ".join(f"{key} = ?" for key in active) or "1 = 1"
+        return self._db.execute(
+            f"SELECT COUNT(*) FROM claims WHERE {where}", tuple(active.values())
+        ).fetchone()[0]
+
     def count_claims(self) -> dict[str, int]:
         return dict(self._db.execute("SELECT status, COUNT(*) FROM claims GROUP BY status").fetchall())
 
     def meta(self) -> dict[str, str]:
         return dict(self._db.execute("SELECT key, value FROM meta").fetchall())
+
+    @staticmethod
+    def _filters(filters: dict[str, str | None]) -> dict[str, str]:
+        active = {key: value for key, value in filters.items() if value is not None}
+        unknown = set(active) - set(CLAIM_FILTERS)
+        if unknown:
+            raise ValueError(f"unknown claim filters: {sorted(unknown)}")
+        return active
+
+    def _migrate(self) -> None:
+        """Stores created before schema 2 lack `files.analyzers`; add it and record the version."""
+        columns = {row[1] for row in self._db.execute("PRAGMA table_info(files)")}
+        if "analyzers" not in columns:
+            self._db.execute("ALTER TABLE files ADD COLUMN analyzers TEXT NOT NULL DEFAULT ''")
+        if self._db.execute("SELECT 1 FROM meta WHERE key = 'schema_version'").fetchone():
+            self._db.execute("UPDATE meta SET value = ? WHERE key = 'schema_version'", (str(SCHEMA_VERSION),))
 
     @contextmanager
     def _transaction(self) -> Iterator[None]:

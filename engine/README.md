@@ -30,6 +30,25 @@ Every `/v1/projects` endpoint needs the token, as `Authorization: Bearer <token>
 Invoke-RestMethod -Headers @{ Authorization = "Bearer $(umbra-engine token)" } http://127.0.0.1:7811/v1/projects
 ```
 
+## What indexing gives you
+
+`umbra-engine index <id|path>` passes every file through the Secret Guard, then through the Analyzers, and stores Claims:
+
+| Relation | Status | Example |
+|---|---|---|
+| `defines` | Fact (Python, JS/TS, Go, Java, C#, Elixir), Hypothesis (other languages) | `app/api.py` defines `app/api.py::login` at lines 24-42 |
+| `imports` | Fact | `web/auth.ts` imports `@tanstack/react-query` |
+| `calls` | Hypothesis (names are matched, not resolved) | `app/api.py::login` calls `create_session` |
+
+C, C++ and Kotlin definitions are not extracted yet (the parser gets them wrong); their imports are. Every Claim keeps its file, line range, producer and, when the working tree is clean, the git commit.
+
+```powershell
+umbra-engine verify-facts <id> --sample 30   # re-read the cited lines and check each Fact
+Invoke-RestMethod -Headers @{ Authorization = "Bearer $(umbra-engine token)" } "http://127.0.0.1:7811/v1/projects/<id>/claims?relation=defines&status=fact"
+```
+
+**Network note:** the first time a language is indexed, tree-sitter-language-pack downloads that language's grammar (a compiled parser) into its cache. Only the grammar is fetched; no code, path or Claim leaves the machine.
+
 ## Where data lives
 
 - `%USERPROFILE%\.umbra\registry.sqlite` — registered Projects.

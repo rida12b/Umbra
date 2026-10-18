@@ -4,7 +4,8 @@ from dataclasses import dataclass
 from typing import Literal
 
 Status = Literal["fact", "hypothesis", "observation"]
-Kind = Literal["module", "function", "class", "method", "symbol", "import"]
+Kind = Literal["module", "function", "class", "method", "type", "namespace", "symbol", "import"]
+Relation = Literal["defines", "imports", "calls"]
 
 DEFINES = "defines"
 IMPORTS = "imports"
