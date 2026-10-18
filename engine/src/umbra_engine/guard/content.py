@@ -147,7 +147,7 @@ def redact(text: str, findings: list[Finding]) -> str:
 
 @cache
 def default_rules() -> RuleSet:
-    package = resources.files(__package__)
+    package = resources.files("umbra_engine.guard")
     gitleaks, umbra = (tomllib.loads(package.joinpath(f).read_text(encoding="utf-8")) for f in RULES_FILES)
     rules = tuple(_rule(entry) for entry in [*gitleaks["rules"], *umbra["rules"]])
     # gitleaks' global path allowlist skips whole files (lock files, vendor/, images) to cut CI noise.
