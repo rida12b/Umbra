@@ -26,6 +26,8 @@
 
 ---
 
+> **System Explorer (V1) is being built** next to this v0.7 tool. Scope: [`SPEC.md`](SPEC.md). Engine install on Windows: [`engine/README.md`](engine/README.md). v0.7 below stays unchanged until V1 is validated.
+
 ## 😰 The Problem
 
 You're using **Cursor**, **Copilot**, or **ChatGPT** to write code faster than ever. But there's a catch:
