@@ -9,7 +9,7 @@ One software system registered in Umbra from one folder, analysed and stored in 
 _Avoid_: Repo, workspace, app
 
 **Validation Corpus**:
-The fixed set of public repositories of different project types on which every V1 acceptance criterion is measured.
+The fixed set of repositories of different project types (public ones, plus one of the author's own followed live) on which every V1 acceptance criterion is measured.
 _Avoid_: Test repos, benchmark, samples
 
 ## Zoom levels
@@ -45,18 +45,18 @@ One operation followed end to end through the system, from an Entry Point to its
 _Avoid_: Execution path, flow, action, use case
 
 **Complete Journey**:
-A Journey whose every step, from its Entry Point to each final output, is either resolved with evidence or explicitly labelled Hypothesis or Coverage Gap; nothing is silently missing.
+A Journey whose every step, from its Entry Point to each final output, is either resolved with Evidence or explicitly labelled Hypothesis or Coverage Gap; nothing is silently missing.
 _Avoid_: Full path, finished flow
 
 **Entry Point**:
-The place where a Journey starts: an HTTP route, a CLI command, a screen action, a pipeline run, a deployment, an event handler, an async job, a message-queue consumer, an AI agent tool or a game loop.
+The place where a Journey starts: an HTTP route, a CLI command, a screen action, a pipeline run, a deployment, an event, an async job, a message queue, an AI agent tool or a game loop.
 _Avoid_: Trigger, handler, main
 
 ## Knowledge
 
 **Claim**:
-One statement Umbra holds about the system (for example "this route calls this Function"), with exactly one knowledge status, its Evidence and the Analyzer or model that produced it.
-_Avoid_: Statement, fact (lower case), edge, finding
+One assertion Umbra holds about the system (for example "this route calls this Function"), with exactly one knowledge status, its Evidence and the Analyzer or model that produced it.
+_Avoid_: Statement, edge, finding
 
 **Evidence**:
 What a Claim rests on: a source location for a Fact, the producer and its inputs for a Hypothesis, an execution artifact for an Observation.
@@ -97,5 +97,5 @@ The single gate through which Umbra reads Project files: it excludes sensitive f
 _Avoid_: Filter, sanitizer
 
 **Event Journal**:
-The persistent, append-only local record of what happened in a Project's development sessions (edits, prompts, Claude's final messages), replayable without loss of order.
+The persistent, append-only local record of what happened in a Project's development sessions (edits, prompts, Claude's final messages), replayed in order to rebuild state.
 _Avoid_: Log, spool, history

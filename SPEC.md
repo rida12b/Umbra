@@ -15,7 +15,7 @@ Understand any software system by its behaviour, Journeys and Components, then f
 Success conditions (all must hold):
 - Navigation from Application to Function on every Validation Corpus Project, nothing permanently hidden.
 - Every Claim carries its status and Evidence (ADR-0001).
-- At least one complete Journey per corpus Project.
+- At least one Complete Journey per Validation Corpus Project.
 - Claude Code edits appear on the structural map without the user asking, with their attribution.
 - The engine, the map and the sync work with zero LLM calls.
 - No code or data leaves the machine except through Claude Code on the user's own subscription, with secrets excluded.
@@ -26,31 +26,31 @@ Success conditions (all must hold):
 - **Claim Store**: one SQLite store per Project in `~/.umbra/projects/<id>/`. A Claim = subject → relation → object + status + Evidence + producer@version + git commit. Views, Journeys and history are computed from Claims.
 - **Secret Guard**: the only way the engine reads Project files (ADR-0004). Analyzers receive guarded content, never paths to open.
 - **Declarations**: configuration (compose, k8s, Terraform, manifests) produces Declarations — Facts about what is declared. A Declaration is never shown as proof that something runs or is deployed; only an Observation can say that.
-- **Analyzers** (pluggable, contract `detect(project) → bool`, `analyze(files) → claims`): language (tree-sitter tags queries), framework (ast-grep rules), artifacts (compose, k8s, Terraform, manifests, OpenAPI), runtime (test runs with tracing → Observations).
+- **Analyzers** (pluggable; contract: `accepts(guarded file) → bool`, `analyze(guarded files) → Claims` — they receive content released by the Secret Guard, never paths): language (tree-sitter tags queries), framework (ast-grep rules), artifacts (compose, k8s, Terraform, manifests, OpenAPI), runtime (test runs with tracing → Observations).
 - **Projection**: five Zoom Levels; Components with stable IDs, formed from facts first (deployable units → packages/manifests → directories), clustering only for flat code, named by the LLM (Hypothesis); ~12 elements per view as a UX preference; Human Overrides on top.
 - **Journey engine**: from Entry Points, follow calls and branches; named by behaviour.
-- **Sync**: file watcher = detection; Claude Code hooks = attribution (session, prompt, Claude's final message) through a persistent local event journal; incremental reanalysis of changed files only.
+- **Sync**: file watcher = detection; Claude Code hooks = attribution (session, prompt, Claude's final message) through a persistent local Event Journal; incremental reanalysis of changed files only.
 - **LLM enrichment**: batched, budget per Project, through the user's official `claude` CLI (`-p --safe-mode`, conditions in ADR-0003) or an interactive Claude Code session. Never blocks Facts.
 - **UI**: React component library + thin standalone app (embeddable or iframe).
 - **Code layout**: new engine built next to the v0.7 package; v0.7 removed in a separate PR after V1 validation.
 
 ## Scenarios (= implementation order)
 
-### S1 — Index a Project and expose its claims
+### S1 — Index a Project and expose its Claims
 - **Trigger**: the user registers a folder (`umbra add <path>`) or the API receives `POST /v1/projects`.
-- **Steps**: detect languages and artifacts → run every matching analyzer → write claims with status, evidence and commit → list Coverage Gaps.
+- **Steps**: detect languages and artifacts → run every matching Analyzer → write Claims with status, Evidence and commit → list Coverage Gaps.
 - **Done when**:
-  - 100 % of tracked files are either covered by an analyzer or listed as a Coverage Gap with a reason.
-  - 30 Facts sampled at random per corpus Project point to the right file and line range (100 %).
+  - 100 % of tracked files are either covered by an Analyzer or listed as a Coverage Gap with a reason.
+  - 30 Facts sampled at random per Validation Corpus Project point to the right file and line range (100 %).
   - Secrets and sensitive files (`.env*`, keys, certificates, gitleaks patterns, `.umbraignore`) are never stored as content and never sent to an LLM; a test fixture with planted secrets proves it.
   - Initial index of a ≤ 80k-LOC Project < 2 min without LLM, on the reference machine described in the validation report (Windows 11 laptop, CPU and RAM recorded).
 - **Out of scope**: names and summaries (S4), Journeys (S3).
 
 ### S2 — Navigate from Application to Function
 - **Trigger**: the user opens a Project in the UI (or a client calls the view endpoints).
-- **Steps**: Application → Architecture → Component → Module → Function; each element shows status, evidence link, Coverage Gaps; the user can apply Human Overrides (move, rename, merge, split), see their history and revert them.
+- **Steps**: Application → Architecture → Component → Module → Function; each element shows status, Evidence link, Coverage Gaps; the user can apply Human Overrides (move, rename, merge, split), see their history and revert them.
 - **Done when**:
-  - All five levels are reachable on every corpus Project; no element is unreachable.
+  - All five levels are reachable on every Validation Corpus Project; no element is unreachable.
   - ≥ 90 % of real deployable parts (checked against compose/k8s/Terraform/README) appear at Architecture level.
   - A Human Override wins for display, survives reindexing, is reversible, and a contradicting Fact is shown next to it with a conflict flag.
   - Editing one file never changes the Component of an unrelated Module (stable IDs, tested).
@@ -61,11 +61,11 @@ Success conditions (all must hold):
 - **Trigger**: the user picks a Journey from the list (named by behaviour, e.g. "Login").
 - **Steps**: start at an Entry Point → follow calls → show inputs, processing, outputs and condition branches (`if`/`try`/`match`/early `return`) → mark each step Fact / Hypothesis / Observation → show alternative paths (error, empty result, missing rights) when the code has them.
 - **Done when**:
-  - ≥ 1 Complete Journey per corpus Project, checked by a reviewer other than its producer (an independent agent, then the author) against the code with a checklist: Entry Point exists, every step has Evidence or a label, every final output is reached, every branch in the code is listed.
-  - On ≥ 2 corpus Projects, Journey steps are confirmed as Observations by running the Project's tests with tracing.
+  - ≥ 1 Complete Journey per Validation Corpus Project, checked by a reviewer other than its producer (an independent agent, then the author) against the code with a checklist: Entry Point exists, every step has Evidence or a label, every final output is reached, every branch in the code is listed, and at least half of the steps are Facts or Observations.
+  - On ≥ 2 Validation Corpus Projects, Journey steps are confirmed as Observations by running the Project's tests with tracing.
   - Projects needing external keys are analysed statically only and say so.
   - Unresolved hops (queues, dependency injection, dynamic dispatch) appear as Hypothesis or Coverage Gap, never as Facts.
-- **Entry Point kinds**: the model defines HTTP route, CLI command, screen action, pipeline run, deployment, event, async job, message queue, AI agent tool and game loop/event. V1 analyzes the first five in depth (FastAPI / Express / Next.js, click / typer / argparse, React / React Native, dbt, Terraform / k8s); the others are recognized where possible and shown as Hypothesis or Coverage Gap. Each kind keeps its own shape (a pipeline is a DAG, a deployment is a resource graph), never forced into a request/response.
+- **Entry Point kinds**: the model defines HTTP route, CLI command, screen action, pipeline run, deployment, event, async job, message queue, AI agent tool and game loop. V1 analyzes the first five in depth (FastAPI / Express / Next.js, click / typer / argparse, React / React Native, dbt, Terraform / k8s); the others are recognized where possible and shown as Hypothesis or Coverage Gap. Each kind keeps its own shape (a pipeline is a DAG, a deployment is a resource graph), never forced into a request/response.
 - **Branch analysis**: Python and TS/JS in V1; other languages follow calls without branches, marked as Coverage Gap.
 - **Honesty rule**: a Journey is never invented to meet a criterion. Unresolved parts are Hypothesis or Coverage Gap, and an incomplete Journey is labelled incomplete.
 - **Out of scope**: Journeys spanning several Projects, production traces.
@@ -75,14 +75,14 @@ Success conditions (all must hold):
 - **Steps**: build batches → call the user's `claude -p --safe-mode` (one at a time, stdin only, no tools, API-key variables stripped, `authMethod` must be `claude.ai`) → store results as Hypotheses with producer and inputs.
 - **Done when**:
   - Default budget 40 calls per import, configurable per Project; the budget is never exceeded (tested).
-  - 30 Hypotheses sampled per corpus Project are judged correct ≥ 80 % by an independent reviewer against the code (correct / partly correct / wrong; partly correct counts as wrong).
+  - 30 Hypotheses sampled per Validation Corpus Project are judged correct ≥ 80 % by an independent reviewer against the code (correct / partly correct / wrong; partly correct counts as wrong).
   - With enrichment disabled, S1–S3 and S5 still pass.
   - The UI lists what Umbra itself sent to Claude (files, time). It does not claim to know what Claude Code reads in the user's own sessions.
 - **Out of scope**: API keys, other LLM providers, local models.
 
 ### S5 — Follow Claude Code live
 - **Trigger**: Claude Code edits files in a registered Project (terminal or VS Code), or the user edits them.
-- **Steps**: watcher detects → incremental reanalysis → SSE `map.updated` → hooks append to the event journal (session, tool, files, prompt, Claude's final message) → the change is attributed on the map and in a timeline; architectures before/after can be compared.
+- **Steps**: watcher detects → incremental reanalysis → SSE `map.updated` → hooks append to the Event Journal (session, tool, files, prompt, Claude's final message) → the change is attributed on the map and in a timeline; architectures before/after can be compared.
 - **Done when** (experimental objectives, p95 over ≥ 20 samples per scenario, structural map only):
   - Edit → detection < 3 s; edit → updated map < 5 s; hook cost < 50 ms per tool call.
   - ≥ 95 % of Claude edits in a sample of ≥ 20 are linked to their prompt and Claude's final message.
@@ -93,7 +93,7 @@ Success conditions (all must hold):
 ### S6 — Validate on the corpus
 - **Trigger**: S1–S5 done.
 - **Corpus**: full-stack-fastapi-template, miurla/morphic, chatwoot/chatwoot-mobile-app, assafelovic/gpt-researcher, matsonj/nba-monte-carlo, aws-containers/retail-store-sample-app, open-telemetry/opentelemetry-demo, aws-ia/terraform-aws-eks-blueprints (IaC only), + Watchdog live.
-- **Done when**: every criterion above holds on every corpus Project, and the final judge passes — **on a repo they have never seen, the author answers correctly 5 questions about how it works in 15 minutes, without opening the code.** The questions and their answer key are written beforehand by an independent agent from the repo, and graded by it.
+- **Done when**: every criterion above holds on every Validation Corpus Project, and the final judge passes — **on a repo they have never seen, the author answers correctly 5 questions about how it works in 15 minutes, without opening the code.** The questions and their answer key are written beforehand by an independent agent from the repo, and graded by it.
 
 ## Known limits
 

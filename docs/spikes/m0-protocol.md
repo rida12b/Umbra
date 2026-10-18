@@ -46,4 +46,4 @@ T-reparse runs on every source file of both repos.
 
 ## GO / NO-GO
 
-GO when every target is met or the gap has a known, cheap fix. Otherwise the architecture is revised before SPEC.md.
+GO when every target is met or the gap has a known, cheap fix. A measure that is not conclusive (too few samples) does not block GO but must be re-measured in the scenario that owns it. Otherwise the architecture is revised before SPEC.md.

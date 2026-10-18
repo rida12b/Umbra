@@ -2,7 +2,7 @@
 
 Status: accepted (2026-10-18)
 
-Umbra reads whole codebases and later sends parts of them to an LLM, so one forgotten `open()` in a future Analyzer would leak a secret into the store or to Claude. A convention is not enough. Only the Secret Guard may read Project files or list their names; Analyzers never receive a path they could open, only guarded content (secrets already redacted) or the reason a file was skipped. This is enforced three ways: the guard hands out content it alone can construct; listing and reading helpers are private to the guard package; and a CI test parses every engine module and fails on any file-reading or directory-walking call outside an explicit allowlist, with a deliberately bad fixture proving the test catches violations.
+Umbra reads whole codebases and later sends parts of them to an LLM, so one forgotten `open()` in a future Analyzer would leak a secret into the store or to Claude. A convention is not enough. Only the Secret Guard may read Project files or list their names; Analyzers never receive a path they could open, only guarded content (secrets already redacted) or the reason a file was skipped. This is enforced three ways (implemented with the guard in S1, ticket T2): the guard hands out content it alone can construct; listing and reading helpers are private to the guard package; and a CI test parses every engine module and fails on any file-reading or directory-walking call outside an explicit allowlist, with a deliberately bad fixture proving the test catches violations.
 
 ## Consequences
 
