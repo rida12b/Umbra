@@ -1,12 +1,12 @@
 """ADR-0004: the Secret Guard is the only reader of Project files.
 
-Parses every engine module outside `umbra_engine/guard/` and fails on any way to read files, list
-directories, run external programs, reach guard internals or forge a GuardedFile. A new exception
-must be added to ALLOWED below, which is visible in review.
+Parses every engine module outside `umbra_engine/guard/` and fails on a fixed list of ways to read
+files, list directories, run programs, use introspection or dynamic code, reach guard internals or
+copy a GuardedFile. It catches mistakes, not deliberate obfuscation; review covers intent. A new
+exception goes into ALLOWED with its reason, which is visible in review.
 """
 
 import ast
-from dataclasses import replace
 from pathlib import Path
 
 import pytest
@@ -18,75 +18,72 @@ from umbra_engine.guard import GuardedFile, SecretGuard
 ENGINE = Path(str(umbra_engine.__file__)).parent
 GUARD = ENGINE / "guard"
 
-READING_CALLS = {
-    "open",
-    "read_text",
-    "read_bytes",
-    "fdopen",
-    "iterdir",
-    "glob",
-    "rglob",
-    "walk",
-    "scandir",
-    "listdir",
-}
-READING_MODULES = {
-    "subprocess",
-    "mmap",
-    "glob",
-    "shutil",
-    "fileinput",
-    "linecache",
-    "zipfile",
-    "tarfile",
-    "io",
-}
-GUARD_INTERNALS = {"_seal", "_SEAL", "_root", "_listing", "list_files"}
+# Attribute or function names that read, list, run or bypass, whether called or just referenced.
+FORBIDDEN_NAMES = {
+    "open", "read_text", "read_bytes", "fdopen", "iterdir", "glob", "rglob", "walk", "scandir", "listdir",
+    "system", "popen", "startfile", "execv", "execve", "execvp", "spawnv", "spawnl", "posix_spawn",
+    "getattr", "setattr", "delattr", "vars", "exec", "eval", "compile", "__import__", "__dict__",
+    "__new__", "__setattr__", "__getattribute__", "__reduce__",
+}  # fmt: skip
+FORBIDDEN_MODULES = {
+    "subprocess", "mmap", "glob", "shutil", "fileinput", "linecache", "zipfile", "tarfile", "io",
+    "builtins", "importlib", "copy", "pickle", "marshal", "sqlite3", "codecs", "ctypes", "pty", "runpy",
+}  # fmt: skip
 
-# file (relative to the package) -> calls it may make, with the reason.
+# module (relative to the package) -> forbidden names or modules it may use, with the reason.
 ALLOWED: dict[str, set[str]] = {
-    "settings.py": {
-        "open",
-        "fdopen",
-        "read_text",
-    },  # Umbra's own token file under UMBRA_HOME, never a Project file
+    "settings.py": {"open", "fdopen", "read_text"},  # Umbra's own token file under UMBRA_HOME
+    "sqlite_db.py": {"sqlite3"},  # Umbra's own stores under UMBRA_HOME
+    "cli.py": {"sqlite3", "getattr"},  # catch sqlite3.Error; optional stream.reconfigure()
 }
 
 
 def violations(source: str, module: str) -> list[str]:
-    found = []
     allowed = ALLOWED.get(module, set())
+    found = []
     for node in ast.walk(ast.parse(source)):
-        if isinstance(node, ast.Call):
-            name = node.func.attr if isinstance(node.func, ast.Attribute) else getattr(node.func, "id", None)
-            if name in READING_CALLS and name not in allowed:
-                found.append(f"{module}:{node.lineno} calls {name}()")
-            if name == "replace" and isinstance(node.func, ast.Attribute):
-                if getattr(node.func.value, "id", None) == "dataclasses":
-                    found.append(f"{module}:{node.lineno} copies a dataclass with dataclasses.replace()")
-        elif isinstance(node, ast.Import):
+        line = getattr(node, "lineno", 0)
+        name = None
+        if isinstance(node, ast.Attribute):
+            name = node.attr
+            owner = getattr(node.value, "id", None)
+            if _is_private(name) and owner not in {"self", "cls"} and name not in FORBIDDEN_NAMES:
+                found.append(f"{module}:{line} touches private attribute {name} of another object")
+        elif isinstance(node, ast.Name):
+            name = node.id
+        if name in FORBIDDEN_NAMES and name not in allowed:
+            found.append(f"{module}:{line} uses {name}")
+        if isinstance(node, ast.Attribute) and node.attr == "replace" and owner_name(node) == "dataclasses":
+            found.append(f"{module}:{line} copies a dataclass with dataclasses.replace")
+        if isinstance(node, ast.Import):
             for alias in node.names:
-                if alias.name.split(".")[0] in READING_MODULES or alias.name.startswith(
-                    "umbra_engine.guard."
-                ):
-                    found.append(f"{module}:{node.lineno} imports {alias.name}")
+                found += _module_problems(alias.name, set(), allowed, module, node.lineno)
         elif isinstance(node, ast.ImportFrom):
-            source_module = node.module or ""
             names = {alias.name for alias in node.names}
-            if source_module.split(".")[0] in READING_MODULES:
-                found.append(f"{module}:{node.lineno} imports from {source_module}")
-            if (
-                source_module.startswith("umbra_engine.guard.")
-                and source_module != "umbra_engine.guard.content"
-            ):
-                found.append(f"{module}:{node.lineno} imports guard internals from {source_module}")
-            if source_module == "dataclasses" and "replace" in names:
-                found.append(f"{module}:{node.lineno} imports dataclasses.replace")
-            if source_module.startswith("umbra_engine.guard") and names & GUARD_INTERNALS:
-                found.append(f"{module}:{node.lineno} imports {sorted(names & GUARD_INTERNALS)}")
-        elif isinstance(node, ast.Attribute) and node.attr in GUARD_INTERNALS:
-            found.append(f"{module}:{node.lineno} touches {node.attr}")
+            found += _module_problems(node.module or "", names, allowed, module, node.lineno)
     return found
+
+
+def owner_name(node: ast.Attribute) -> str | None:
+    return getattr(node.value, "id", None)
+
+
+def _is_private(name: str) -> bool:
+    return name.startswith("_") and not (name.startswith("__") and name.endswith("__"))
+
+
+def _module_problems(imported: str, names: set[str], allowed: set[str], module: str, line: int) -> list[str]:
+    top = imported.split(".")[0]
+    problems = []
+    if top in FORBIDDEN_MODULES and top not in allowed:
+        problems.append(f"{module}:{line} imports {imported}")
+    if imported.startswith("umbra_engine.guard."):
+        problems.append(f"{module}:{line} imports guard internals from {imported}")
+    if imported == "dataclasses" and "replace" in names:
+        problems.append(f"{module}:{line} imports dataclasses.replace")
+    if imported == "umbra_engine.guard" and any(n.startswith("_") for n in names):
+        problems.append(f"{module}:{line} imports private guard names {sorted(names)}")
+    return problems
 
 
 def engine_modules() -> list[Path]:
@@ -100,41 +97,43 @@ def test_no_engine_module_reads_project_files_outside_the_guard():
     assert problems == []
 
 
-def test_the_boundary_check_catches_every_kind_of_bypass():
-    """A deliberately bad Analyzer: if this stops failing, the boundary test above protects nothing."""
-    bad_analyzer = """
-import subprocess
+BAD_ANALYZER = """\
+import subprocess, copy, builtins, importlib
 from pathlib import Path
 from dataclasses import replace
 from umbra_engine.guard._listing import list_files
+from umbra_engine.guard.content import RuleSet
 from umbra_engine.guard import _SEAL, GuardedFile
-
-def analyze(root, guarded):
+def analyze(root, guarded, guard, os):
     open(root / "a.py")
-    Path(root, "b.py").read_text()
-    (root / "c.py").read_bytes()
-    list(root.rglob("*.py"))
-    subprocess.run(["cat", "d.py"])
-    GuardedFile("x", "raw", (), _seal=_SEAL)
-    replace(guarded, text="raw")
-    return guarded._seal, guard._root
+    reader = Path.read_text
+    getattr(Path, "read_" + "text")(root)
+    os.system("cat x")
+    __import__("subprocess")
+    exec("x")
+    GuardedFile.__new__(GuardedFile)
+    vars(guarded)["_seal"]
+    guard._rules = None
+    return guarded._seal, guard.__dict__
 """
-    found = violations(bad_analyzer, "analyzers/bad.py")
+
+
+def test_the_boundary_check_catches_every_kind_of_bypass():
+    """A deliberately bad Analyzer: if this stops failing, the boundary test above protects nothing."""
+    found = violations(BAD_ANALYZER, "analyzers/bad.py")
     flagged_lines = {int(problem.split(":")[1].split()[0]) for problem in found}
-    assert flagged_lines == {2, 4, 5, 6, 9, 10, 11, 12, 16}, found
+    assert flagged_lines == set(range(1, 18)) - {2, 7}, found
 
 
 def test_the_allowlist_stays_minimal():
-    assert set(ALLOWED) == {"settings.py"}
-    assert all(path.exists() for path in (ENGINE / name for name in ALLOWED))
+    assert all((ENGINE / name).exists() for name in ALLOWED)
+    assert sum(len(entries) for entries in ALLOWED.values()) == 6
 
 
-def test_a_guarded_file_cannot_be_forged_or_copied_with_raw_text(make_repo):
+def test_a_guarded_file_cannot_be_built_outside_the_guard(make_repo):
     with pytest.raises(TypeError):
         GuardedFile("a.py", "raw secret", ())
-
     root = write_repo(make_repo("seal"), {"a.py": "x = 1\n"}, git=False)
     (released,) = SecretGuard(root).files()
-    assert isinstance(released, GuardedFile)
-    forged = replace(released, text="raw secret")  # possible in Python, hence the static ban above
-    assert forged.text == "raw secret"
+    with pytest.raises(TypeError):
+        GuardedFile(released.rel_path, "raw secret", ())

@@ -32,9 +32,13 @@ class FileEntry:
 
 
 class ProjectStore:
-    def __init__(self, path: Path) -> None:
+    def __init__(self, path: Path, *, create: bool = False) -> None:
         self.path = path
         self._db = sqlite_db.connect(path, SCHEMA)
+        if create:
+            self._db.execute(
+                "INSERT OR IGNORE INTO meta(key, value) VALUES ('schema_version', ?)", (str(SCHEMA_VERSION),)
+            )
 
     def __enter__(self) -> "ProjectStore":
         return self
@@ -45,11 +49,7 @@ class ProjectStore:
     @classmethod
     def create(cls, directory: Path) -> "ProjectStore":
         directory.mkdir(parents=True, exist_ok=True)
-        store = cls(directory / STORE_FILE)
-        store._db.execute(
-            "INSERT OR IGNORE INTO meta(key, value) VALUES ('schema_version', ?)", (str(SCHEMA_VERSION),)
-        )
-        return store
+        return cls(directory / STORE_FILE, create=True)
 
     @classmethod
     def open_existing(cls, directory: Path) -> "ProjectStore":

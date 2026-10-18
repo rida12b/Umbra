@@ -12,7 +12,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from umbra_engine.guard._listing import UNDECODABLE, list_files
-from umbra_engine.guard.content import RULES_VERSION, Finding, RuleSet, default_rules, redact
+from umbra_engine.guard.content import RULES_VERSION, Finding, default_rules, redact
 from umbra_engine.guard.paths import load_umbraignore, sensitive_reason
 
 MAX_SCAN_BYTES = 2_000_000
@@ -58,9 +58,9 @@ class Skipped:
 class SecretGuard:
     rules_version = RULES_VERSION
 
-    def __init__(self, root: Path, rules: RuleSet | None = None) -> None:
+    def __init__(self, root: Path) -> None:
         self._root = Path(os.path.realpath(root))
-        self._rules = rules or default_rules()
+        self._rules = default_rules()
         self._umbraignore = load_umbraignore(self._root)
 
     def files(self) -> Iterator[GuardedFile | Skipped]:
