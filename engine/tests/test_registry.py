@@ -43,7 +43,7 @@ def test_windows_case_and_short_names_resolve_to_the_same_project(settings, make
     assert not created_upper and upper.id == project.id
 
     buffer = ctypes.create_unicode_buffer(1024)
-    ctypes.windll.kernel32.GetShortPathNameW(str(repo), buffer, 1024)
+    ctypes.windll.kernel32.GetShortPathNameW(str(repo), buffer, 1024)  # pyright: ignore[reportAttributeAccessIssue]
     short = buffer.value
     if "~" not in short:
         pytest.skip("8.3 names disabled on this volume")
