@@ -10,6 +10,13 @@ Enforced in three ways (implemented in S1, ticket T2):
 2. **Sealed content**: a `GuardedFile` can only be constructed by the guard.
 3. **CI architecture test** (`engine/tests/test_guard_boundary.py`): parses every engine module outside the guard and fails on a fixed list of names and modules that read files, list directories, run programs, use introspection or dynamic code (`getattr`, `vars`, `exec`…), reach guard internals or copy a dataclass. A deliberately bad Analyzer fixture proves each rule still fires. Exceptions live in one reviewed allowlist (Umbra's own token file and stores).
 
+## Legitimate operations that are not file reads
+
+- **External programs** (git metadata, the user's `claude -p`, a Project's own test run for Observations) may only be started from `umbra_engine/gateways/`. A gateway may not read files either, and whatever a program returns (output, traces, file names) passes through the guard's redaction before it is stored or sent.
+- **Claude Code hook payloads** (prompts, edited strings) are content too: they are redacted by the guard before they enter the Event Journal.
+- **The file watcher** only yields paths; the content of a changed file is read again through the guard.
+- Parsing, regexes, path arithmetic and AST or tree-sitter walks on guarded text stay unrestricted; a test proves that ordinary Analyzer code is not flagged.
+
 ## Consequences
 
 - Adding a file read anywhere in the engine requires changing the allowlist, which is visible in review.
