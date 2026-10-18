@@ -12,6 +12,8 @@ requires-python = ">=3.11,<3.14"
 dependencies = [
     "fastapi>=0.115,<1.0",
     "uvicorn>=0.32,<1.0",
+    "google-re2>=1.1.20250722,<2.0",
+    "pathspec>=0.12,<2.0",
 ]
 
 [project.optional-dependencies]
@@ -27,6 +29,9 @@ umbra-engine = "umbra_engine.cli:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.setuptools.package-data]
+"umbra_engine.guard" = ["gitleaks.toml", "umbra.toml", "GITLEAKS-LICENSE"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
