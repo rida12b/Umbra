@@ -14,7 +14,7 @@ import tomllib
 from collections import Counter
 from collections.abc import Iterator
 from dataclasses import dataclass
-from functools import cache
+from functools import cache, cached_property
 from importlib import resources
 from typing import Protocol, cast
 
@@ -84,6 +84,11 @@ class RuleSet:
     rules: tuple[_Rule, ...]
     global_allowlist: _Allowlist
 
+    @cached_property
+    def _keywords(self) -> frozenset[str]:
+        """Every keyword once: one substring search each per text, instead of one per rule."""
+        return frozenset(keyword for rule in self.rules for keyword in rule.keywords)
+
     def path_is_sensitive(self, path: str) -> str | None:
         """Id of a path-only rule matching this path (e.g. PKCS#12 files), if any."""
         for rule in self.rules:
@@ -102,11 +107,12 @@ class RuleSet:
 
     def _scan(self, path: str, text: str) -> list[Finding]:
         lowered = text.lower()
+        present = {keyword for keyword in self._keywords if keyword in lowered}
         findings: list[Finding] = []
         for rule in self.rules:
             if rule.pattern is None:
                 continue
-            if rule.keywords and not any(keyword in lowered for keyword in rule.keywords):
+            if rule.keywords and present.isdisjoint(rule.keywords):
                 continue
             if rule.path is not None and not rule.path.search(path):
                 continue

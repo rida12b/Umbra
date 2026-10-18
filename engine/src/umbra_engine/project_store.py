@@ -52,7 +52,7 @@ class ProjectStore:
         return store
 
     @classmethod
-    def open(cls, directory: Path) -> "ProjectStore":
+    def open_existing(cls, directory: Path) -> "ProjectStore":
         path = directory / STORE_FILE
         if not path.exists():
             raise FileNotFoundError(f"no store at {path}")

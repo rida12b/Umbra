@@ -18,7 +18,7 @@ def test_add_creates_isolated_store_under_umbra_home(settings, make_repo):
     assert created
     assert project.root == repo.resolve()
     assert (settings.projects_dir / project.id / STORE_FILE).is_file()
-    assert ProjectStore.open(settings.projects_dir / project.id).schema_version() == 1
+    assert ProjectStore.open_existing(settings.projects_dir / project.id).schema_version() == 1
     assert not any(repo.iterdir()), "nothing may be written inside the registered folder"
 
 
@@ -69,9 +69,9 @@ def test_two_projects_get_two_isolated_stores(settings, make_repo):
         a, _ = registry.add(make_repo("a"))
         b, _ = registry.add(make_repo("b"))
 
-    with ProjectStore.open(settings.projects_dir / a.id) as store_a:
+    with ProjectStore.open_existing(settings.projects_dir / a.id) as store_a:
         store_a._db.execute("INSERT INTO meta(key, value) VALUES ('only_in_a', 'x')")
-    with ProjectStore.open(settings.projects_dir / b.id) as store_b:
+    with ProjectStore.open_existing(settings.projects_dir / b.id) as store_b:
         keys = [row[0] for row in store_b._db.execute("SELECT key FROM meta")]
     assert a.id != b.id
     assert "only_in_a" not in keys

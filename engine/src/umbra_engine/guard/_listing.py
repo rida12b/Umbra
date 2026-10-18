@@ -1,4 +1,7 @@
-"""Which files belong to a Project: what git tracks plus untracked files git does not ignore."""
+"""Which files belong to a Project: what git tracks plus untracked files git does not ignore.
+
+Private to the guard package: names can hold secrets too, so only the guard may hand them out.
+"""
 
 import os
 import subprocess
@@ -7,14 +10,20 @@ from pathlib import Path
 import pathspec
 
 ALWAYS_SKIPPED_DIRS = {".git", ".hg", ".svn"}
+GIT_TIMEOUT_S = 120
+UNDECODABLE = "�"
 
 
 def list_files(root: Path) -> list[str]:
-    """Relative POSIX paths of the Project's files, sorted. Uses git when the folder is a repository."""
+    """Relative POSIX paths of the Project's files, sorted. Uses git when the folder is a repository.
+
+    A name git reports in an encoding that cannot be decoded is kept (with U+FFFD), so it can be
+    reported as a Coverage Gap instead of vanishing; tracked files missing on disk are dropped.
+    """
     files = _git_files(root)
     if files is None:
         files = _walk_files(root)
-    return sorted(f for f in set(files) if (root / f).is_file())
+    return sorted(f for f in set(files) if UNDECODABLE in f or (root / f).is_file())
 
 
 def _git_files(root: Path) -> list[str] | None:
@@ -23,8 +32,9 @@ def _git_files(root: Path) -> list[str] | None:
             ["git", "-C", str(root), "ls-files", "--cached", "--others", "--exclude-standard", "-z"],
             capture_output=True,
             check=True,
+            timeout=GIT_TIMEOUT_S,
         )
-    except (OSError, subprocess.CalledProcessError):
+    except (OSError, subprocess.CalledProcessError, subprocess.TimeoutExpired):
         return None
     return [entry.decode("utf-8", errors="replace") for entry in result.stdout.split(b"\0") if entry]
 

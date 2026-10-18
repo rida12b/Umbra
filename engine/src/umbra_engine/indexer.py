@@ -1,11 +1,10 @@
-"""Index a Project: list its files and pass each one through the secret guard before anything is kept."""
+"""Index a Project: every file goes through the Secret Guard before anything about it is kept."""
 
 from collections import Counter
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 
 from umbra_engine.guard import GuardedFile, SecretGuard
-from umbra_engine.project_files import list_files
 from umbra_engine.project_store import FileEntry, ProjectStore
 from umbra_engine.registry import Project
 
@@ -22,10 +21,9 @@ def index_project(project: Project, store: ProjectStore) -> IndexSummary:
     guard = SecretGuard(project.root)
     entries: list[FileEntry] = []
     redacted = 0
-    for rel_path in list_files(project.root):
-        result = guard.read(rel_path)
+    for result in guard.files():
         if isinstance(result, GuardedFile):
-            entries.append(FileEntry(rel_path, "readable"))
+            entries.append(FileEntry(result.rel_path, "readable"))
             redacted += len(result.redacted)
         else:
             entries.append(FileEntry(result.rel_path, "skipped", result.reason, result.detail))

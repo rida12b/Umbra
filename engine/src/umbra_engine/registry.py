@@ -9,6 +9,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from umbra_engine import sqlite_db
+from umbra_engine.guard import path_has_secret
 from umbra_engine.project_store import ProjectStore
 from umbra_engine.settings import Settings
 
@@ -57,6 +58,8 @@ def resolve_root(path: str | Path) -> Path:
         raise ProjectPathError(f"path does not exist: {path}")
     if not resolved.is_dir():
         raise ProjectPathError(f"path is not a directory: {path}")
+    if path_has_secret(str(resolved)):
+        raise ProjectPathError("the folder path looks like it contains a secret; rename the folder first")
     return resolved
 
 
@@ -110,7 +113,7 @@ class Registry:
         return [_to_project(row) for row in rows]
 
     def open_store(self, project: Project) -> ProjectStore:
-        return ProjectStore.open(self._settings.projects_dir / project.id)
+        return ProjectStore.open_existing(self._settings.projects_dir / project.id)
 
     def close(self) -> None:
         self._db.close()
