@@ -61,3 +61,14 @@ def test_a_project_endpoint_only_returns_that_project(client, auth, make_repo):
     assert client.get(f"/v1/projects/{a['id']}", headers=auth).json()["root"] == a["root"]
     assert client.get(f"/v1/projects/{b['id']}", headers=auth).json()["root"] == b["root"]
     assert a["root"] != b["root"]
+
+
+@pytest.mark.parametrize("host", ["evil.example", "127.0.0.1.nip.io", "attacker.localhost.example"])
+def test_requests_for_another_host_name_are_refused(client, auth, host):
+    """DNS rebinding: a page on a foreign host name that resolves to 127.0.0.1 must not reach the API."""
+    for url in ("/v1/health", "/v1/projects"):
+        assert client.get(url, headers={**auth, "Host": host}).status_code == 400
+
+
+def test_localhost_by_name_is_accepted(client, auth):
+    assert client.get("/v1/projects", headers={**auth, "Host": "localhost:7811"}).status_code == 200

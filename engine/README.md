@@ -27,7 +27,7 @@ umbra-engine token                         # local token for API clients
 Every `/v1/projects` endpoint needs the token, as `Authorization: Bearer <token>`. `POST /v1/projects` only accepts absolute paths.
 
 ```powershell
-curl -H "Authorization: Bearer $(umbra-engine token)" http://127.0.0.1:7811/v1/projects
+Invoke-RestMethod -Headers @{ Authorization = "Bearer $(umbra-engine token)" } http://127.0.0.1:7811/v1/projects
 ```
 
 ## Where data lives

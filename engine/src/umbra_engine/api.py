@@ -7,11 +7,12 @@ from pathlib import Path
 from typing import Annotated
 
 from fastapi import Depends, FastAPI, Header, HTTPException, status
+from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from pydantic import BaseModel
 
 from umbra_engine import __version__
-from umbra_engine.registry import Project, ProjectPathError, Registry
-from umbra_engine.settings import Settings, load_or_create_token
+from umbra_engine.registry import Project, ProjectIdCollisionError, ProjectPathError, Registry
+from umbra_engine.settings import LOOPBACK_HOSTS, Settings, load_or_create_token
 
 
 class ProjectIn(BaseModel):
@@ -39,6 +40,9 @@ def create_app(settings: Settings) -> FastAPI:
         registry.close()
 
     app = FastAPI(title="Umbra engine", version=__version__, lifespan=lifespan)
+    # A web page can make the browser resolve any host name to 127.0.0.1 (DNS rebinding);
+    # requests that do not address the loopback by name are refused before any route runs.
+    app.add_middleware(TrustedHostMiddleware, allowed_hosts=list(LOOPBACK_HOSTS))
 
     def require_token(authorization: Annotated[str | None, Header()] = None) -> None:
         presented = ""
@@ -61,6 +65,8 @@ def create_app(settings: Settings) -> FastAPI:
             project, _ = registry.add(body.path)
         except ProjectPathError as error:
             raise HTTPException(status.HTTP_400_BAD_REQUEST, str(error)) from error
+        except ProjectIdCollisionError as error:
+            raise HTTPException(status.HTTP_409_CONFLICT, str(error)) from error
         return ProjectOut.of(project)
 
     @app.get("/v1/projects", dependencies=authorized)

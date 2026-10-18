@@ -50,3 +50,12 @@ def test_add_empty_path_exits_2(settings, monkeypatch, capsys):
     monkeypatch.setenv("UMBRA_HOME", str(settings.home))
     assert cli.main(["add", ""]) == 2
     assert "empty" in capsys.readouterr().err
+
+
+def test_engine_errors_are_one_line_messages_not_tracebacks(settings, monkeypatch, capsys):
+    monkeypatch.setenv("UMBRA_HOME", str(settings.home))
+    settings.home.mkdir(parents=True)
+    (settings.home / "token").write_text("")
+    monkeypatch.setattr("umbra_engine.settings.TOKEN_READ_RETRIES", 1)
+    assert cli.main(["token"]) == 1
+    assert capsys.readouterr().err.startswith("umbra-engine: empty token file")

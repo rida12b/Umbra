@@ -30,3 +30,15 @@ def test_empty_token_file_is_an_error_not_an_open_door(settings):
     (settings.home / TOKEN_FILE).write_text("  \n")
     with pytest.raises(TokenFileError):
         load_or_create_token(settings)
+
+
+def test_token_is_created_on_filesystems_without_hard_links(settings, monkeypatch):
+    import os
+
+    def no_links(*_args):
+        raise OSError("hard links not supported")
+
+    monkeypatch.setattr(os, "link", no_links)
+    token = load_or_create_token(settings)
+    assert token and load_or_create_token(settings) == token
+    assert sorted(p.name for p in settings.home.iterdir()) == [TOKEN_FILE]

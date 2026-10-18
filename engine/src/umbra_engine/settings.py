@@ -2,12 +2,15 @@
 
 import os
 import secrets
+import time
 from dataclasses import dataclass
 from pathlib import Path
 
 API_HOST = "127.0.0.1"
+LOOPBACK_HOSTS = ("127.0.0.1", "localhost")
 DEFAULT_PORT = 7811
 TOKEN_FILE = "token"
+TOKEN_READ_RETRIES = 20
 
 
 class TokenFileError(RuntimeError):
@@ -35,15 +38,21 @@ class Settings:
 
 
 def load_or_create_token(settings: Settings) -> str:
-    """Return the local API token, creating it atomically (owner-only file) on first use."""
+    """Return the local API token, creating it atomically on first use.
+
+    The file is created owner-only (mode 0600) on POSIX. On Windows the mode is ignored and the file
+    is as private as its folder: keep UMBRA_HOME inside the user profile.
+    """
     settings.home.mkdir(parents=True, exist_ok=True)
     path = settings.home / TOKEN_FILE
     if not path.exists():
         _create_token_file(path)
-    token = path.read_text(encoding="utf-8").strip()
-    if not token:
-        raise TokenFileError(f"empty token file: {path} (delete it to generate a new token)")
-    return token
+    for _ in range(TOKEN_READ_RETRIES):
+        token = path.read_text(encoding="utf-8").strip()
+        if token:
+            return token
+        time.sleep(0.05)
+    raise TokenFileError(f"empty token file: {path} (delete it to generate a new token)")
 
 
 def _create_token_file(path: Path) -> None:
@@ -55,5 +64,17 @@ def _create_token_file(path: Path) -> None:
         os.link(staging, path)
     except FileExistsError:
         pass
+    except OSError:
+        _create_without_hard_link(path, staging.read_text(encoding="utf-8"))
     finally:
         staging.unlink()
+
+
+def _create_without_hard_link(path: Path, token: str) -> None:
+    """For filesystems without hard links (FAT, exFAT, some shares). Readers retry while it is empty."""
+    try:
+        descriptor = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+    except FileExistsError:
+        return
+    with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
+        handle.write(token)

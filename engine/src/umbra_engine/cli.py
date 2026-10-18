@@ -4,10 +4,11 @@ Named `umbra-engine` while the v0.7 `umbra` command still exists; renamed when v
 """
 
 import argparse
+import sqlite3
 import sys
 
-from umbra_engine.registry import ProjectPathError, Registry
-from umbra_engine.settings import API_HOST, Settings, load_or_create_token
+from umbra_engine.registry import ProjectIdCollisionError, ProjectPathError, Registry
+from umbra_engine.settings import API_HOST, Settings, TokenFileError, load_or_create_token
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -21,6 +22,14 @@ def main(argv: list[str] | None = None) -> int:
     commands.add_parser("token", help="print the local API token")
     args = parser.parse_args(argv)
 
+    try:
+        return _run(args)
+    except (TokenFileError, ProjectIdCollisionError, sqlite3.Error) as error:
+        print(f"umbra-engine: {error}", file=sys.stderr)
+        return 1
+
+
+def _run(args: argparse.Namespace) -> int:
     settings = Settings.from_env()
     if args.command == "add":
         return _add(settings, args.path)

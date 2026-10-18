@@ -27,6 +27,10 @@ class ProjectPathError(ValueError):
     """The given path cannot be registered as a Project."""
 
 
+class ProjectIdCollisionError(RuntimeError):
+    """Two different folders produced the same Project id (should never happen with a 48-bit digest)."""
+
+
 @dataclass(frozen=True)
 class Project:
     id: str
@@ -63,7 +67,7 @@ def root_key(root: Path) -> str:
 def project_id_for(root: Path) -> str:
     ascii_name = unicodedata.normalize("NFKD", root.name).encode("ascii", "ignore").decode()
     slug = re.sub(r"[^a-z0-9]+", "-", ascii_name.lower()).strip("-") or "project"
-    digest = hashlib.sha256(root_key(root).encode()).hexdigest()[:8]
+    digest = hashlib.sha256(root_key(root).encode()).hexdigest()[:12]
     return f"{slug}-{digest}"
 
 
@@ -91,7 +95,7 @@ class Registry:
         )
         project = self._find_by_key(root_key(root))
         if project is None:
-            raise ProjectPathError(f"project id collision for {root}")
+            raise ProjectIdCollisionError(f"project id {candidate.id} is already used by another folder")
         ProjectStore.create(self._settings.projects_dir / project.id).close()
         return project, cursor.rowcount == 1
 
