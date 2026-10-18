@@ -130,6 +130,15 @@ class SecretGuard:
         return None
 
 
+def redact_output(text: str, origin: str) -> str:
+    """Redact what an external program returned (gateways, ADR-0004) before it is stored or sent.
+
+    `origin` names the producer (e.g. `git rev-parse`) so path-scoped rules can apply.
+    """
+    findings = default_rules().scan(origin, text)
+    return redact(text, findings) if findings else text
+
+
 def path_has_secret(path: str) -> bool:
     """True when a path (e.g. a folder about to be registered as a Project) itself contains a secret."""
     return bool(default_rules().scan(path, path))
