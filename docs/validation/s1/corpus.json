@@ -1,0 +1,13 @@
+{
+  "note": "S1 Validation Corpus, pinned by commit. Re-run: python engine/tools/validate_s1.py",
+  "projects": [
+    {"name": "full-stack-fastapi-template", "url": "https://github.com/fastapi/full-stack-fastapi-template", "commit": "b1125d8839482cb7bbae603ddc6d0081bf87532e", "type": "web app (FastAPI + React)"},
+    {"name": "morphic", "url": "https://github.com/miurla/morphic", "commit": "a95b1d7aa17f729fd8cae7e9896fa8d32b76989d", "type": "AI app (Next.js)"},
+    {"name": "chatwoot-mobile-app", "url": "https://github.com/chatwoot/chatwoot-mobile-app", "commit": "e3c8fc5f3d0ece96ea6843e38759bc9b44e13112", "type": "mobile app (React Native)"},
+    {"name": "gpt-researcher", "url": "https://github.com/assafelovic/gpt-researcher", "commit": "3582a6841fe7dc801e2a34e34ee408641aea9bce", "type": "AI agent (Python)"},
+    {"name": "nba-monte-carlo", "url": "https://github.com/matsonj/nba-monte-carlo", "commit": "e8bf34f252923a640ad224d24e49f007684016ba", "type": "data pipeline (dbt, DuckDB)"},
+    {"name": "retail-store-sample-app", "url": "https://github.com/aws-containers/retail-store-sample-app", "commit": "d7a380b843e0759e58754f74188ea18252a51415", "type": "microservices (Java, Go, Node) + Terraform + Kubernetes"},
+    {"name": "opentelemetry-demo", "url": "https://github.com/open-telemetry/opentelemetry-demo", "commit": "85c2cb253ae3519ef2b3a02984c32614106de5ea", "type": "polyglot microservices"},
+    {"name": "terraform-aws-eks-blueprints", "url": "https://github.com/aws-ia/terraform-aws-eks-blueprints", "commit": "fc40e64615785b3dc4db88e57c45a6687ca026b5", "type": "infrastructure as code only"}
+  ]
+}
