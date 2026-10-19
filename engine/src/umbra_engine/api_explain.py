@@ -7,7 +7,14 @@ from typing import Literal
 from fastapi import FastAPI, HTTPException, params, status
 from pydantic import BaseModel
 
-from umbra_engine.explain.cards import CARD_PRODUCER
+from umbra_engine.claims import IMPORTS
+from umbra_engine.explain.architecture import (
+    ARCHITECTURE,
+    architecture_material,
+    parse_architecture,
+    prompt_for_architecture,
+)
+from umbra_engine.explain.cards import CARD_PRODUCER, parse_card, prompt_for
 from umbra_engine.explain.material import Material, material
 from umbra_engine.explain.worker import Explainer, Job
 from umbra_engine.guard import SecretGuard
@@ -38,8 +45,13 @@ def add_explain_routes(
 ) -> None:
     def material_of(project_id: str, node: str) -> Material:
         project = known_project(project_id)
+        guard = SecretGuard(project.root)
+        if node == ARCHITECTURE:
+            with indexed_store(project_id) as store:
+                imports = store.claims_with_relations((IMPORTS,))
+            return architecture_material(graph_of(project_id), guard, imports)
         try:
-            return material(graph_of(project_id), SecretGuard(project.root), node)
+            return material(graph_of(project_id), guard, node)
         except UnknownElementError as error:
             raise HTTPException(status.HTTP_404_NOT_FOUND, f"unknown element: {node}") from error
 
@@ -71,7 +83,12 @@ def add_explain_routes(
         found = material_of(project_id, node)
         current = explanation(project_id, node, found)
         if current.state in ("missing", "stale", "error"):
-            project = known_project(project_id)
-            explainer.request(Job(project_id, node, found, lambda: indexed_store(project.id)))
+            graph = graph_of(project_id)
+            prompt, parse = (
+                (prompt_for_architecture(found), lambda answer: parse_architecture(answer, graph))
+                if node == ARCHITECTURE
+                else (prompt_for(found), lambda answer: parse_card(answer, found))
+            )
+            explainer.request(Job(project_id, node, found, lambda: indexed_store(project_id), prompt, parse))
             current = explanation(project_id, node, found)
         return current

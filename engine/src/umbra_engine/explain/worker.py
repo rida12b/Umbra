@@ -5,8 +5,9 @@ import threading
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime
+from typing import Protocol
 
-from umbra_engine.explain.cards import CARD_PRODUCER, CardFormatError, parse_card, prompt_for
+from umbra_engine.explain.cards import CARD_PRODUCER, CardFormatError
 from umbra_engine.explain.material import Material
 from umbra_engine.gateways.claude import ClaudeUnavailableError
 from umbra_engine.project_store import ProjectStore
@@ -14,12 +15,20 @@ from umbra_engine.project_store import ProjectStore
 DAILY_CARD_BUDGET = 150  # per Project: background calls share the user's own Claude limits
 
 
+class Written(Protocol):
+    def to_json(self) -> str: ...
+
+
 @dataclass(frozen=True)
 class Job:
+    """One card to write: the prompt built from `material`, and how to read Claude's answer."""
+
     project_id: str
     key: str
     material: Material
     open_store: Callable[[], ProjectStore]
+    prompt: str
+    parse: Callable[[str], Written]
 
 
 class Explainer:
@@ -58,7 +67,7 @@ class Explainer:
             job = self._jobs.get()
             self._set(job, "working")
             try:
-                card = parse_card(self._ask(prompt_for(job.material)), job.material)
+                card = job.parse(self._ask(job.prompt))
                 with job.open_store() as store:
                     store.save_card(job.key, job.material.digest, card.to_json(), CARD_PRODUCER, _now())
                 self._set(job, None)

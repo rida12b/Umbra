@@ -11,36 +11,51 @@ export interface Placed {
   y: number;
 }
 
+export interface Size {
+  width: number;
+  height: number;
+}
+
 const elk = new ELK();
 
 /**
- * Layered layout (ELK): links flow left to right, so a dependency sits to the right of what uses it.
- * Elements without links are packed in rows below, instead of one endless column.
+ * Layered layout (ELK): links flow left to right, so what is used sits to the right of what uses it.
+ * Boxes without links are packed apart, instead of one endless column.
  */
-export async function layout(nodes: MapNode[], edges: MapEdge[], vertical: boolean): Promise<Placed[]> {
+export async function layoutBoxes(
+  ids: string[],
+  links: [string, string][],
+  size: Size,
+  vertical: boolean,
+): Promise<Map<string, { x: number; y: number }>> {
   const graph: ElkNode = {
     id: "root",
     layoutOptions: {
       "elk.algorithm": "layered",
       "elk.direction": vertical ? "DOWN" : "RIGHT",
-      "elk.spacing.nodeNode": "28",
-      "elk.layered.spacing.nodeNodeBetweenLayers": "72",
+      "elk.spacing.nodeNode": "32",
+      "elk.layered.spacing.nodeNodeBetweenLayers": "96",
       "elk.layered.nodePlacement.strategy": "BRANDES_KOEPF",
       "elk.separateConnectedComponents": "true",
-      "elk.spacing.componentComponent": "36",
+      "elk.spacing.componentComponent": "40",
       "elk.aspectRatio": vertical ? "0.6" : "1.6",
     },
-    children: nodes.map((node) => ({ id: node.key, width: NODE_WIDTH, height: NODE_HEIGHT })),
-    edges: edges.map((edge, index) => ({
-      id: `e${index}`,
-      sources: [edge.source],
-      targets: [edge.target],
-    })),
+    children: ids.map((id) => ({ id, width: size.width, height: size.height })),
+    edges: links.map(([source, target], index) => ({ id: `e${index}`, sources: [source], targets: [target] })),
   };
   const result = await elk.layout(graph);
-  const byKey = new Map(nodes.map((node) => [node.key, node]));
-  return (result.children ?? []).flatMap((child) => {
-    const node = byKey.get(child.id);
-    return node ? [{ node, x: child.x ?? 0, y: child.y ?? 0 }] : [];
+  return new Map((result.children ?? []).map((child) => [child.id, { x: child.x ?? 0, y: child.y ?? 0 }]));
+}
+
+export async function layout(nodes: MapNode[], edges: MapEdge[], vertical: boolean): Promise<Placed[]> {
+  const positions = await layoutBoxes(
+    nodes.map((node) => node.key),
+    edges.map((edge) => [edge.source, edge.target]),
+    { width: NODE_WIDTH, height: NODE_HEIGHT },
+    vertical,
+  );
+  return nodes.flatMap((node) => {
+    const position = positions.get(node.key);
+    return position ? [{ node, ...position }] : [];
   });
 }

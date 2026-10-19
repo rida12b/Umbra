@@ -97,9 +97,40 @@ export interface Card {
   incertitudes: string[];
 }
 
-export interface Explanation {
+export type BlockType =
+  | "user" | "frontend" | "backend" | "worker" | "database" | "storage" | "queue" | "external"
+  | "ml_model" | "device" | "cli" | "library" | "docs" | "tests" | "infra";
+
+export interface ArchBlock {
+  id: string;
+  nom: string;
+  type: BlockType;
+  role: string;
+  techno: string;
+  code: { chemin: string; element: string }[];
+  indices: string;
+}
+
+export interface ArchFlow {
+  de: string;
+  vers: string;
+  quoi: string;
+}
+
+/** The Project drawn as running parts, stores and outside services: Claude Code's reading (Hypothesis). */
+export interface Architecture {
+  resume: string;
+  blocs: ArchBlock[];
+  flux: ArchFlow[];
+  parcours: string[];
+  incertitudes: string[];
+}
+
+export const ARCHITECTURE = "arch:";
+
+export interface Explanation<T = Card> {
   state: "ready" | "stale" | "missing" | "queued" | "working" | "error";
-  card: Card | null;
+  card: T | null;
   producer: string | null;
   created_at: string | null;
   message: string | null;

@@ -35,7 +35,7 @@ def material(graph: ProjectGraph, guard: SecretGuard, key: str) -> Material:
     if key in graph.definitions:
         return Material("code", title, _definition(graph, guard, key), [])
     if view.parent.kind == "module":
-        return Material("code", title, _numbered(guard, key, 1, MAX_FILE_LINES), [])
+        return Material("code", title, numbered_file(guard, key, 1, MAX_FILE_LINES), [])
     level = "application" if key == APPLICATION else "group"
     return Material(level, title, _structure(graph, guard, key, view), children(graph, key))
 
@@ -43,12 +43,12 @@ def material(graph: ProjectGraph, guard: SecretGuard, key: str) -> Material:
 def _definition(graph: ProjectGraph, guard: SecretGuard, key: str) -> str:
     definition = graph.definitions[key]
     start, end = definition.lines
-    header = _numbered(guard, definition.file, 1, 25)  # imports: where names come from
-    body = _numbered(guard, definition.file, start, min(end, start + MAX_FILE_LINES))
+    header = numbered_file(guard, definition.file, 1, 25)  # imports: where names come from
+    body = numbered_file(guard, definition.file, start, min(end, start + MAX_FILE_LINES))
     return f"FILE {definition.file} (top of file)\n{header}\n\nDEFINITION {key}\n{body}"
 
 
-def _numbered(guard: SecretGuard, path: str, start: int, end: int) -> str:
+def numbered_file(guard: SecretGuard, path: str, start: int, end: int) -> str:
     released = guard.read(path)
     if not isinstance(released, GuardedFile):
         return f"({path}: not readable: {released.reason})"
@@ -79,7 +79,7 @@ def _structure(graph: ProjectGraph, guard: SecretGuard, key: str, view) -> str:
     for name in README_NAMES:
         readme = f"{directory}/{name}" if directory else name
         if isinstance(guard.read(readme), GuardedFile):
-            text += "\n\nREADME\n" + _numbered(guard, readme, 1, 150)
+            text += "\n\nREADME\n" + numbered_file(guard, readme, 1, 150)
             break
     return text[:MAX_CONTEXT_CHARS]
 

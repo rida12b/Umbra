@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 
 // Where the user is, kept in the URL fragment so Back/Forward and reloads work.
-// `#/` lists Projects; `#/p/<id>?node=<key>&expand=1` shows one map view.
+// `#/` lists Projects; `#/p/<id>` shows its architecture; `#/p/<id>?node=<key>&expand=1` one map view.
 // A login link arrives as `#login=<code>`: it is consumed once and replaced, never kept in history.
 
 export interface Route {
@@ -11,6 +11,7 @@ export interface Route {
 }
 
 export const APPLICATION = "app:";
+export const ARCHITECTURE_VIEW = "arch:"; // a Project opens on its architecture
 const LOGIN = "#login=";
 
 export function takeLoginCode(): string | null {
@@ -26,7 +27,7 @@ export function parseRoute(hash: string): Route {
   const params = new URLSearchParams(query);
   return {
     projectId: match?.[1] ? safeDecode(match[1]) : null,
-    node: params.get("node") ?? APPLICATION,
+    node: params.get("node") ?? ARCHITECTURE_VIEW,
     expand: params.get("expand") === "1",
   };
 }
@@ -43,7 +44,7 @@ function safeDecode(text: string): string | null {
 export function routeHash(route: Route): string {
   if (!route.projectId) return "#/";
   const params = new URLSearchParams();
-  if (route.node !== APPLICATION) params.set("node", route.node);
+  if (route.node !== ARCHITECTURE_VIEW) params.set("node", route.node);
   if (route.expand) params.set("expand", "1");
   const query = params.toString();
   return `#/p/${encodeURIComponent(route.projectId)}${query ? `?${query}` : ""}`;

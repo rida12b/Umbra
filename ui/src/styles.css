@@ -188,6 +188,36 @@ button:disabled { opacity: 0.6; cursor: wait; }
 .line.cited { background: var(--cited); }
 .line-number { width: 3.5em; flex: none; color: var(--muted); text-align: right; padding-right: 10px; user-select: none; }
 
+/* Views and architecture */
+.tabs { display: flex; gap: 4px; padding: 8px 16px 0; background: var(--surface); border-bottom: 1px solid var(--border); }
+.tab { border: 0; border-bottom: 2px solid transparent; border-radius: 0; background: none; padding: 6px 12px; color: var(--muted); }
+.tab.active { color: var(--text); border-bottom-color: var(--accent); font-weight: 600; }
+.arch-block {
+  width: 260px; height: 132px; padding: 10px 12px; border-radius: 10px; background: var(--surface);
+  border: 1.5px dashed var(--tone, var(--border)); box-shadow: var(--shadow); cursor: pointer;
+  display: flex; flex-direction: column; gap: 6px; overflow: hidden;
+}
+.arch-block.selected { outline: 2px solid var(--accent); outline-offset: 2px; }
+.arch-head { display: flex; align-items: center; gap: 10px; }
+.arch-head > span { display: grid; }
+.block-icon { width: 30px; height: 30px; flex: none; color: var(--tone, var(--muted)); }
+.arch-kind { font-size: 10px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--tone, var(--muted)); font-weight: 600; }
+.arch-name { font-weight: 700; font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.arch-role { font-size: 12px; line-height: 1.35; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.arch-techno { margin-top: auto; font-size: 11px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.arch-row { border-style: dashed; border-color: var(--tone, var(--border)); }
+.tone-user { --tone: #d0457a; }
+.tone-frontend { --tone: #2f8fd3; }
+.tone-backend, .tone-worker, .tone-cli { --tone: #3b6fe0; }
+.tone-database, .tone-storage, .tone-queue { --tone: #1f9a63; }
+.tone-external, .tone-infra { --tone: #8a93a3; }
+.tone-ml_model, .tone-device { --tone: #8b5cf6; }
+.tone-library, .tone-docs, .tone-tests { --tone: #b07a1f; }
+.react-flow__edge.flow .react-flow__edge-path { stroke: var(--muted); stroke-width: 1.5; stroke-dasharray: 6 4; }
+.react-flow__edge.flow-active .react-flow__edge-path { stroke: var(--accent); stroke-width: 2.5; }
+.back { padding: 0; margin-bottom: 8px; }
+.code-link { padding: 0; font-family: var(--mono); font-size: 12px; text-align: left; }
+
 /* Narrow screens: a list instead of the graph */
 .element-list { list-style: none; margin: 0; padding: 12px 16px 24px; overflow-y: auto; flex: 1; display: grid; gap: 10px; align-content: start; }
 .element-row { width: 100%; text-align: left; display: grid; gap: 4px; padding: 10px 12px; border-radius: 8px; border-width: 1.5px; }
