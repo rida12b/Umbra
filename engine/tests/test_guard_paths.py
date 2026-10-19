@@ -99,3 +99,14 @@ def test_a_secret_in_a_file_name_is_redacted_in_the_listing(make_repo):
     assert isinstance(result, Skipped)
     assert (result.reason, result.detail) == (EXCLUDED_SENSITIVE, SECRET_IN_PATH)
     assert GH not in result.rel_path
+
+
+def test_a_project_inside_a_workspace_that_ignores_it_is_still_listed(make_repo):
+    """A workspace repository ignoring `projects/` must not hide a Project kept there; the Project's
+    own `.gitignore` still applies."""
+    workspace = write_repo(make_repo("workspace"), {".gitignore": "projects/\n", "notes.md": "x\n"})
+    project = workspace / "projects" / "app"
+    write_repo(
+        project, {"main.py": "x = 1\n", ".gitignore": "build/\n", "build/out.py": "y = 2\n"}, git=False
+    )
+    assert listed(project) == [".gitignore", "main.py"]

@@ -5,40 +5,34 @@ import threading
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime
-from typing import Protocol
 
-from umbra_engine.explain.cards import CARD_PRODUCER, CardFormatError
-from umbra_engine.explain.material import Material
+from umbra_engine.analysis.model import ModelFormatError
+from umbra_engine.explain.cards import CardFormatError
 from umbra_engine.gateways.claude import ClaudeUnavailableError
 from umbra_engine.project_store import ProjectStore
 
 DAILY_CARD_BUDGET = 150  # per Project: background calls share the user's own Claude limits
 
 
-class Written(Protocol):
-    def to_json(self) -> str: ...
-
-
 @dataclass(frozen=True)
 class Job:
-    """One card to write: the prompt built from `material`, and how to read Claude's answer."""
+    """One thing to write with Claude Code (an element's card, or the Project model): `produce` runs
+    the session and returns what to store; `digest` names what it was written from."""
 
     project_id: str
     key: str
-    material: Material
+    digest: str
+    producer: str
     open_store: Callable[[], ProjectStore]
-    prompt: str
-    parse: Callable[[str], Written]
+    produce: Callable[[], str]
 
 
 class Explainer:
     def __init__(
         self,
-        ask: Callable[[str], str],
         daily_budget: int = DAILY_CARD_BUDGET,
         on_saved: Callable[[str, str], None] = lambda project_id, key: None,
     ) -> None:
-        self._ask = ask
         self._on_saved = on_saved
         self._budget = daily_budget
         self._jobs: queue.Queue[Job] = queue.Queue()
@@ -73,12 +67,12 @@ class Explainer:
             job = self._jobs.get()
             self._set(job, "working")
             try:
-                card = job.parse(self._ask(job.prompt))
+                written = job.produce()
                 with job.open_store() as store:
-                    store.save_card(job.key, job.material.digest, card.to_json(), CARD_PRODUCER, _now())
+                    store.save_card(job.key, job.digest, written, job.producer, _now())
                 self._set(job, None)
                 self._on_saved(job.project_id, job.key)
-            except (ClaudeUnavailableError, CardFormatError) as error:
+            except (ClaudeUnavailableError, CardFormatError, ModelFormatError) as error:
                 self._set(job, f"explanation failed: {error}")
             except Exception as error:  # the worker must survive any single failure
                 self._set(job, f"explanation failed: {type(error).__name__}")

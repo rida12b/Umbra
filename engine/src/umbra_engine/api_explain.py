@@ -1,4 +1,5 @@
-"""Explanation routes: the card of a map element, written in the background by the user's Claude Code."""
+"""Explanation routes: a deeper card on one map element, on demand, written by the user's Claude Code.
+The Project model (api_model) explains the whole Project; a card zooms on one file or function."""
 
 import json
 from collections.abc import Callable
@@ -7,13 +8,7 @@ from typing import Literal
 from fastapi import FastAPI, HTTPException, params, status
 from pydantic import BaseModel
 
-from umbra_engine.claims import IMPORTS
-from umbra_engine.explain.architecture import (
-    ARCHITECTURE,
-    architecture_material,
-    parse_architecture,
-    prompt_for_architecture,
-)
+from umbra_engine.analysis.runner import MODEL_KEY
 from umbra_engine.explain.cards import CARD_PRODUCER, parse_card, prompt_for
 from umbra_engine.explain.material import Material, material
 from umbra_engine.explain.worker import Explainer, Job
@@ -21,11 +16,9 @@ from umbra_engine.guard import SecretGuard
 from umbra_engine.project_store import ProjectStore
 from umbra_engine.projection.graph import ProjectGraph
 from umbra_engine.projection.model import APPLICATION
-from umbra_engine.projection.tree import DIR, children
 from umbra_engine.projection.view import UnknownElementError
 from umbra_engine.registry import Project
 
-WARM_UP_CARDS = 20  # first views written when a Project is followed; the rest when opened
 CardState = Literal["ready", "stale", "missing", "queued", "working", "error"]
 
 
@@ -35,7 +28,7 @@ class Explanation(BaseModel):
     producer: str | None = None
     created_at: str | None = None
     message: str | None = None
-    level: str | None = None  # application, group, code, doc, test or architecture: how to read the card
+    level: str | None = None  # application, group, code, doc or test: how to read the card
 
 
 def add_explain_routes(
@@ -45,18 +38,14 @@ def add_explain_routes(
     indexed_store: Callable[[str], ProjectStore],
     graph_of: Callable[[str], ProjectGraph],
     explainer: Explainer,
-) -> Callable[..., int]:
+    ask: Callable[[str], str],
+) -> Callable[[str], int]:
     """Adds the routes; returns `refresh_cards(project_id)`, which queues every out-of-date card."""
 
     def material_of(project_id: str, node: str) -> Material:
         project = known_project(project_id)
-        guard = SecretGuard(project.root)
-        if node == ARCHITECTURE:
-            with indexed_store(project_id) as store:
-                imports = store.claims_with_relations((IMPORTS,))
-            return architecture_material(graph_of(project_id), guard, imports)
         try:
-            return material(graph_of(project_id), guard, node)
+            return material(graph_of(project_id), SecretGuard(project.root), node)
         except UnknownElementError as error:
             raise HTTPException(status.HTTP_404_NOT_FOUND, f"unknown element: {node}") from error
 
@@ -95,34 +84,27 @@ def add_explain_routes(
         return current
 
     def job(project_id: str, node: str, found: Material) -> Job:
-        graph = graph_of(project_id)
-        prompt, parse = (
-            (prompt_for_architecture(found), lambda answer: parse_architecture(answer, graph))
-            if node == ARCHITECTURE
-            else (prompt_for(found), lambda answer: parse_card(answer, found))
+        prompt = prompt_for(found)
+        return Job(
+            project_id,
+            node,
+            found.digest,
+            CARD_PRODUCER,
+            lambda: indexed_store(project_id),
+            lambda: parse_card(ask(prompt), found).to_json(),
         )
-        return Job(project_id, node, found, lambda: indexed_store(project_id), prompt, parse)
 
-    def refresh_cards(project_id: str, warm_up: bool = False) -> int:
-        """After the code changed: rewrite the cards already written whose material changed since.
-        With `warm_up`, also write the first views a reader opens: the architecture, the
-        Application and the two levels below it (folders and services, not single files)."""
+    def refresh_cards(project_id: str) -> int:
+        """After the code changed: rewrite the cards already written whose material changed since."""
         with indexed_store(project_id) as store:
-            keys = store.card_keys()
-        if warm_up:
-            graph = graph_of(project_id)
-            first = [c for c in children(graph, APPLICATION) if c.startswith(DIR) or c in graph.services]
-            second = [g for c in first for g in children(graph, c) if g.startswith(DIR)]
-            keys = list(dict.fromkeys([ARCHITECTURE, APPLICATION, *first, *second][:WARM_UP_CARDS] + keys))
+            keys = [k for k in store.card_keys() if k != MODEL_KEY]
         queued = 0
         for node in keys:
             try:
                 found = material_of(project_id, node)
             except HTTPException:
                 continue  # the element is gone from the map
-            if explanation(project_id, node, found).state in (
-                ("stale", "missing") if warm_up else ("stale",)
-            ):
+            if explanation(project_id, node, found).state == "stale":
                 explainer.request(job(project_id, node, found))
                 queued += 1
         return queued

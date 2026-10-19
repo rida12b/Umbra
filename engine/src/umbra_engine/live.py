@@ -18,11 +18,13 @@ class LiveProjects:
         self,
         open_store: Callable[[Project], ProjectStore],
         events: EventHub,
-        refresh_cards: Callable[..., int],
+        refresh_cards: Callable[[str], int],
+        refresh_model: Callable[[str], str],
     ) -> None:
         self._open_store = open_store
         self._events = events
         self._refresh_cards = refresh_cards
+        self._refresh_model = refresh_model
         self._watched: dict[str, threading.Event] = {}
         self._locks: dict[str, threading.Lock] = {}
         self._guard = threading.Lock()
@@ -35,9 +37,7 @@ class LiveProjects:
             stop = self._watched[project.id] = threading.Event()
             self._locks[project.id] = threading.Lock()
         watch_project(project.root, lambda: self.refresh(project), stop)
-        queued = self._refresh_cards(project.id, warm_up=True)  # first look: written once, in the background
-        if queued:
-            self._events.publish(project.id, {"type": "rewriting", "count": queued})
+        self._study(project.id)  # first look: Claude studies the whole Project once, in the background
 
     def stop_all(self) -> None:
         with self._guard:
@@ -58,7 +58,12 @@ class LiveProjects:
                 project.id,
                 {"type": "indexed", "changed": changed[:MAX_LISTED_CHANGES], "count": len(changed)},
             )
+            self._study(project.id)  # an update session: only the changed files are read again
             rewriting = self._refresh_cards(project.id)
             if rewriting:
                 self._events.publish(project.id, {"type": "rewriting", "count": rewriting})
             return changed
+
+    def _study(self, project_id: str) -> None:
+        if self._refresh_model(project_id) in ("queued", "working"):
+            self._events.publish(project_id, {"type": "studying"})
