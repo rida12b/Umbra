@@ -73,3 +73,7 @@ runaway.py
 
 # Poetry
 poetry.lock
+
+# Umbra web app: dependencies and build output (built into the engine package)
+ui/node_modules/
+engine/src/umbra_engine/web/
