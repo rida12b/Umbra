@@ -1,6 +1,7 @@
 """Index a Project: every file goes through the Secret Guard, then through every Analyzer that accepts it;
 then Linkers add the Claims that need the whole Project."""
 
+import uuid
 from collections import Counter
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
@@ -14,6 +15,7 @@ from umbra_engine.linkers import PRODUCER as LINKER
 from umbra_engine.linkers import link
 from umbra_engine.project_store import INDEXED_SCHEMA, LIST_SEPARATOR, SCHEMA_VERSION, FileEntry, ProjectStore
 from umbra_engine.registry import Project
+from umbra_engine.store_schema import INDEX_ID
 
 
 @dataclass(frozen=True)
@@ -73,6 +75,7 @@ def index_project(
         claims += keyed(file, derived_claims, LINKER, versions[file])
 
     meta = {
+        INDEX_ID: uuid.uuid4().hex,  # names this run: readers cache what they derive from it
         "indexed_at": datetime.now(UTC).isoformat(timespec="seconds"),
         "guard_rules": guard.rules_version,
         "git_commit": commit or "",

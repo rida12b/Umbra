@@ -1,5 +1,6 @@
 """The Project as the map needs it: services, files, definitions and links, loaded once from the store."""
 
+import bisect
 import posixpath
 from collections import defaultdict
 from dataclasses import dataclass, field
@@ -19,6 +20,18 @@ from umbra_engine.claims import (
 from umbra_engine.project_store import FileEntry
 from umbra_engine.store_schema import LIST_SEPARATOR
 
+# The only relations the map reads (kept small: a large Project holds millions of import Claims).
+MAP_RELATIONS = (
+    DECLARES,
+    USES_IMAGE,
+    EXPOSES,
+    CODE_ROOT,
+    DEFINES,
+    IMPORTS_MODULE,
+    DEPENDS_ON,
+    TARGETS,
+    ROUTES_TO,
+)
 SERVICE_KINDS = {"service", "workload", "k8s-service", "ingress"}
 SERVICE_LINKS = (DEPENDS_ON, TARGETS, ROUTES_TO)
 CODE_PRODUCER = "code-"
@@ -32,6 +45,7 @@ class Service:
     images: list[str] = field(default_factory=list)
     ports: list[str] = field(default_factory=list)
     code_root: str | None = None
+    code_root_status: str = "fact"
 
 
 @dataclass(frozen=True)
@@ -74,7 +88,8 @@ class ProjectGraph:
             _add_once(self._service(claim.subject).ports, claim.object.removeprefix("port:"))
         elif claim.relation == CODE_ROOT:
             root = claim.object.removeprefix("dir:")
-            self._service(claim.subject).code_root = "" if root == "." else root
+            service = self._service(claim.subject)
+            service.code_root, service.code_root_status = ("" if root == "." else root), claim.status
         elif claim.relation == DEFINES:
             self.definitions[claim.object] = Definition(
                 claim.object, claim.object_kind, claim.status, claim.file, (claim.line_start, claim.line_end)
@@ -83,6 +98,14 @@ class ProjectGraph:
             self.module_links.append(claim)
         elif claim.relation in SERVICE_LINKS:
             self.service_links.append(claim)
+
+    def files_in(self, directory: str) -> list[str]:
+        """Modules under `directory` (`""` is the root): one contiguous slice of the sorted list."""
+        if not directory:
+            return self.files
+        prefix = directory + "/"
+        start = bisect.bisect_left(self.files, prefix)
+        return self.files[start : bisect.bisect_left(self.files, prefix + "􏿿", lo=start)]
 
     def _service(self, key: str) -> Service:
         if key not in self.services:

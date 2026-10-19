@@ -13,6 +13,8 @@ from umbra_engine.claims import IMPORTS, IMPORTS_MODULE, Claim, Kind, Status, St
 
 JS_EXTENSIONS = (".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs", ".d.ts")
 JS_SOURCES = (".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs", ".vue", ".svelte")
+# TypeScript ESM imports name the emitted file: `./util.js` is `util.ts` in the sources.
+TS_SOURCE_OF = {".js": (".ts", ".tsx"), ".jsx": (".tsx",), ".mjs": (".mts",), ".cjs": (".cts",)}
 JVM_EXTENSIONS = (".java", ".kt", ".scala")
 
 
@@ -21,18 +23,24 @@ class ModuleIndex:
 
     def __init__(self, files: set[str]) -> None:
         self.files = files
-        self.directories = {posixpath.dirname(f) for f in files}
-        self._by_suffix: dict[str, list[str]] = defaultdict(list)
-        for path in files:
-            parts = path.split("/")
-            for start in range(len(parts)):
-                self._by_suffix["/".join(parts[start:])].append(path)
+        self._by_suffix = _suffixes(files)
+        self._directories_by_suffix = _suffixes({posixpath.dirname(f) for f in files} - {""})
 
     def suffix(self, candidate: str) -> list[str]:
-        return sorted(set(self._by_suffix.get(candidate, [])))
+        return self._by_suffix.get(candidate, [])
 
     def directory_suffix(self, candidate: str) -> list[str]:
-        return sorted(d for d in self.directories if d == candidate or d.endswith("/" + candidate))
+        return self._directories_by_suffix.get(candidate, [])
+
+
+def _suffixes(paths: set[str]) -> dict[str, list[str]]:
+    """Every path under each of its suffixes: `a/b/c.py` under `c.py`, `b/c.py` and `a/b/c.py`."""
+    by_suffix: dict[str, set[str]] = defaultdict(set)
+    for path in paths:
+        parts = path.split("/")
+        for start in range(len(parts)):
+            by_suffix["/".join(parts[start:])].add(path)
+    return {suffix: sorted(found) for suffix, found in by_suffix.items()}
 
 
 def resolve_imports(claims: list[StoredClaim], modules: ModuleIndex) -> list[tuple[str, Claim]]:
@@ -68,7 +76,7 @@ def _resolve(file: str, target: str, modules: ModuleIndex) -> tuple[str, Kind, S
     if file.endswith(".py"):
         return _python(file, target, modules)
     if file.endswith(JS_SOURCES):
-        return _relative(file, target, modules, JS_EXTENSIONS, ("/index" + e for e in JS_EXTENSIONS))
+        return _javascript(file, target, modules)
     if file.endswith(".go"):
         return _go(target, modules)
     if file.endswith(JVM_EXTENSIONS):
@@ -86,12 +94,23 @@ def _python(file: str, target: str, modules: ModuleIndex) -> tuple[str, Kind, St
     path = target.lstrip(".").replace(".", "/")
     candidates = [f"{path}.py", f"{path}/__init__.py"] if path else ["__init__.py"]
     if level:
-        base = posixpath.dirname(file)
-        for _ in range(level - 1):
-            base = posixpath.dirname(base)
+        package = posixpath.dirname(file).split("/") if posixpath.dirname(file) else []
+        if level - 1 > len(package):
+            return None  # climbs above the Project: Python refuses it, so it names no Module here
+        base = "/".join(package[: len(package) - (level - 1)])
         exact = [posixpath.normpath(posixpath.join(base, c)) for c in candidates]
         return _unique([c for c in exact if c in modules.files], "fact")
     return _unique([m for c in candidates for m in modules.suffix(c)], "hypothesis")
+
+
+def _javascript(file: str, target: str, modules: ModuleIndex) -> tuple[str, Kind, Status] | None:
+    """Node and bundler order: the file as written, then with an extension, then a folder's index."""
+    stem, extension = posixpath.splitext(target)
+    if extension in TS_SOURCE_OF:
+        found = _relative(file, stem, modules, TS_SOURCE_OF[extension], ())
+        if found:
+            return found
+    return _relative(file, target, modules, ("", *JS_EXTENSIONS), ["/index" + e for e in JS_EXTENSIONS])
 
 
 def _relative(

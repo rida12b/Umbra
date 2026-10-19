@@ -26,30 +26,38 @@ def head_commit(root: Path) -> str | None:
 
 
 def changed_files(root: Path) -> set[str] | None:
-    """Paths that differ from HEAD (modified, added, renamed or untracked); None when git cannot tell.
+    """Project-relative paths that differ from HEAD (modified, added, renamed or untracked); None when
+    git cannot tell, which makes every file a worktree version.
 
-    A path holding a secret comes back redacted, so it never matches: that file is then treated as
-    changed, which is the safe side.
+    The Project may be a sub-folder of its repository: porcelain paths are relative to the repository
+    root, so they are brought back under the Project. A path that holds a secret cannot be compared
+    once redacted: the whole answer is then None, the safe side.
     """
+    prefix = _run(root, "rev-parse", "--show-prefix")
+    status = _run(root, "status", "--porcelain", "-z", "--untracked-files=all", "--", ".")
+    if prefix is None or status is None:
+        return None
+    prefix = prefix.strip()
+    changed: set[str] = set()
+    skip_next = False
+    for entry in (e for e in status.split("\0") if e):
+        if skip_next:  # the original path of a rename
+            skip_next, path = False, entry
+        else:
+            code, path = entry[:2], entry[3:]
+            skip_next = "R" in code or "C" in code
+        if redact_output(path, "git status") != path:
+            return None
+        if path.startswith(prefix):
+            changed.add(path.removeprefix(prefix))
+    return changed
+
+
+def _run(root: Path, *args: str) -> str | None:
     try:
-        result = subprocess.run(
-            ["git", "-C", str(root), "status", "--porcelain", "-z", "--untracked-files=all"],
-            capture_output=True,
-            timeout=GIT_TIMEOUT_S,
-        )
+        result = subprocess.run(["git", "-C", str(root), *args], capture_output=True, timeout=GIT_TIMEOUT_S)
     except (OSError, subprocess.TimeoutExpired):
         return None
     if result.returncode != 0:
         return None
-    entries = [e.decode("utf-8", errors="replace") for e in result.stdout.split(b"\0") if e]
-    changed: set[str] = set()
-    skip_next = False
-    for entry in entries:
-        if skip_next:  # the original path of a rename
-            skip_next = False
-            changed.add(redact_output(entry, "git status"))
-            continue
-        status, path = entry[:2], entry[3:]
-        changed.add(redact_output(path, "git status"))
-        skip_next = "R" in status or "C" in status
-    return changed
+    return result.stdout.decode("utf-8", errors="replace")

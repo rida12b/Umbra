@@ -129,6 +129,14 @@ class ProjectStore:
             row[0] for row in self._db.execute(f"SELECT key FROM claims WHERE {where} ORDER BY key", values)
         ]
 
+    def claims_with_relations(self, relations: tuple[str, ...]) -> list[StoredClaim]:
+        marks = placeholders(relations)
+        rows = self._db.execute(
+            f"SELECT {', '.join(CLAIM_FIELDS)} FROM claims WHERE relation IN ({marks}) ORDER BY key",
+            relations,
+        )
+        return [StoredClaim(*row) for row in rows]
+
     def claims_by_key(self, keys: list[str]) -> list[StoredClaim]:
         query = f"SELECT {', '.join(CLAIM_FIELDS)} FROM claims WHERE key = ?"
         rows = [self._db.execute(query, (key,)).fetchone() for key in keys]

@@ -31,6 +31,8 @@ def excerpt(guard: SecretGuard, entry: FileEntry, start: int, end: int) -> Evide
     if not isinstance(released, GuardedFile):
         raise EvidenceUnavailableError(f"{entry.path}: {released.reason}")
     lines = [line.rstrip("\r") for line in released.text.split("\n")]
+    if start > len(lines):
+        raise EvidenceUnavailableError(f"{entry.path} has {len(lines)} lines, not {start}")
     first = max(1, start - CONTEXT_LINES)
     last = min(len(lines), end + CONTEXT_LINES, first + MAX_EXCERPT_LINES - 1)
     current = content_digest(released.text) == entry.digest

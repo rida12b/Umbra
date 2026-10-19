@@ -1,5 +1,6 @@
 """Map routes: the Zoom Levels of a Project and the Evidence behind each element (SPEC S2)."""
 
+import threading
 from collections.abc import Callable
 from typing import Annotated
 
@@ -9,10 +10,11 @@ from umbra_engine.claims import StoredClaim
 from umbra_engine.evidence import EvidenceExcerpt, EvidenceUnavailableError, excerpt
 from umbra_engine.guard import SecretGuard
 from umbra_engine.project_store import ProjectStore
-from umbra_engine.projection.graph import ProjectGraph
+from umbra_engine.projection.graph import MAP_RELATIONS, ProjectGraph
 from umbra_engine.projection.model import APPLICATION, MapView
 from umbra_engine.projection.view import UnknownElementError, map_view
 from umbra_engine.registry import Project
+from umbra_engine.store_schema import INDEX_ID
 
 GRAPH_CACHE_SIZE = 4
 
@@ -24,17 +26,19 @@ def add_map_routes(
     indexed_store: Callable[[str], ProjectStore],
 ) -> None:
     graphs: dict[tuple[str, str], ProjectGraph] = {}
+    lock = threading.Lock()
 
     def graph_of(project_id: str) -> ProjectGraph:
-        """Built once per index run (keyed by its time), so every request sees one consistent map."""
+        """Built once per index run, so every request sees one consistent map."""
         project = known_project(project_id)
-        with indexed_store(project_id) as store:
-            cache_key = (project_id, store.meta().get("indexed_at", ""))
+        with indexed_store(project_id) as store, lock:
+            cache_key = (project_id, store.meta().get(INDEX_ID, ""))
             if cache_key not in graphs:
                 if len(graphs) >= GRAPH_CACHE_SIZE:
                     graphs.pop(next(iter(graphs)))
-                graphs[cache_key] = ProjectGraph(project.name, store.files(), store.claims(limit=10_000_000))
-        return graphs[cache_key]
+                claims = store.claims_with_relations(MAP_RELATIONS)
+                graphs[cache_key] = ProjectGraph(project.name, store.files(), claims)
+            return graphs[cache_key]
 
     @app.get("/v1/projects/{project_id}/map", dependencies=authorized)
     def project_map(project_id: str, node: str = APPLICATION, expand: bool = False) -> MapView:

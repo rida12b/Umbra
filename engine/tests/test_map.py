@@ -243,3 +243,68 @@ def test_a_service_code_root_nested_in_a_component_is_reachable_both_ways(client
     assert "dir:src/web" in keys_of(view(client, auth, project, "dir:src"))
     web = view(client, auth, project, "dir:src/web")
     assert [c["key"] for c in web["breadcrumbs"]] == ["app:", "dir:src", "dir:src/web"]
+
+
+def index_files(client, auth, make_repo, name: str, files: dict[str, str]) -> str:
+    root = write_repo(make_repo(name), files, git=False)
+    project = client.post("/v1/projects", json={"path": str(root)}, headers=auth).json()["id"]
+    index(client, auth, project)
+    return project
+
+
+def code_roots(client, auth, project: str) -> dict[str, tuple[str, str]]:
+    return {
+        c["subject"]: (c["object"], c["status"])
+        for c in all_claims(client, auth, project)
+        if c["relation"] == "code_root"
+    }
+
+
+def test_code_root_is_the_build_context_and_only_a_guess_when_the_context_is_the_whole_project(
+    client, auth, make_repo
+):
+    files = {
+        "compose.yml": (
+            "services:\n"
+            "  api:\n    build:\n      context: ./api\n      dockerfile: docker/Dockerfile\n"
+            "  cart:\n    build:\n      context: .\n      dockerfile: src/cart/Dockerfile\n"
+            "  edge:\n    build:\n      context: .\n      dockerfile: Dockerfile\n"
+        ),
+        "api/docker/Dockerfile": "FROM python:3.12\n",
+        "api/main.py": "def run():\n    return 1\n",
+        "src/cart/Dockerfile": "FROM node:20\n",
+        "src/cart/index.ts": "export const cart = 1\n",
+        "Dockerfile": "FROM nginx\n",
+    }
+    project = index_files(client, auth, make_repo, "contexts", files)
+    assert code_roots(client, auth, project) == {
+        "service:api": ("dir:api", "fact"),  # not `api/docker`: the context is what the image is built from
+        "service:cart": ("dir:src/cart", "hypothesis"),
+    }
+    cart = view(client, auth, project)["nodes"]
+    assert next(n for n in cart if n["key"] == "service:cart")["details"]["code status"] == ["hypothesis"]
+
+
+def test_services_under_one_directory_keep_their_import_links(client, auth, make_repo):
+    """Services built from `src/web` and `src/api`: `src` is shown too, but must not take their files."""
+    files = {
+        "compose.yml": "services:\n  web:\n    build: ./src/web\n  api:\n    build: ./src/api\n",
+        "src/web/Dockerfile": "FROM node:20\n",
+        "src/web/app.ts": "import { serve } from '../api/server'\nexport const app = serve\n",
+        "src/api/Dockerfile": "FROM node:20\n",
+        "src/api/server.ts": "export function serve() { return 1 }\n",
+        "src/shared/util.ts": "export const u = 1\n",
+    }
+    project = index_files(client, auth, make_repo, "monorepo", files)
+    top = view(client, auth, project)
+    assert {(e["source"], e["target"], e["relation"]) for e in top["edges"]} == {
+        ("service:web", "service:api", "imports")
+    }
+
+
+def test_application_level_shows_services_before_large_directories(client, auth, make_repo):
+    services = "".join(f"  s{i:02}:\n    image: busybox\n" for i in range(MAX_VISIBLE))
+    files = {"compose.yml": f"services:\n{services}", "big/a.py": "A = 1\n", "big/b.py": "B = 2\n"}
+    project = index_files(client, auth, make_repo, "many-services", files)
+    shown = keys_of(view(client, auth, project))
+    assert all(k.startswith(("service:", "group:")) for k in shown)

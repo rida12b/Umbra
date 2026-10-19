@@ -6,6 +6,7 @@ import posixpath
 from collections import defaultdict
 
 from umbra_engine.claims import (
+    BUILD_CONTEXT,
     BUILT_FROM,
     CODE_ROOT,
     HAS_LABELS,
@@ -16,7 +17,7 @@ from umbra_engine.claims import (
 )
 from umbra_engine.linkers.imports import ModuleIndex, resolve_imports
 
-PRODUCER = "linker@1.0"
+PRODUCER = "linker@1.1"
 
 
 def link(claims: list[StoredClaim], readable_files: set[str]) -> list[tuple[str, Claim]]:
@@ -49,17 +50,37 @@ def _service_targets(claims: list[StoredClaim]) -> list[tuple[str, Claim]]:
 
 
 def _code_roots(claims: list[StoredClaim], readable_files: set[str]) -> list[tuple[str, Claim]]:
-    """A service built from one of the Project's Dockerfiles has that Dockerfile's directory as code."""
+    """The code of a built service is its build context: a Fact. When the context is the whole Project
+    (`context: .`, `dockerfile: src/cart/Dockerfile`), the Dockerfile's directory is only a guess at
+    which part of it the image uses: a Hypothesis. Without such a guess, no code root: "the whole
+    Project" would put every file under every service."""
+    dockerfiles = {
+        (c.file, c.subject): c.object.removeprefix("build:")
+        for c in claims
+        if c.relation == BUILT_FROM and c.object.startswith("build:")
+    }
     links = []
     for claim in claims:
-        if claim.relation == BUILT_FROM and claim.object.startswith("build:"):
-            dockerfile = claim.object.removeprefix("build:")
-            if dockerfile in readable_files:
-                root = posixpath.dirname(dockerfile) or "."
-                root_claim = Claim(claim.subject, "service", CODE_ROOT, f"dir:{root}", "directory", "fact",
-                             claim.line_start, claim.line_end)  # fmt: skip
-                links.append((claim.file, root_claim))
+        if claim.relation != BUILD_CONTEXT:
+            continue
+        context = claim.object.removeprefix("dir:")
+        if context == ".." or context.startswith("../") or not _has_files(context, readable_files):
+            continue  # outside the Project, or nothing readable in it
+        root, status = context, "fact"
+        if context == ".":
+            dockerfile = dockerfiles.get((claim.file, claim.subject))
+            if dockerfile not in readable_files or not posixpath.dirname(dockerfile):
+                continue
+            root, status = posixpath.dirname(dockerfile), "hypothesis"
+        root_claim = Claim(claim.subject, "service", CODE_ROOT, f"dir:{root}", "directory", status,
+                     claim.line_start, claim.line_end)  # fmt: skip
+        links.append((claim.file, root_claim))
     return links
+
+
+def _has_files(directory: str, readable_files: set[str]) -> bool:
+    prefix = "" if directory == "." else directory + "/"
+    return any(f.startswith(prefix) for f in readable_files)
 
 
 def _namespace(key: str) -> str:

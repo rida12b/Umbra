@@ -11,7 +11,7 @@ Kind = Literal[
 Relation = Literal[
     "defines", "imports", "calls",
     "declares", "uses_image", "built_from", "depends_on", "exposes", "based_on",
-    "has_labels", "selects", "routes_to", "mounts", "imports_module", "targets", "code_root",
+    "has_labels", "selects", "routes_to", "mounts", "build_context", "imports_module", "targets", "code_root",
 ]  # fmt: skip
 
 DEFINES = "defines"
@@ -28,6 +28,7 @@ HAS_LABELS = "has_labels"
 SELECTS = "selects"
 ROUTES_TO = "routes_to"
 MOUNTS = "mounts"
+BUILD_CONTEXT = "build_context"  # the directory a build sends to the image builder
 # Links computed across files once every file is analyzed:
 IMPORTS_MODULE = "imports_module"  # a Module's import resolved to another Module (or package directory)
 TARGETS = "targets"  # a Kubernetes Service reaches a workload (its selector is a subset of the labels)

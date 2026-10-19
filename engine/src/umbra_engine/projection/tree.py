@@ -38,9 +38,9 @@ def files_under(graph: ProjectGraph, key: str) -> list[str]:
         return graph.files
     if key in graph.services:
         root = graph.services[key].code_root
-        return _files_in(graph, root) if root is not None else []
+        return graph.files_in(root) if root is not None else []
     if key.startswith(DIR):
-        return _files_in(graph, key.removeprefix(DIR))
+        return graph.files_in(key.removeprefix(DIR))
     return [key.split("::", 1)[0]]
 
 
@@ -61,6 +61,8 @@ def _contains(graph: ProjectGraph, key: str, target: str) -> bool:
         return True
     if key in graph.definitions or not (key.startswith(DIR) or key in graph.services):
         return target.startswith(key + ("." if "::" in key else "::"))
+    if target in graph.services:
+        return False  # services are children of the Application only
     target_file = target.removeprefix(DIR).split("::", 1)[0]
     if key in graph.services:
         # A service shows what is inside its code root, not the root itself: that directory keeps
@@ -84,15 +86,10 @@ def _collapse(graph: ProjectGraph, directory: str) -> str:
         directory = subdirs[0]
 
 
-def _files_in(graph: ProjectGraph, directory: str) -> list[str]:
-    prefix = directory + "/" if directory else ""
-    return [f for f in graph.files if f.startswith(prefix)]
-
-
 def _covered(child: str, roots: list[str]) -> bool:
     """A root-level directory entirely made of service code is shown through those services instead."""
     path = child.removeprefix(DIR)
-    return child.startswith(DIR) and any(path == r or path.startswith(r + "/") for r in roots)
+    return child.startswith(DIR) and any(r == "" or path == r or path.startswith(r + "/") for r in roots)
 
 
 def label(graph: ProjectGraph, parent: str, key: str) -> str:

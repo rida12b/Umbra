@@ -3,6 +3,7 @@ written by another version is then refused until the Project is indexed again.""
 
 SCHEMA_VERSION = 4
 INDEXED_SCHEMA = "indexed_schema"  # schema of the store when the last index run wrote it
+INDEX_ID = "index_id"  # unique per index run
 STALE_INDEX = "this Project is not indexed, or was indexed by an older Umbra: index it again"
 LIST_SEPARATOR = "\n"  # several analyzers, failures or notes in one column
 
