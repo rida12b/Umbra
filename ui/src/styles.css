@@ -241,6 +241,10 @@ button:disabled { opacity: 0.6; cursor: wait; }
 .step-where { display: flex; align-items: center; gap: 6px; font-weight: 600; font-size: 13px; }
 .step-where .block-icon { width: 20px; height: 20px; }
 .step-reaches { font-size: 12px; color: var(--muted); }
+.step-conditions { font-size: 12px; color: var(--hypothesis); }
+.badge.manual { color: var(--accent); margin-bottom: 4px; }
+.branches { margin-top: 20px; }
+.branches h2 { font-size: 15px; margin: 0 0 8px; }
 .journey-links { list-style: none; padding: 0; margin: 0; display: grid; gap: 6px; }
 .journey-links .link-button { padding: 0; text-align: left; }
 .cited { font-family: var(--mono); font-size: 12px; padding: 0; }

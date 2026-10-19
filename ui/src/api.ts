@@ -147,6 +147,13 @@ export interface JourneyStep extends Cited {
   texte: string;
   composant: string;
   touche: string[]; // blocks this step reaches: the user, a database, a model, an outside service
+  conditions?: string[]; // what must hold for the step to happen at all
+  manuel?: boolean; // done by a person (a command, a click), not by the code
+}
+
+export interface Branch extends Cited {
+  quand: string;
+  alors: string;
 }
 
 export interface Journey {
@@ -155,6 +162,7 @@ export interface Journey {
   declencheur: string;
   etapes: JourneyStep[];
   resultat: string;
+  branches?: Branch[];
 }
 
 /** What Claude Code understood of the whole Project in one study (a Hypothesis, citations checked). */

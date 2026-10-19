@@ -165,6 +165,8 @@ def _journey(item: object, line_counts: dict[str, int], block_ids: set[str]) -> 
             "texte": str(s.get("texte", "")),
             "composant": str(s.get("composant", "")),
             "touche": [b for b in _texts(s.get("touche")) if b in block_ids],
+            "conditions": _texts(s.get("conditions")),
+            "manuel": s.get("manuel") is True,
             **_citation(s, line_counts),
         }
         for s in _list(item.get("etapes"))
@@ -176,6 +178,11 @@ def _journey(item: object, line_counts: dict[str, int], block_ids: set[str]) -> 
         "declencheur": str(item.get("declencheur", "")),
         "etapes": steps,
         "resultat": str(item.get("resultat", "")),
+        "branches": [
+            {"quand": str(b.get("quand", "")), "alors": str(b.get("alors", "")), **_citation(b, line_counts)}
+            for b in _list(item.get("branches"))
+            if isinstance(b, dict) and b.get("quand")
+        ],
     }
 
 
