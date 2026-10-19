@@ -1,4 +1,5 @@
-"""Explanation routes: the card of a map element, written in the background by the user's Claude Code."""
+"""Explanation routes: a deeper card on one map element, on demand, written by the user's Claude Code.
+The Project model (api_model) explains the whole Project; a card zooms on one file or function."""
 
 import json
 from collections.abc import Callable
@@ -7,7 +8,8 @@ from typing import Literal
 from fastapi import FastAPI, HTTPException, params, status
 from pydantic import BaseModel
 
-from umbra_engine.explain.cards import CARD_PRODUCER
+from umbra_engine.analysis.runner import MODEL_KEY
+from umbra_engine.explain.cards import CARD_PRODUCER, parse_card, prompt_for
 from umbra_engine.explain.material import Material, material
 from umbra_engine.explain.worker import Explainer, Job
 from umbra_engine.guard import SecretGuard
@@ -26,6 +28,7 @@ class Explanation(BaseModel):
     producer: str | None = None
     created_at: str | None = None
     message: str | None = None
+    level: str | None = None  # application, group, code, doc or test: how to read the card
 
 
 def add_explain_routes(
@@ -35,7 +38,10 @@ def add_explain_routes(
     indexed_store: Callable[[str], ProjectStore],
     graph_of: Callable[[str], ProjectGraph],
     explainer: Explainer,
-) -> None:
+    ask: Callable[[str], str],
+) -> Callable[[str], int]:
+    """Adds the routes; returns `refresh_cards(project_id)`, which queues every out-of-date card."""
+
     def material_of(project_id: str, node: str) -> Material:
         project = known_project(project_id)
         try:
@@ -54,12 +60,14 @@ def add_explain_routes(
             created_at=row[3],
         )  # fmt: skip
         if working in ("queued", "working"):
-            return (card or Explanation(state="missing")).model_copy(update={"state": working})
+            return (card or Explanation(state="missing")).model_copy(
+                update={"state": working, "level": found.level}
+            )
         if working is not None:
             return (card or Explanation(state="error")).model_copy(
-                update={"state": "error", "message": working}
+                update={"state": "error", "message": working, "level": found.level}
             )
-        return card or Explanation(state="missing")
+        return (card or Explanation(state="missing")).model_copy(update={"level": found.level})
 
     @app.get("/v1/projects/{project_id}/explain", dependencies=authorized)
     def get_explanation(project_id: str, node: str = APPLICATION) -> Explanation:
@@ -71,7 +79,34 @@ def add_explain_routes(
         found = material_of(project_id, node)
         current = explanation(project_id, node, found)
         if current.state in ("missing", "stale", "error"):
-            project = known_project(project_id)
-            explainer.request(Job(project_id, node, found, lambda: indexed_store(project.id)))
+            explainer.request(job(project_id, node, found))
             current = explanation(project_id, node, found)
         return current
+
+    def job(project_id: str, node: str, found: Material) -> Job:
+        prompt = prompt_for(found)
+        return Job(
+            project_id,
+            node,
+            found.digest,
+            CARD_PRODUCER,
+            lambda: indexed_store(project_id),
+            lambda: parse_card(ask(prompt), found).to_json(),
+        )
+
+    def refresh_cards(project_id: str) -> int:
+        """After the code changed: rewrite the cards already written whose material changed since."""
+        with indexed_store(project_id) as store:
+            keys = [k for k in store.card_keys() if k != MODEL_KEY]
+        queued = 0
+        for node in keys:
+            try:
+                found = material_of(project_id, node)
+            except HTTPException:
+                continue  # the element is gone from the map
+            if explanation(project_id, node, found).state == "stale":
+                explainer.request(job(project_id, node, found))
+                queued += 1
+        return queued
+
+    return refresh_cards

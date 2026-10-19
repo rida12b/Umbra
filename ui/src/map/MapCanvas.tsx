@@ -12,6 +12,7 @@ import type { MapEdge, MapNode, MapView } from "../api";
 import type { Theme } from "../theme";
 import { ElementNode, type ElementFlowNode } from "./ElementNode";
 import { layout } from "./layout";
+import { changedUnder, useLive } from "../live";
 
 export type Selection = { type: "node"; node: MapNode } | { type: "edge"; edge: MapEdge } | null;
 
@@ -27,12 +28,18 @@ interface Props {
 
 const nodeTypes = { element: ElementNode };
 
+/** The code an element stands for: its file or folder, or a service's code folder. */
+export function nodePath(element: MapNode): string | null {
+  return element.path ?? element.details.code?.[0] ?? null;
+}
+
 export function edgeId(edge: MapEdge): string {
   return `${edge.source}->${edge.target}:${edge.relation}`;
 }
 
 export function MapCanvas({ view, roles, theme, vertical, selection, onSelect, onOpen }: Props) {
   const [nodes, setNodes] = useState<ElementFlowNode[] | null>(null);
+  const live = useLive();
   const [failed, setFailed] = useState(false);
 
   useEffect(() => {
@@ -65,9 +72,9 @@ export function MapCanvas({ view, roles, theme, vertical, selection, onSelect, o
       nodes?.map((node) => ({
         ...node,
         selected: node.id === selectedKey,
-        data: { ...node.data, role: roles[node.id] },
+        data: { ...node.data, role: roles[node.id], changed: changedUnder(live, nodePath(node.data.element)) },
       })) ?? [],
-    [nodes, selectedKey, roles],
+    [nodes, selectedKey, roles, live],
   );
 
   const edges: Edge[] = useMemo(

@@ -1,7 +1,7 @@
 import { Handle, Position, type Node, type NodeProps } from "@xyflow/react";
 import type { MapNode, MapStatus, NodeKind } from "../api";
 
-export type ElementData = { element: MapNode; vertical: boolean; role?: string };
+export type ElementData = { element: MapNode; vertical: boolean; role?: string; changed?: boolean };
 export type ElementFlowNode = Node<ElementData, "element">;
 
 export const KIND_LABEL: Record<NodeKind, string> = {
@@ -29,11 +29,11 @@ export function childrenLabel(element: MapNode): string {
 }
 
 export function ElementNode({ data, selected }: NodeProps<ElementFlowNode>) {
-  const { element, vertical, role } = data;
+  const { element, vertical, role, changed } = data;
   const inside = childrenLabel(element);
   return (
     <div
-      className={`element kind-${element.kind} status-${element.status}${selected ? " selected" : ""}`}
+      className={`element kind-${element.kind} status-${element.status}${selected ? " selected" : ""}${changed ? " changed" : ""}`}
       title={element.path ?? element.label}
     >
       <Handle type="target" position={vertical ? Position.Top : Position.Left} />
@@ -43,7 +43,10 @@ export function ElementNode({ data, selected }: NodeProps<ElementFlowNode>) {
           <span className={`badge badge-${element.status}`}>{STATUS_LABEL[element.status]}</span>
         )}
       </div>
-      <div className="element-label">{element.label}</div>
+      <div className="element-label">
+        {changed && <span className="changed-dot" title="Modifié à l'instant" />}
+        {element.label}
+      </div>
       {role && <div className="element-role">{role}</div>}
       {inside && <div className="element-inside">{inside}</div>}
       <Handle type="source" position={vertical ? Position.Bottom : Position.Right} />

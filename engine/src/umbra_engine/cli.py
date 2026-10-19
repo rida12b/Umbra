@@ -160,7 +160,7 @@ def _serve(settings: Settings, open_browser: bool) -> int:
 
     from umbra_engine.api import create_app
 
-    app = create_app(settings)
+    app = create_app(settings, live=True)
     link = _login_link(settings, app.state.ui_sessions.new_login_code())
     print(f"Umbra web app: {link}")
     print("(one-time link, valid 2 minutes; `umbra-engine open` makes a new one)")

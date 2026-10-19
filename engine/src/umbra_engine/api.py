@@ -1,6 +1,7 @@
 """Local HTTP API (`/v1`). Every client — UI, MCP server, future dashboard — goes through it."""
 
 import secrets
+import threading
 from collections.abc import AsyncIterator, Callable
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -11,14 +12,19 @@ from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from pydantic import BaseModel
 
 from umbra_engine import __version__
+from umbra_engine.analysis.runner import MODEL_KEY, Study
 from umbra_engine.api_explain import add_explain_routes
+from umbra_engine.api_live import add_live_routes
 from umbra_engine.api_map import add_map_routes
+from umbra_engine.api_model import add_model_routes
 from umbra_engine.claims import Relation, Status, StoredClaim
 from umbra_engine.coverage import CoverageReport, coverage_report
 from umbra_engine.coverage import State as CoverageState
+from umbra_engine.events import EventHub
 from umbra_engine.explain.worker import Explainer
 from umbra_engine.gateways import claude
 from umbra_engine.indexer import IndexSummary, index_project
+from umbra_engine.live import LiveProjects
 from umbra_engine.project_store import STALE_INDEX, ProjectStore
 from umbra_engine.registry import Project, ProjectIdCollisionError, ProjectPathError, Registry
 from umbra_engine.settings import LOOPBACK_HOSTS, Settings, load_or_create_token
@@ -26,6 +32,7 @@ from umbra_engine.ui_session import SESSION_HEADER, UiSessions
 from umbra_engine.web import add_web_routes
 
 MAX_PAGE = 1000
+MODEL_FOLLOW_UP_S = 60.0
 
 
 class ProjectIn(BaseModel):
@@ -43,15 +50,29 @@ class ProjectOut(BaseModel):
         return cls(id=project.id, name=project.name, root=str(project.root), created_at=project.created_at)
 
 
-def create_app(settings: Settings, ask: Callable[[str], str] = claude.ask) -> FastAPI:
-    """`ask` answers one prompt with the user's Claude Code (tests pass a fake)."""
+def create_app(
+    settings: Settings,
+    ask: Callable[[str], str] = claude.ask,
+    study: Study = claude.study,
+    live: bool = False,
+) -> FastAPI:
+    """`ask` and `study` run the user's Claude Code (tests pass fakes). With `live`, every indexed
+    Project is watched: a change re-indexes it and updates the model and cards it made out of date."""
     registry = Registry(settings)
     token = load_or_create_token(settings).encode()
     sessions = UiSessions()
+    events = EventHub()
 
     @asynccontextmanager
     async def lifespan(_: FastAPI) -> AsyncIterator[None]:
+        if live_projects is not None:
+            for project in registry.list():
+                with registry.open_store(project) as store:
+                    if store.index_is_current():
+                        live_projects.follow(project)
         yield
+        if live_projects is not None:
+            live_projects.stop_all()
         registry.close()
 
     app = FastAPI(title="Umbra engine", version=__version__, lifespan=lifespan)
@@ -143,10 +164,32 @@ def create_app(settings: Settings, ask: Callable[[str], str] = claude.ask) -> Fa
     def index(project_id: str) -> IndexSummary:
         project = known_project(project_id)
         with registry.open_store(project) as store:
-            return index_project(project, store)
+            summary = index_project(project, store)
+        if live_projects is not None:
+            live_projects.follow(project)
+        return summary
 
     graph_of = add_map_routes(app, authorized, known_project, indexed_store)
-    app.state.explainer = Explainer(ask)
-    add_explain_routes(app, authorized, known_project, indexed_store, graph_of, app.state.explainer)
+
+    def saved(project_id: str, key: str) -> None:
+        events.publish(project_id, {"type": "card", "key": key})
+        if key == MODEL_KEY:  # changes that landed during the session: one follow-up, a bit later
+            follow_up = threading.Timer(MODEL_FOLLOW_UP_S, lambda: refresh_model(project_id))
+            follow_up.daemon = True
+            follow_up.start()
+
+    app.state.explainer = Explainer(
+        on_saved=saved,
+        on_failed=lambda project_id, key: events.publish(project_id, {"type": "failed", "key": key}),
+    )
+    refresh_cards = add_explain_routes(
+        app, authorized, known_project, indexed_store, graph_of, app.state.explainer, ask
+    )
+    refresh_model = add_model_routes(
+        app, authorized, known_project, indexed_store, graph_of, app.state.explainer, study
+    )
+    add_live_routes(app, authorized, known_project, events)
+    live_projects = LiveProjects(registry.open_store, events, refresh_cards, refresh_model) if live else None
+    app.state.live = live_projects
     add_web_routes(app, authorized, sessions)  # last: the web app is mounted at `/`
     return app

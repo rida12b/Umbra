@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { ApiError, api, whenSignedOut, type Project } from "./api";
-import { ProjectView } from "./ProjectView";
+import { LiveContext, useLiveEvents } from "./live";
+import { ProjectPage } from "./ProjectPage";
 import { takeLoginCode, useRoute } from "./route";
 import { useTheme } from "./theme";
 
@@ -40,6 +41,7 @@ export function App() {
 
   const project =
     projects && "list" in projects ? projects.list.find((p) => p.id === route.projectId) : undefined;
+  const live = useLiveEvents(project?.id ?? null);
 
   return (
     <div className="app">
@@ -52,6 +54,7 @@ export function App() {
           {theme === "dark" ? "Light" : "Dark"}
         </button>
       </header>
+      <LiveContext.Provider value={live}>
       <main className="main">
         {projects === null && <div className="state">Connecting to the local engine…</div>}
         {projects && "error" in projects && <ConnectionProblem error={projects.error} />}
@@ -62,16 +65,9 @@ export function App() {
             <a href="#/">All Projects</a>
           </div>
         )}
-        {project && (
-          <ProjectView
-            key={`${project.id}|${route.node}|${route.expand}`} // a new view starts with nothing selected
-            project={project}
-            route={route}
-            theme={theme}
-            narrow={narrow}
-          />
-        )}
+        {project && <ProjectPage key={project.id} project={project} route={route} theme={theme} narrow={narrow} />}
       </main>
+      </LiveContext.Provider>
     </div>
   );
 }

@@ -23,6 +23,16 @@ INSTRUCTIONS = {
         "This is one part of the system (a service or a folder of code). Explain what this part is "
         "responsible for, what it receives and produces, and how its pieces work together."
     ),
+    "doc": (
+        "This is a document. Leave 'entrees', 'sorties' and 'points_entree' empty. In 'role', say what "
+        "the document is for and who should read it; in 'etapes', give its 3 to 6 key points, each with "
+        "the lines where it is said; in 'depend_de', the parts of the system it talks about."
+    ),
+    "test": (
+        "These are tests. In 'role', say which part of the system they protect; in 'entrees', the "
+        "situations they set up; in 'sorties', what they check; in 'etapes', the main scenarios with "
+        "their lines; leave 'points_entree' empty."
+    ),
     "code": (
         "This is one file or one function. Explain it like a low-level design (LLD): who calls it "
         "with what, what it returns or changes (database, files, network, messages), and the "

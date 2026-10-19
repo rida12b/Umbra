@@ -1,21 +1,22 @@
-import { useEffect, useState } from "react";
-import { api, type Explanation } from "../api";
+import { useCallback, useEffect, useState } from "react";
+import { api, type Card, type Explanation } from "../api";
+import { useLive } from "../live";
 
 const POLL_MS = 2500;
 
 /**
- * The card of one element. Asks Claude Code to write it when there is none, or when the code
- * changed since; then follows the background work until the card is there.
+ * The deeper card of one element (a zoom beyond the Project model). It is read if it exists and
+ * written only on `request()`, then followed until ready. Live mode rewrites out-of-date cards.
  */
-export function useExplanation(projectId: string, node: string): Explanation | null {
-  const [explanation, setExplanation] = useState<Explanation | null>(null);
+export function useExplanation(projectId: string, node: string): [Explanation<Card> | null, () => void] {
+  const [explanation, setExplanation] = useState<Explanation<Card> | null>(null);
+  const [requested, setRequested] = useState(0);
+  const { revision } = useLive(); // the code changed or a card was rewritten: read again
 
   useEffect(() => {
     let current = true;
     let timer: number | undefined;
-    setExplanation(null);
-
-    const follow = (found: Explanation) => {
+    const follow = (found: Explanation<Card>) => {
       if (!current) return;
       setExplanation(found);
       if (found.state === "queued" || found.state === "working") {
@@ -25,18 +26,13 @@ export function useExplanation(projectId: string, node: string): Explanation | n
     const fail = (error: Error) =>
       current &&
       setExplanation({ state: "error", card: null, producer: null, created_at: null, message: error.message });
-
-    api
-      .explanation(projectId, node)
-      .then((found) =>
-        found.state === "missing" || found.state === "stale" ? api.explain(projectId, node) : found,
-      )
-      .then(follow, fail);
+    (requested > 0 ? api.explain(projectId, node) : api.explanation(projectId, node)).then(follow, fail);
     return () => {
       current = false;
       window.clearTimeout(timer);
     };
-  }, [projectId, node]);
+  }, [projectId, node, revision, requested]);
 
-  return explanation;
+  const request = useCallback(() => setRequested((n) => n + 1), []);
+  return [explanation, request];
 }

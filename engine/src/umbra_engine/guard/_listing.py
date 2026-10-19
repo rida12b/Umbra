@@ -27,7 +27,14 @@ def list_files(root: Path) -> list[str]:
 
 
 def _git_files(root: Path) -> list[str] | None:
+    """None when git cannot list the Project: not a repository, or a folder that the enclosing
+    repository ignores (a Project kept inside an ignored `projects/` folder of a workspace)."""
     try:
+        ignored = subprocess.run(
+            ["git", "-C", str(root), "check-ignore", "-q", "."], capture_output=True, timeout=GIT_TIMEOUT_S
+        )
+        if ignored.returncode == 0:
+            return None
         result = subprocess.run(
             ["git", "-C", str(root), "ls-files", "--cached", "--others", "--exclude-standard", "-z"],
             capture_output=True,

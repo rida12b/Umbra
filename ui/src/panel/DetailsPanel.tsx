@@ -1,9 +1,8 @@
-import type { Explanation, MapEdge, MapNode, MapStatus } from "../api";
+import type { MapEdge, MapNode, MapStatus } from "../api";
 import { KIND_LABEL, STATUS_LABEL, childrenLabel } from "../map/ElementNode";
 import type { Selection } from "../map/MapCanvas";
 import { EvidenceItem } from "./EvidenceItem";
-import { ExplanationCard } from "./ExplanationCard";
-import { useExplanation } from "./useExplanation";
+import { ElementUnderstanding } from "./ElementUnderstanding";
 
 const STATUS_MEANING: Record<MapStatus, string> = {
   fact: "Read directly from the code: each part is backed by the cited lines.",
@@ -15,16 +14,15 @@ const MODULE_PREVIEW_LINES = 30;
 interface Props {
   projectId: string;
   selection: Selection;
-  /** The element whose inside is shown, and its card: what the panel shows when nothing is selected. */
+  /** The element whose inside is shown: what the panel explains when nothing is selected. */
   level: MapNode;
-  levelExplanation: Explanation | null;
   labelOf: (key: string) => string;
   onOpen: (node: MapNode) => void;
   onClose: () => void;
 }
 
 export function DetailsPanel(props: Props) {
-  const { projectId, selection, level, levelExplanation, labelOf, onOpen, onClose } = props;
+  const { projectId, selection, level, labelOf, onOpen, onClose } = props;
   return (
     <aside className="panel" aria-label="Explanation and evidence">
       <button className="panel-close" onClick={onClose} aria-label="Close panel">
@@ -34,8 +32,8 @@ export function DetailsPanel(props: Props) {
         <>
           <p className="panel-kind">Vous êtes ici · {KIND_LABEL[level.kind]}</p>
           <h2 className="panel-title">{level.label}</h2>
-          <ExplanationCard projectId={projectId} explanation={levelExplanation} defaultFile={level.path} />
-          <p className="muted hint">Cliquez un bloc pour son explication, double-cliquez pour entrer dedans.</p>
+          <ElementUnderstanding key={level.key} projectId={projectId} node={level} />
+          <p className="muted hint">Cliquez un bloc pour son rôle, double-cliquez pour entrer dedans.</p>
         </>
       ) : selection.type === "node" ? (
         <NodeDetails key={selection.node.key} projectId={projectId} node={selection.node} onOpen={onOpen} />
@@ -47,7 +45,6 @@ export function DetailsPanel(props: Props) {
 }
 
 function NodeDetails({ projectId, node, onOpen }: { projectId: string; node: MapNode; onOpen: (n: MapNode) => void }) {
-  const explanation = useExplanation(projectId, node.key);
   const details = Object.entries(node.details).filter(([, values]) => values.length > 0);
   const location = node.path && node.lines ? `${node.path}:${node.lines[0]}–${node.lines[1]}` : node.path;
   return (
@@ -59,7 +56,7 @@ function NodeDetails({ projectId, node, onOpen }: { projectId: string; node: Map
           Entrer — {childrenLabel(node)}
         </button>
       )}
-      <ExplanationCard projectId={projectId} explanation={explanation} defaultFile={node.path} />
+      <ElementUnderstanding projectId={projectId} node={node} />
       <details className="technical">
         <summary>Détails techniques et preuves</summary>
         <p className="status-line">

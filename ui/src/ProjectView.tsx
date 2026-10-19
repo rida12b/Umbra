@@ -3,7 +3,8 @@ import { ApiError, api, type MapNode, type MapView, type Project } from "./api";
 import { ElementList } from "./map/ElementList";
 import { MapCanvas, type Selection } from "./map/MapCanvas";
 import { DetailsPanel } from "./panel/DetailsPanel";
-import { useExplanation } from "./panel/useExplanation";
+import { useLive } from "./live";
+import { roleOf, useModel } from "./model";
 import { APPLICATION, navigate, type Route } from "./route";
 import type { Theme } from "./theme";
 
@@ -22,13 +23,11 @@ export function ProjectView({ project, route, theme, narrow }: Props) {
   const [indexing, setIndexing] = useState(false);
   const [attempt, setAttempt] = useState(0);
   const [panelOpen, setPanelOpen] = useState(!narrow);
-  // The card of the level shown: its own explanation, and one sentence per block on the map.
-  const levelExplanation = useExplanation(project.id, route.node);
-  const roles = levelExplanation?.card?.enfants ?? {};
+  const live = useLive();
+  const model = useModel()?.model ?? null;
 
   useEffect(() => {
-    let current = true;
-    setLoading(null);
+    let current = true; // on a live refresh the current map stays on screen until the new one arrives
     api
       .map(project.id, route.node, route.expand)
       .then((view) => current && setLoading({ view }))
@@ -36,7 +35,7 @@ export function ProjectView({ project, route, theme, narrow }: Props) {
     return () => {
       current = false;
     };
-  }, [project.id, route.node, route.expand, attempt]);
+  }, [project.id, route.node, route.expand, attempt, live.revision]);
 
   const open = useCallback(
     (node: MapNode) => {
@@ -90,6 +89,12 @@ export function ProjectView({ project, route, theme, narrow }: Props) {
 
   const { view } = loading;
   const labels = new Map(view.nodes.map((node) => [node.key, node.label]));
+  // One sentence per block, from the Project model: no Claude call per element.
+  const roles: Record<string, string> = {};
+  for (const node of view.nodes) {
+    const role = roleOf(model, node.key, node.path);
+    if (role) roles[node.key] = role;
+  }
   const showPanel = selection !== null || panelOpen;
   return (
     <div className={`project${showPanel ? " with-panel" : ""}`}>
@@ -147,7 +152,6 @@ export function ProjectView({ project, route, theme, narrow }: Props) {
             projectId={project.id}
             selection={selection}
             level={view.parent}
-            levelExplanation={levelExplanation}
             labelOf={(key) => labels.get(key) ?? key}
             onOpen={open}
             onClose={() => {

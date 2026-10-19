@@ -97,12 +97,85 @@ export interface Card {
   incertitudes: string[];
 }
 
-export interface Explanation {
+export type BlockType =
+  | "user" | "frontend" | "backend" | "worker" | "database" | "storage" | "queue" | "external"
+  | "ml_model" | "device" | "cli" | "library" | "docs" | "tests" | "infra";
+
+export interface ArchBlock {
+  id: string;
+  nom: string;
+  type: BlockType;
+  role: string;
+  techno: string;
+  code: { chemin: string; element: string }[];
+  indices: string;
+}
+
+export interface ArchFlow {
+  de: string;
+  vers: string;
+  quoi: string;
+}
+
+/** A place in the code the model cites; `verifie` = Umbra found the file and those lines. */
+export interface Cited {
+  fichier: string | null;
+  lignes: [number, number] | null;
+  verifie: boolean;
+}
+
+export interface Component {
+  id: string;
+  nom: string;
+  bloc: string;
+  role: string;
+  responsabilites: string[];
+  expose: (Cited & { quoi: string })[];
+  utilise: string[];
+  fichiers: string[];
+}
+
+export interface JourneyStep extends Cited {
+  texte: string;
+  composant: string;
+  touche: string[]; // blocks this step reaches: the user, a database, a model, an outside service
+}
+
+export interface Journey {
+  id: string;
+  nom: string;
+  declencheur: string;
+  etapes: JourneyStep[];
+  resultat: string;
+}
+
+/** What Claude Code understood of the whole Project in one study (a Hypothesis, citations checked). */
+export interface ProjectModel {
+  resume: string;
+  blocs: ArchBlock[];
+  flux: ArchFlow[];
+  composants: Component[];
+  parcours: Journey[];
+  modules: Record<string, string>;
+  dossiers: Record<string, string>;
+  incertitudes: string[];
+}
+
+export interface ModelState {
   state: "ready" | "stale" | "missing" | "queued" | "working" | "error";
-  card: Card | null;
+  model: ProjectModel | null;
+  created_at: string | null;
+  changed: string[];
+  message: string | null;
+}
+
+export interface Explanation<T = Card> {
+  state: "ready" | "stale" | "missing" | "queued" | "working" | "error";
+  card: T | null;
   producer: string | null;
   created_at: string | null;
   message: string | null;
+  level?: string | null;
 }
 
 /** Why a request failed, in the terms the page shows. */
@@ -143,6 +216,12 @@ function keepSession(session: string | null): void {
   } catch {
     // kept in memory only
   }
+}
+
+/** The session header, for requests made outside `call` (the live stream). */
+export function readSessionHeader(): Record<string, string> {
+  const session = readSession();
+  return session ? { "X-Umbra-Session": session } : {};
 }
 
 /** Called once by the app: any 401 means the session is gone (engine restarted, or expired). */
@@ -191,6 +270,8 @@ export const api = {
   index: (id: string) => call<IndexSummary>(`${project(id)}/index`, { method: "POST" }),
   map: (id: string, node: string, expand: boolean) =>
     call<MapView>(`${project(id)}/map?${new URLSearchParams({ node, expand: String(expand) })}`),
+  model: (id: string) => call<ModelState>(`${project(id)}/model`),
+  study: (id: string) => call<ModelState>(`${project(id)}/model`, { method: "POST" }),
   explanation: (id: string, node: string) =>
     call<Explanation>(`${project(id)}/explain?${new URLSearchParams({ node })}`),
   explain: (id: string, node: string) =>

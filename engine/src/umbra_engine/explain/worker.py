@@ -1,32 +1,53 @@
-"""One background worker writes cards, one Claude call at a time (ADR-0003), within a daily budget."""
+"""One background worker runs Claude Code sessions, one at a time (ADR-0003), within a daily budget.
 
+A card someone asked for goes before a long study; every session counts against the Project's
+budget for the day, rewrites and failures included.
+"""
+
+import itertools
 import queue
 import threading
+from collections import Counter
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import UTC, datetime
 
-from umbra_engine.explain.cards import CARD_PRODUCER, CardFormatError, parse_card, prompt_for
-from umbra_engine.explain.material import Material
+from umbra_engine.analysis.model import ModelFormatError
+from umbra_engine.explain.cards import CardFormatError
 from umbra_engine.gateways.claude import ClaudeUnavailableError
 from umbra_engine.project_store import ProjectStore
 
-DAILY_CARD_BUDGET = 150  # per Project: background calls share the user's own Claude limits
+DAILY_CARD_BUDGET = 150  # sessions per Project per day: they share the user's own Claude limits
+CARD, STUDY = 0, 1  # priorities: lower runs first
 
 
 @dataclass(frozen=True)
 class Job:
+    """One thing to write with Claude Code (an element's card, or the Project model): `produce` runs
+    the session and returns what to store; `digest` names what it was written from."""
+
     project_id: str
     key: str
-    material: Material
+    digest: str
+    producer: str
     open_store: Callable[[], ProjectStore]
+    produce: Callable[[], str]
+    priority: int = field(default=CARD)
 
 
 class Explainer:
-    def __init__(self, ask: Callable[[str], str], daily_budget: int = DAILY_CARD_BUDGET) -> None:
-        self._ask = ask
+    def __init__(
+        self,
+        daily_budget: int = DAILY_CARD_BUDGET,
+        on_saved: Callable[[str, str], None] = lambda project_id, key: None,
+        on_failed: Callable[[str, str], None] = lambda project_id, key: None,
+    ) -> None:
+        self._on_saved = on_saved
+        self._on_failed = on_failed
         self._budget = daily_budget
-        self._jobs: queue.Queue[Job] = queue.Queue()
+        self._jobs: queue.PriorityQueue[tuple[int, int, Job]] = queue.PriorityQueue()
+        self._order = itertools.count()
+        self._sessions: Counter[tuple[str, str]] = Counter()  # (project, day) -> sessions started
         self._states: dict[tuple[str, str], str] = {}  # "queued", "working" or an error message
         self._lock = threading.Lock()
         self._thread: threading.Thread | None = None
@@ -36,18 +57,20 @@ class Explainer:
             return self._states.get((project_id, key))
 
     def request(self, job: Job) -> str:
-        """Queue a card unless one is already on its way; returns the state to show."""
+        """Queue a session unless one for the same thing is already on its way; returns the state."""
         with self._lock:
             current = self._states.get((job.project_id, job.key))
             if current in ("queued", "working"):
                 return current
             with job.open_store() as store:
-                if store.cards_written_since(_today()) >= self._budget:
-                    message = f"daily budget reached ({self._budget} cards for this Project)"
-                    self._states[(job.project_id, job.key)] = message
-                    return message
+                written_today = store.cards_written_since(_today())
+            if max(written_today, self._sessions[(job.project_id, _today())]) >= self._budget:
+                message = f"daily budget reached ({self._budget} Claude sessions for this Project)"
+                self._states[(job.project_id, job.key)] = message
+                return message
+            self._sessions[(job.project_id, _today())] += 1
             self._states[(job.project_id, job.key)] = "queued"
-            self._jobs.put(job)
+            self._jobs.put((job.priority, next(self._order), job))
             if self._thread is None or not self._thread.is_alive():
                 self._thread = threading.Thread(target=self._run, name="umbra-explainer", daemon=True)
                 self._thread.start()
@@ -55,17 +78,22 @@ class Explainer:
 
     def _run(self) -> None:
         while True:  # a daemon thread: it waits for free and ends with the engine
-            job = self._jobs.get()
+            _, _, job = self._jobs.get()
             self._set(job, "working")
             try:
-                card = parse_card(self._ask(prompt_for(job.material)), job.material)
+                written = job.produce()
                 with job.open_store() as store:
-                    store.save_card(job.key, job.material.digest, card.to_json(), CARD_PRODUCER, _now())
+                    store.save_card(job.key, job.digest, written, job.producer, _now())
                 self._set(job, None)
-            except (ClaudeUnavailableError, CardFormatError) as error:
-                self._set(job, f"explanation failed: {error}")
+                self._on_saved(job.project_id, job.key)
+            except (ClaudeUnavailableError, CardFormatError, ModelFormatError) as error:
+                self._fail(job, f"explanation failed: {error}")
             except Exception as error:  # the worker must survive any single failure
-                self._set(job, f"explanation failed: {type(error).__name__}")
+                self._fail(job, f"explanation failed: {type(error).__name__}")
+
+    def _fail(self, job: Job, message: str) -> None:
+        self._set(job, message)
+        self._on_failed(job.project_id, job.key)
 
     def _set(self, job: Job, state: str | None) -> None:
         with self._lock:

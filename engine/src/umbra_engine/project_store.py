@@ -167,6 +167,9 @@ class ProjectStore:
             (key, digest, card, producer, created_at),
         )
 
+    def card_keys(self) -> list[str]:
+        return [row[0] for row in self._db.execute("SELECT key FROM cards ORDER BY key")]
+
     def cards_written_since(self, since: str) -> int:
         return self._db.execute("SELECT COUNT(*) FROM cards WHERE created_at >= ?", (since,)).fetchone()[0]
 
