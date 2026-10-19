@@ -6,12 +6,12 @@ the API, which reads it through the Secret Guard.
 
 from pathlib import Path
 
-from fastapi import FastAPI, HTTPException, Response, params, status
+from fastapi import FastAPI, HTTPException, params, status
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from umbra_engine.ui_session import SESSION_COOKIE, SESSION_TTL, UiSessions
+from umbra_engine.ui_session import UiSessions
 
 WEB_ROOT = Path(__file__).parent / "web"
 NOT_BUILT = """<!doctype html><meta charset="utf-8"><title>Umbra</title>
@@ -23,25 +23,22 @@ class LoginCode(BaseModel):
     code: str
 
 
+class Session(BaseModel):
+    session: str
+
+
 def add_web_routes(app: FastAPI, authorized: list[params.Depends], sessions: UiSessions) -> None:
     @app.post("/v1/ui/login-codes", dependencies=authorized)
     def new_login_code() -> LoginCode:
         """For `umbra-engine open`: the CLI holds the token, the browser only gets a one-time code."""
         return LoginCode(code=sessions.new_login_code())
 
-    @app.post("/v1/ui/session", status_code=status.HTTP_204_NO_CONTENT)
-    def open_session(body: LoginCode, response: Response) -> None:
+    @app.post("/v1/ui/session")
+    def open_session(body: LoginCode) -> Session:
         session = sessions.redeem(body.code)
         if session is None:
             raise HTTPException(status.HTTP_401_UNAUTHORIZED, "login link expired or already used")
-        response.set_cookie(
-            SESSION_COOKIE,
-            session,
-            max_age=int(SESSION_TTL),
-            path="/v1",
-            httponly=True,
-            samesite="strict",
-        )
+        return Session(session=session)
 
     if (WEB_ROOT / "index.html").is_file():
         app.mount("/", StaticFiles(directory=WEB_ROOT, html=True), name="web")

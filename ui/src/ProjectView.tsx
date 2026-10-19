@@ -48,6 +48,7 @@ export function ProjectView({ project, route, theme, narrow }: Props) {
       setAttempt((n) => n + 1);
     } catch (error) {
       setLoading({ error: error as ApiError });
+      setSelection(null);
     } finally {
       setIndexing(false);
     }

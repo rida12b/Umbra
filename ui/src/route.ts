@@ -15,7 +15,7 @@ const LOGIN = "#login=";
 
 export function takeLoginCode(): string | null {
   if (!window.location.hash.startsWith(LOGIN)) return null;
-  const code = decodeURIComponent(window.location.hash.slice(LOGIN.length));
+  const code = safeDecode(window.location.hash.slice(LOGIN.length));
   window.history.replaceState(null, "", `${window.location.pathname}#/`);
   return code || null;
 }
@@ -25,10 +25,19 @@ export function parseRoute(hash: string): Route {
   const match = /^\/p\/([^/]+)$/.exec(path);
   const params = new URLSearchParams(query);
   return {
-    projectId: match?.[1] ? decodeURIComponent(match[1]) : null,
+    projectId: match?.[1] ? safeDecode(match[1]) : null,
     node: params.get("node") ?? APPLICATION,
     expand: params.get("expand") === "1",
   };
+}
+
+/** A mistyped or truncated link (`%E0`) must not blank the page. */
+function safeDecode(text: string): string | null {
+  try {
+    return decodeURIComponent(text);
+  } catch {
+    return null;
+  }
 }
 
 export function routeHash(route: Route): string {

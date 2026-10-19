@@ -1,7 +1,9 @@
 """Browser sessions for the local web app, so the API token never travels in a URL.
 
 `umbra-engine serve` (or `open`) mints a one-time login code and opens `/#login=<code>`: the fragment
-never reaches the server or its logs. The page trades the code for an HttpOnly session cookie.
+never reaches the server or its logs. The page trades the code for a session secret that it keeps in
+its own storage and sends in a header. No cookie: browsers send cookies to every port of 127.0.0.1, so
+another local server could receive one and replay it; page storage is per origin, port included.
 Sessions live in memory: restarting the engine signs every browser out.
 """
 
@@ -12,10 +14,7 @@ from collections.abc import Callable
 
 LOGIN_CODE_TTL = 120.0
 SESSION_TTL = 12 * 3600.0
-SESSION_COOKIE = "umbra_session"
-# Cookie requests must carry this header: a page on another local port is "same-site" for the
-# browser, but a custom header forces a CORS preflight that this API never grants.
-UI_CLIENT_HEADER = "X-Umbra-Client"
+SESSION_HEADER = "X-Umbra-Session"
 
 
 class UiSessions:

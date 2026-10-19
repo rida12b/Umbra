@@ -32,21 +32,25 @@ export function edgeId(edge: MapEdge): string {
 
 export function MapCanvas({ view, theme, vertical, selection, onSelect, onOpen }: Props) {
   const [nodes, setNodes] = useState<ElementFlowNode[] | null>(null);
+  const [failed, setFailed] = useState(false);
 
   useEffect(() => {
     let current = true;
     setNodes(null);
-    layout(view.nodes, view.edges, vertical).then((placed) => {
-      if (!current) return;
-      setNodes(
-        placed.map(({ node, x, y }) => ({
-          id: node.key,
-          type: "element",
-          position: { x, y },
-          data: { element: node, vertical },
-        })),
-      );
-    });
+    setFailed(false);
+    layout(view.nodes, view.edges, vertical)
+      .then((placed) => {
+        if (!current) return;
+        setNodes(
+          placed.map(({ node, x, y }) => ({
+            id: node.key,
+            type: "element",
+            position: { x, y },
+            data: { element: node, vertical },
+          })),
+        );
+      })
+      .catch(() => current && setFailed(true));
     return () => {
       current = false;
     };
@@ -87,6 +91,7 @@ export function MapCanvas({ view, theme, vertical, selection, onSelect, onOpen }
     if (found) onSelect({ type: "edge", edge: found });
   };
 
+  if (failed) return <div className="state error-text">The layout failed for this view.</div>;
   if (nodes === null) return <div className="state">Placing elements…</div>;
   return (
     <ReactFlow

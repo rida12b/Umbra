@@ -1,4 +1,6 @@
-// The local engine API (`/v1`), as the web app uses it. Same origin, session cookie, no token.
+// The local engine API (`/v1`), as the web app uses it. Same origin, no token: a session secret,
+// kept in this page's storage (per origin, so per port) and sent in a header. Never a cookie:
+// browsers would send it to every server on 127.0.0.1.
 
 export type NodeKind =
   | "application" | "service" | "component" | "module"
@@ -95,18 +97,51 @@ export class ApiError extends Error {
   }
 }
 
-const UI_HEADER = { "X-Umbra-Client": "web" };
+const SESSION_KEY = "umbra-session";
+let memorySession: string | null = null; // when storage is blocked: this page only
+let onUnauthorized: () => void = () => undefined;
+
+function readSession(): string | null {
+  try {
+    return window.localStorage.getItem(SESSION_KEY) ?? memorySession;
+  } catch {
+    return memorySession;
+  }
+}
+
+function keepSession(session: string | null): void {
+  memorySession = session;
+  try {
+    if (session) window.localStorage.setItem(SESSION_KEY, session);
+    else window.localStorage.removeItem(SESSION_KEY);
+  } catch {
+    // kept in memory only
+  }
+}
+
+/** Called once by the app: any 401 means the session is gone (engine restarted, or expired). */
+export function whenSignedOut(handler: () => void): void {
+  onUnauthorized = handler;
+}
 
 async function call<T>(path: string, init: RequestInit = {}): Promise<T> {
   let response: Response;
+  const session = readSession();
   try {
     response = await fetch(path, {
       ...init,
-      credentials: "same-origin",
-      headers: { ...UI_HEADER, ...(init.body ? { "Content-Type": "application/json" } : {}) },
+      credentials: "omit",
+      headers: {
+        ...(session ? { "X-Umbra-Session": session } : {}),
+        ...(init.body ? { "Content-Type": "application/json" } : {}),
+      },
     });
   } catch {
     throw new ApiError(0, "The Umbra engine does not answer. Is `umbra-engine serve` running?");
+  }
+  if (response.status === 401 && !path.startsWith("/v1/ui/")) {
+    keepSession(null);
+    onUnauthorized();
   }
   if (!response.ok) {
     const body = await response.json().catch(() => ({}));
@@ -119,8 +154,13 @@ async function call<T>(path: string, init: RequestInit = {}): Promise<T> {
 const project = (id: string) => `/v1/projects/${encodeURIComponent(id)}`;
 
 export const api = {
-  openSession: (code: string) =>
-    call<void>("/v1/ui/session", { method: "POST", body: JSON.stringify({ code }) }),
+  openSession: async (code: string) => {
+    const { session } = await call<{ session: string }>("/v1/ui/session", {
+      method: "POST",
+      body: JSON.stringify({ code }),
+    });
+    keepSession(session);
+  },
   projects: () => call<Project[]>("/v1/projects"),
   index: (id: string) => call<IndexSummary>(`${project(id)}/index`, { method: "POST" }),
   map: (id: string, node: string, expand: boolean) =>

@@ -1,13 +1,11 @@
-"""The web app's access: one-time login codes, HttpOnly sessions, and the token never in a URL."""
+"""The web app's access: one-time login codes, header sessions, and the token never in a URL."""
 
 import pytest
 from fastapi.testclient import TestClient
 
 from umbra_engine import web
 from umbra_engine.api import create_app
-from umbra_engine.ui_session import LOGIN_CODE_TTL, SESSION_COOKIE, UI_CLIENT_HEADER, UiSessions
-
-UI = {UI_CLIENT_HEADER: "web"}
+from umbra_engine.ui_session import LOGIN_CODE_TTL, SESSION_HEADER, UiSessions
 
 
 def login(client: TestClient, code: str):
@@ -19,19 +17,21 @@ def code(client, auth) -> str:
     return client.post("/v1/ui/login-codes", headers=auth).json()["code"]
 
 
-def test_a_login_code_opens_one_httponly_session_once(client, code):
+def test_a_login_code_opens_one_session_once(client, code):
     response = login(client, code)
-    assert response.status_code == 204
-    cookie = response.headers["set-cookie"].lower()
-    assert "httponly" in cookie and "samesite=strict" in cookie and "path=/v1" in cookie
+    assert response.status_code == 200
+    session = response.json()["session"]
+    assert "set-cookie" not in response.headers
 
-    assert client.get("/v1/projects", headers=UI).status_code == 200
+    assert client.get("/v1/projects", headers={SESSION_HEADER: session}).status_code == 200
     assert login(client, code).status_code == 401  # used
+    assert client.get("/v1/projects", headers={SESSION_HEADER: "forged"}).status_code == 401
 
 
-def test_a_session_needs_the_ui_header(client, code):
-    """Another page on 127.0.0.1 is same-site: the cookie alone must not be enough."""
-    login(client, code)
+def test_no_ambient_credential_is_accepted(client, code):
+    """Browsers send cookies to every port of 127.0.0.1: a session must never ride on a cookie."""
+    session = login(client, code).json()["session"]
+    client.cookies.set("umbra_session", session)
     assert client.get("/v1/projects").status_code == 401
 
 
@@ -49,11 +49,9 @@ def test_login_codes_expire():
 
 
 def test_sessions_do_not_survive_a_restart(settings, client, code):
-    login(client, code)
-    session = client.cookies[SESSION_COOKIE]
+    session = login(client, code).json()["session"]
     restarted = TestClient(create_app(settings), base_url="http://127.0.0.1")
-    restarted.cookies.set(SESSION_COOKIE, session)
-    assert restarted.get("/v1/projects", headers=UI).status_code == 401
+    assert restarted.get("/v1/projects", headers={SESSION_HEADER: session}).status_code == 401
 
 
 def test_the_built_app_is_served_and_its_absence_is_explained(settings, tmp_path, monkeypatch):

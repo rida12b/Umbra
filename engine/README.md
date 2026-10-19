@@ -29,8 +29,9 @@ umbra-engine token                         # local token for API clients
 
 `serve` prints a one-time login link (`http://127.0.0.1:7811/#login=…`) and opens it. The code is
 in the URL fragment, which browsers never send to the server; it works once, for 2 minutes, and opens
-a browser session (HttpOnly cookie). The API token itself never goes in a URL. Restarting the engine
-signs every browser out: run `umbra-engine open`.
+a browser session: a secret the page keeps in its own storage and sends in a header (no cookie, which
+browsers would also send to other servers on 127.0.0.1). The API token itself never goes in a URL.
+Restarting the engine signs every browser out: run `umbra-engine open`.
 
 In the web app: click an element for its details and Evidence (file, lines, version, guarded excerpt),
 double-click (or **Open**) to go one level down, click a `+N more` group to show everything. Line

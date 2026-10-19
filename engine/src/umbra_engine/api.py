@@ -6,7 +6,7 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Annotated
 
-from fastapi import Cookie, Depends, FastAPI, Header, HTTPException, Query, Response, status
+from fastapi import Depends, FastAPI, Header, HTTPException, Query, Response, status
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from pydantic import BaseModel
 
@@ -19,7 +19,7 @@ from umbra_engine.indexer import IndexSummary, index_project
 from umbra_engine.project_store import STALE_INDEX, ProjectStore
 from umbra_engine.registry import Project, ProjectIdCollisionError, ProjectPathError, Registry
 from umbra_engine.settings import LOOPBACK_HOSTS, Settings, load_or_create_token
-from umbra_engine.ui_session import SESSION_COOKIE, UI_CLIENT_HEADER, UiSessions
+from umbra_engine.ui_session import SESSION_HEADER, UiSessions
 from umbra_engine.web import add_web_routes
 
 MAX_PAGE = 1000
@@ -58,11 +58,10 @@ def create_app(settings: Settings) -> FastAPI:
 
     def require_token(
         authorization: Annotated[str | None, Header()] = None,
-        session: Annotated[str | None, Cookie(alias=SESSION_COOKIE)] = None,
-        ui_client: Annotated[str | None, Header(alias=UI_CLIENT_HEADER)] = None,
+        session: Annotated[str | None, Header(alias=SESSION_HEADER)] = None,
     ) -> None:
         """The token (CLI, MCP, dashboard) or a browser session opened with a one-time login code."""
-        if session and ui_client and sessions.is_valid(session):
+        if session and sessions.is_valid(session):
             return
         presented = ""
         if authorization and authorization.lower().startswith("bearer "):

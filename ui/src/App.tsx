@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { ApiError, api, type Project } from "./api";
+import { ApiError, api, whenSignedOut, type Project } from "./api";
 import { ProjectView } from "./ProjectView";
 import { takeLoginCode, useRoute } from "./route";
 import { useTheme } from "./theme";
@@ -31,6 +31,7 @@ export function App() {
   const [projects, setProjects] = useState<Projects>(null);
 
   useEffect(() => {
+    whenSignedOut(() => setProjects({ error: new ApiError(401, "signed out") }));
     sessionReady
       .then(() => api.projects())
       .then((list) => setProjects({ list }))
