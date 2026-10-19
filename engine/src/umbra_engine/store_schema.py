@@ -46,6 +46,18 @@ CREATE TABLE IF NOT EXISTS cards (
     producer TEXT NOT NULL,
     created_at TEXT NOT NULL
 );
+-- What Claude Code did in the Project, as its hooks reported it: kept across re-indexing.
+CREATE TABLE IF NOT EXISTS events (
+    id TEXT PRIMARY KEY,
+    at TEXT NOT NULL,
+    kind TEXT NOT NULL,
+    session TEXT NOT NULL,
+    cwd TEXT NOT NULL,
+    files TEXT NOT NULL,
+    text TEXT NOT NULL,
+    tool TEXT NOT NULL,
+    prompt_id TEXT NOT NULL DEFAULT ''
+);
 CREATE INDEX IF NOT EXISTS claims_by_file ON claims(file);
 CREATE INDEX IF NOT EXISTS claims_by_subject ON claims(subject);
 CREATE INDEX IF NOT EXISTS claims_by_object ON claims(object);

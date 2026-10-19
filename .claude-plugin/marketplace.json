@@ -1,0 +1,11 @@
+{
+  "name": "umbra",
+  "owner": { "name": "rida12b" },
+  "plugins": [
+    {
+      "name": "umbra",
+      "source": "./plugin",
+      "description": "Lets Umbra attribute each change to its Claude Code prompt and final message."
+    }
+  ]
+}

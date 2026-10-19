@@ -189,6 +189,20 @@ class ProjectStore:
             (key, digest, card, producer, created_at),
         )
 
+    def add_event(self, row: tuple[str, ...]) -> bool:
+        """Store one journal event; False when this event id was already stored (replays are harmless)."""
+        cursor = self._db.execute(
+            "INSERT OR IGNORE INTO events(id, at, kind, session, cwd, files, text, tool, prompt_id)"
+            " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            row,
+        )
+        return cursor.rowcount == 1
+
+    def events(self) -> list[tuple[str, ...]]:
+        return self._db.execute(
+            "SELECT id, at, kind, session, cwd, files, text, tool, prompt_id FROM events ORDER BY at, id"
+        ).fetchall()
+
     def card_keys(self) -> list[str]:
         return [row[0] for row in self._db.execute("SELECT key FROM cards ORDER BY key")]
 
