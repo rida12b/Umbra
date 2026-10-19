@@ -97,6 +97,9 @@ class _Broken:
     def analyze(self, file: GuardedFile) -> list:
         raise RuntimeError("grammar unavailable")
 
+    def limits(self, file: GuardedFile) -> list[str]:
+        return []
+
 
 def test_a_failing_analyzer_is_recorded_and_does_not_stop_the_index(settings, make_repo):
     root = write_repo(make_repo("broken"), {"a.py": "def f():\n    pass\n"}, git=False)
@@ -183,3 +186,13 @@ def test_imports_inside_comments_or_strings_are_ignored_and_groups_expand(
         if c.relation == IMPORTS
     ]
     assert imports == expected
+
+
+def test_a_require_inside_an_exported_function_cites_its_own_line(make_repo):
+    text = 'export default function App() {\n  const font = require("./font.ttf")\n  return font\n}\n'
+    imports = [
+        (c.object, c.line_start, c.line_end)
+        for c in analyze(make_repo, "app.tsx", text)
+        if c.relation == IMPORTS
+    ]
+    assert imports == [("./font.ttf", 2, 2)]

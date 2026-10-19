@@ -24,6 +24,13 @@ _C_INCLUDE = re.compile(r"""^\s*#\s*include\s*[<"]([^>"]+)[>"]""")
 _RUBY = re.compile(r"""^\s*(?:require|require_relative|load)\s*\(?\s*["']([^"']+)["']""")
 
 JS_LIKE = {"javascript", "typescript", "tsx", "jsx"}
+RULE_LANGUAGES = JS_LIKE | {
+    "python", "go", "java", "kotlin", "scala", "csharp", "rust", "elixir", "php", "c", "cpp", "ruby",
+}  # fmt: skip
+
+
+def has_import_rule(language: str) -> bool:
+    return language in RULE_LANGUAGES
 
 
 def import_targets(language: str, statement: str) -> list[str]:

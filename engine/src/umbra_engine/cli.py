@@ -6,7 +6,9 @@ Named `umbra-engine` while the v0.7 `umbra` command still exists; renamed when v
 import argparse
 import sqlite3
 import sys
+from collections import Counter
 
+from umbra_engine.project_store import STALE_INDEX
 from umbra_engine.registry import ProjectIdCollisionError, ProjectPathError, Registry
 from umbra_engine.settings import API_HOST, Settings, TokenFileError, load_or_create_token
 
@@ -20,6 +22,9 @@ def main(argv: list[str] | None = None) -> int:
     commands.add_parser("list", help="list registered Projects")
     index = commands.add_parser("index", help="index a registered Project (id or path)")
     index.add_argument("project")
+    coverage = commands.add_parser("coverage", help="show which files are covered, partial or Coverage Gaps")
+    coverage.add_argument("project")
+    coverage.add_argument("--state", choices=["covered", "partial", "gap"], help="also list these files")
     verify = commands.add_parser("verify-facts", help="check a random sample of Facts against the code")
     verify.add_argument("project")
     verify.add_argument("--sample", type=int, default=30)
@@ -41,6 +46,8 @@ def _run(args: argparse.Namespace) -> int:
         return _add(settings, args.path)
     if args.command == "index":
         return _index(settings, args.project)
+    if args.command == "coverage":
+        return _coverage(settings, args.project, args.state)
     if args.command == "verify-facts":
         return _verify_facts(settings, args.project, args.sample, args.seed)
     if args.command == "list":
@@ -93,6 +100,31 @@ def _index(settings: Settings, project_ref: str) -> int:
     return 0
 
 
+def _coverage(settings: Settings, project_ref: str, state: str | None) -> int:
+    from umbra_engine.coverage import coverage_report
+
+    with Registry(settings) as registry:
+        project = registry.get(project_ref)
+        if project is None:
+            print(f"umbra-engine: unknown project: {project_ref}", file=sys.stderr)
+            return 2
+        with registry.open_store(project) as store:
+            if not store.index_is_current():
+                print(f"umbra-engine: {STALE_INDEX}", file=sys.stderr)
+                return 1
+            report = coverage_report(store.files())
+    counts = f"{report.covered} covered, {report.partial} partial, {report.gap} Coverage Gaps"
+    print(f"{report.total} files: {counts}")
+    for reason, count in report.gap_reasons.items():
+        print(f"  gap  {count:5}  {reason}")
+    partial = Counter(r for f in report.files if f.state == "partial" for r in f.reasons)
+    for reason, count in partial.most_common():
+        print(f"  part {count:5}  {reason}")
+    for file in (f for f in report.files if state and f.state == state):
+        print(f"{file.state:8} {file.path}  {'; '.join(file.reasons)}")
+    return 0
+
+
 def _verify_facts(settings: Settings, project_ref: str, sample: int, seed: int) -> int:
     from umbra_engine.fact_check import check_facts
 
@@ -102,6 +134,9 @@ def _verify_facts(settings: Settings, project_ref: str, sample: int, seed: int) 
             print(f"umbra-engine: unknown project: {project_ref}", file=sys.stderr)
             return 2
         with registry.open_store(project) as store:
+            if not store.index_is_current():
+                print(f"umbra-engine: {STALE_INDEX}", file=sys.stderr)
+                return 1
             checks = check_facts(project, store, sample, seed)
     for check in checks:
         c = check.claim

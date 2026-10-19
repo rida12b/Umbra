@@ -8,7 +8,7 @@ from umbra_engine.analyzers import Analyzer, default_analyzers
 from umbra_engine.claims import Claim
 from umbra_engine.gateways.git import has_uncommitted_changes, head_commit
 from umbra_engine.guard import GuardedFile, SecretGuard
-from umbra_engine.project_store import FileEntry, ProjectStore
+from umbra_engine.project_store import INDEXED_SCHEMA, LIST_SEPARATOR, SCHEMA_VERSION, FileEntry, ProjectStore
 from umbra_engine.registry import Project
 
 
@@ -38,7 +38,7 @@ def index_project(
             entries.append(FileEntry(result.rel_path, "skipped", result.reason, result.detail))
             continue
         redacted += len(result.redacted)
-        used, failures = [], []
+        used, failures, notes = [], [], []
         for analyzer in (a for a in analyzers if a.accepts(result)):
             try:
                 produced = [(result.rel_path, claim, analyzer.producer) for claim in analyzer.analyze(result)]
@@ -47,14 +47,22 @@ def index_project(
                 continue
             claims += produced
             used.append(analyzer.producer)
+            notes += analyzer.limits(result)
         entries.append(
-            FileEntry(result.rel_path, "readable", detail="; ".join(failures), analyzers=",".join(used))
+            FileEntry(
+                path=result.rel_path,
+                state="readable",
+                detail=LIST_SEPARATOR.join(failures),
+                analyzers=LIST_SEPARATOR.join(used),
+                notes=LIST_SEPARATOR.join(notes),
+            )
         )
 
     meta = {
         "indexed_at": datetime.now(UTC).isoformat(timespec="seconds"),
         "guard_rules": guard.rules_version,
         "uncommitted_changes": str(dirty),
+        INDEXED_SCHEMA: str(SCHEMA_VERSION),
     }
     # A Claim names a commit only when the files it was read from are exactly that commit.
     store.replace_index(entries, claims, commit if dirty is False else None, meta)

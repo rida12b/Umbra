@@ -17,6 +17,10 @@ VERIFIED = {"python", "javascript", "typescript", "tsx", "go", "java", "csharp",
 # tree-sitter-language-pack 1.22 mislabels C/C++ definitions (macros and return types as names) and
 # yields no Kotlin names: better no claim than a wrong one.
 UNSUPPORTED = {"c", "cpp", "kotlin"}
+# Languages whose extraction was looked at on real code: definitions are Hypotheses until verified.
+EXPLORED = {"rust", "ruby", "php", "swift", "scala", "lua", "bash", "dart"}
+# The Code Analyzer only claims to understand these; any other language is a Coverage Gap.
+CODE_LANGUAGES = VERIFIED | UNSUPPORTED | EXPLORED
 
 KINDS: dict[str, Kind] = {
     "Function": "function",

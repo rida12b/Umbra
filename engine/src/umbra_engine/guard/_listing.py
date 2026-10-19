@@ -81,3 +81,23 @@ def _gitignore(directory: Path) -> pathspec.GitIgnoreSpec | None:
 
 def _join(rel_dir: str, name: str) -> str:
     return name if rel_dir == "." else f"{rel_dir}/{name}"
+
+
+def git_links(root: Path) -> set[str]:
+    """Symbolic links tracked by git. Without symlink support (common on Windows) git writes them as
+    small text files holding the target path, which must not be read as code."""
+    try:
+        result = subprocess.run(
+            ["git", "-C", str(root), "ls-files", "--stage", "-z"],
+            capture_output=True,
+            check=True,
+            timeout=GIT_TIMEOUT_S,
+        )
+    except (OSError, subprocess.CalledProcessError, subprocess.TimeoutExpired):
+        return set()
+    links = set()
+    for entry in result.stdout.split(b"\0"):
+        meta, _, path = entry.partition(b"\t")
+        if meta.startswith(b"120000 "):
+            links.add(path.decode("utf-8", errors="replace"))
+    return links

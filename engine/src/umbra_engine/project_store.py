@@ -9,7 +9,10 @@ from umbra_engine import sqlite_db
 from umbra_engine.claims import Claim, StoredClaim
 
 STORE_FILE = "store.sqlite"
-SCHEMA_VERSION = 2
+LIST_SEPARATOR = "\n"  # several analyzers, failures or notes in one column
+INDEXED_SCHEMA = "indexed_schema"  # schema of the store when the last index run wrote it
+STALE_INDEX = "this Project is not indexed, or was indexed by an older Umbra: index it again"
+SCHEMA_VERSION = 3
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS meta (
     key TEXT PRIMARY KEY,
@@ -20,7 +23,8 @@ CREATE TABLE IF NOT EXISTS files (
     state TEXT NOT NULL CHECK (state IN ('readable', 'skipped')),
     reason TEXT NOT NULL DEFAULT '',
     detail TEXT NOT NULL DEFAULT '',
-    analyzers TEXT NOT NULL DEFAULT ''
+    analyzers TEXT NOT NULL DEFAULT '',
+    notes TEXT NOT NULL DEFAULT ''
 );
 CREATE TABLE IF NOT EXISTS claims (
     id INTEGER PRIMARY KEY,
@@ -40,6 +44,7 @@ CREATE INDEX IF NOT EXISTS claims_by_file ON claims(file);
 CREATE INDEX IF NOT EXISTS claims_by_subject ON claims(subject);
 CREATE INDEX IF NOT EXISTS claims_by_object ON claims(object);
 """
+FILE_FIELDS = ("path", "state", "reason", "detail", "analyzers", "notes")
 CLAIM_FIELDS = (
     "file", "subject", "subject_kind", "relation", "object", "object_kind", "status",
     "line_start", "line_end", "producer", "git_commit",
@@ -56,6 +61,7 @@ class FileEntry:
     reason: str = ""
     detail: str = ""
     analyzers: str = ""
+    notes: str = ""
 
 
 class ProjectStore:
@@ -105,8 +111,8 @@ class ProjectStore:
             self._db.execute("DELETE FROM files")
             self._db.execute("DELETE FROM claims")
             self._db.executemany(
-                "INSERT INTO files(path, state, reason, detail, analyzers) VALUES (?, ?, ?, ?, ?)",
-                [(e.path, e.state, e.reason, e.detail, e.analyzers) for e in entries],
+                f"INSERT INTO files({', '.join(FILE_FIELDS)}) VALUES ({', '.join('?' * len(FILE_FIELDS))})",
+                [(e.path, e.state, e.reason, e.detail, e.analyzers, e.notes) for e in entries],
             )
             self._db.executemany(
                 INSERT_CLAIM,
@@ -119,7 +125,7 @@ class ProjectStore:
             self._db.executemany("INSERT OR REPLACE INTO meta(key, value) VALUES (?, ?)", list(meta.items()))
 
     def files(self) -> list[FileEntry]:
-        rows = self._db.execute("SELECT path, state, reason, detail, analyzers FROM files ORDER BY path")
+        rows = self._db.execute(f"SELECT {', '.join(FILE_FIELDS)} FROM files ORDER BY path")
         return [FileEntry(*row) for row in rows]
 
     def claims(self, limit: int = 1000, offset: int = 0, **filters: str | None) -> list[StoredClaim]:
@@ -155,6 +161,12 @@ class ProjectStore:
     def count_claims(self) -> dict[str, int]:
         return dict(self._db.execute("SELECT status, COUNT(*) FROM claims GROUP BY status").fetchall())
 
+    def index_is_current(self) -> bool:
+        """False when the Project was never indexed, or indexed by an older Umbra: its rows would be
+        read with the wrong meaning, so callers must ask for a new index instead."""
+        row = self._db.execute("SELECT value FROM meta WHERE key = ?", (INDEXED_SCHEMA,)).fetchone()
+        return row is not None and row[0] == str(SCHEMA_VERSION)
+
     def meta(self) -> dict[str, str]:
         return dict(self._db.execute("SELECT key, value FROM meta").fetchall())
 
@@ -167,10 +179,11 @@ class ProjectStore:
         return active
 
     def _migrate(self) -> None:
-        """Stores created before schema 2 lack `files.analyzers`; add it and record the version."""
+        """Older stores lack later `files` columns; add them and record the version."""
         columns = {row[1] for row in self._db.execute("PRAGMA table_info(files)")}
-        if "analyzers" not in columns:
-            self._db.execute("ALTER TABLE files ADD COLUMN analyzers TEXT NOT NULL DEFAULT ''")
+        for column in ("analyzers", "notes"):
+            if column not in columns:
+                self._db.execute(f"ALTER TABLE files ADD COLUMN {column} TEXT NOT NULL DEFAULT ''")
         if self._db.execute("SELECT 1 FROM meta WHERE key = 'schema_version'").fetchone():
             self._db.execute("UPDATE meta SET value = ? WHERE key = 'schema_version'", (str(SCHEMA_VERSION),))
 
