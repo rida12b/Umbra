@@ -13,7 +13,17 @@ import yaml
 
 from umbra_engine.analyzers.dockerfile import build_key
 from umbra_engine.analyzers.yaml_nodes import YamlText, get, items, scalar, sequence
-from umbra_engine.claims import BUILT_FROM, DECLARES, DEPENDS_ON, EXPOSES, MOUNTS, USES_IMAGE, Claim, Kind
+from umbra_engine.claims import (
+    BUILD_CONTEXT,
+    BUILT_FROM,
+    DECLARES,
+    DEPENDS_ON,
+    EXPOSES,
+    MOUNTS,
+    USES_IMAGE,
+    Claim,
+    Kind,
+)
 from umbra_engine.guard import GuardedFile
 
 REMOTE_CONTEXT = re.compile(r"^(?:https?://|git@|git://|ssh://|github\.com/)", re.IGNORECASE)
@@ -25,7 +35,7 @@ def service_key(name: str) -> str:
 
 
 class ComposeAnalyzer:
-    producer = "compose@1.1"
+    producer = "compose@1.2"
 
     def accepts(self, file: GuardedFile) -> bool:
         return COMPOSE_NAME.search(file.rel_path) is not None
@@ -72,6 +82,8 @@ def _service(parsed: YamlText, path: str, name: str, key: yaml.Node, service: ya
             build,
             "build",
         )
+        if not REMOTE_CONTEXT.match(context):
+            at(BUILD_CONTEXT, f"dir:{_context_dir(path, context)}", "directory", build, "build")
     depends = get(service, "depends_on")
     for dependency in sequence(depends):
         if scalar(dependency):
@@ -93,8 +105,14 @@ def _build_target(path: str, context: str, dockerfile: str | None) -> str:
     """The Dockerfile a build uses, as the Dockerfile Analyzer keys it; a remote context stays a URL."""
     if REMOTE_CONTEXT.match(context):
         return f"remote:{context}"
-    directory = posixpath.normpath(posixpath.join(posixpath.dirname(path), context))
-    return build_key(posixpath.normpath(posixpath.join(directory, dockerfile or "Dockerfile")))
+    return build_key(
+        posixpath.normpath(posixpath.join(_context_dir(path, context), dockerfile or "Dockerfile"))
+    )
+
+
+def _context_dir(path: str, context: str) -> str:
+    """The build context relative to the Project root (`.` for the root itself)."""
+    return posixpath.normpath(posixpath.join(posixpath.dirname(path), context))
 
 
 def _long_port(port: yaml.Node) -> str | None:

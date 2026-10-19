@@ -13,6 +13,7 @@ from umbra_engine.analyzers.code import language_of
 from umbra_engine.analyzers.imports import JS_LIKE
 from umbra_engine.claims import (
     BASED_ON,
+    BUILD_CONTEXT,
     BUILT_FROM,
     DECLARES,
     DEFINES,
@@ -40,6 +41,7 @@ DECLARATION_RELATIONS = (
     SELECTS,
     ROUTES_TO,
     BUILT_FROM,
+    BUILD_CONTEXT,
     MOUNTS,
 )
 CHECKED_RELATIONS = (DEFINES, IMPORTS, *DECLARATION_RELATIONS)
@@ -60,10 +62,10 @@ class FactCheck:
 
 
 def check_facts(project: Project, store: ProjectStore, sample: int = 30, seed: int = 0) -> list[FactCheck]:
-    ids = [i for relation in CHECKED_RELATIONS for i in store.claim_ids(relation=relation, status="fact")]
-    chosen = sorted(random.Random(seed).sample(ids, min(sample, len(ids))))
+    keys = [k for relation in CHECKED_RELATIONS for k in store.claim_keys(relation=relation, status="fact")]
+    chosen = sorted(random.Random(seed).sample(keys, min(sample, len(keys))))
     guard = SecretGuard(project.root)
-    return [_check(guard, claim) for claim in store.claims_by_id(chosen)]
+    return [_check(guard, claim) for claim in store.claims_by_key(chosen)]
 
 
 def _check(guard: SecretGuard, claim: StoredClaim) -> FactCheck:
@@ -97,6 +99,13 @@ def _check_declaration(claim: StoredClaim, lines: list[str]) -> FactCheck:
         value = value.rsplit("/", 1)[-1]  # `k8s:Deployment/cart` is named `cart` in the manifest
     elif claim.relation == BUILT_FROM:
         value = _build_evidence(cited, value)
+    elif claim.relation == BUILD_CONTEXT:
+        name = value.rsplit("/", 1)[-1]
+        value = (
+            name
+            if name not in (".", "..")
+            else ("context" if any("context" in c for c in cited) else "build")
+        )
     elif claim.relation in (HAS_LABELS, SELECTS):
         value = value.split("=", 1)[0]
     hit = next((line for line in cited if value in line), None)

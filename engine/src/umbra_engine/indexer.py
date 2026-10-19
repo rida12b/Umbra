@@ -1,15 +1,21 @@
-"""Index a Project: every file goes through the Secret Guard, then through every Analyzer that accepts it."""
+"""Index a Project: every file goes through the Secret Guard, then through every Analyzer that accepts it;
+then Linkers add the Claims that need the whole Project."""
 
+import uuid
 from collections import Counter
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 
 from umbra_engine.analyzers import Analyzer, default_analyzers
-from umbra_engine.claims import Claim
-from umbra_engine.gateways.git import has_uncommitted_changes, head_commit
+from umbra_engine.claim_keys import content_digest, evidence_version, keyed
+from umbra_engine.claims import StoredClaim
+from umbra_engine.gateways.git import changed_files, head_commit
 from umbra_engine.guard import GuardedFile, SecretGuard
+from umbra_engine.linkers import PRODUCER as LINKER
+from umbra_engine.linkers import link
 from umbra_engine.project_store import INDEXED_SCHEMA, LIST_SEPARATOR, SCHEMA_VERSION, FileEntry, ProjectStore
 from umbra_engine.registry import Project
+from umbra_engine.store_schema import INDEX_ID
 
 
 @dataclass(frozen=True)
@@ -27,25 +33,27 @@ def index_project(
     project: Project, store: ProjectStore, analyzers: list[Analyzer] | None = None
 ) -> IndexSummary:
     commit = head_commit(project.root)
-    dirty = has_uncommitted_changes(project.root) if commit else None
+    changed = changed_files(project.root) if commit else None
     guard = SecretGuard(project.root)
     analyzers = default_analyzers() if analyzers is None else analyzers
     entries: list[FileEntry] = []
-    claims: list[tuple[str, Claim, str]] = []
+    claims: list[StoredClaim] = []
+    versions: dict[str, str] = {}
     redacted = 0
     for result in guard.files():
         if not isinstance(result, GuardedFile):
             entries.append(FileEntry(result.rel_path, "skipped", result.reason, result.detail))
             continue
         redacted += len(result.redacted)
+        version = versions[result.rel_path] = evidence_version(commit, changed, result.rel_path, result.text)
         used, failures, notes = [], [], []
         for analyzer in (a for a in analyzers if a.accepts(result)):
             try:
-                produced = [(result.rel_path, claim, analyzer.producer) for claim in analyzer.analyze(result)]
+                produced = list(analyzer.analyze(result))
             except Exception as error:  # one broken grammar or parser must not stop the whole index
                 failures.append(f"{analyzer.producer} failed: {type(error).__name__}")
                 continue
-            claims += produced
+            claims += keyed(result.rel_path, produced, analyzer.producer, version)
             used.append(analyzer.producer)
             notes += analyzer.limits(result)
         entries.append(
@@ -55,23 +63,32 @@ def index_project(
                 detail=LIST_SEPARATOR.join(failures),
                 analyzers=LIST_SEPARATOR.join(used),
                 notes=LIST_SEPARATOR.join(notes),
+                version=version,
+                digest=content_digest(result.text),
             )
         )
 
+    by_file: dict[str, list] = {}
+    for file, derived in link(claims, set(versions)):
+        by_file.setdefault(file, []).append(derived)
+    for file, derived_claims in sorted(by_file.items()):
+        claims += keyed(file, derived_claims, LINKER, versions[file])
+
     meta = {
+        INDEX_ID: uuid.uuid4().hex,  # names this run: readers cache what they derive from it
         "indexed_at": datetime.now(UTC).isoformat(timespec="seconds"),
         "guard_rules": guard.rules_version,
-        "uncommitted_changes": str(dirty),
+        "git_commit": commit or "",
+        "uncommitted_changes": str(bool(changed) if changed is not None else None),
         INDEXED_SCHEMA: str(SCHEMA_VERSION),
     }
-    # A Claim names a commit only when the files it was read from are exactly that commit.
-    store.replace_index(entries, claims, commit if dirty is False else None, meta)
+    store.replace_index(entries, claims, meta)
     return IndexSummary(
         files=len(entries),
-        readable=sum(e.state == "readable" for e in entries),
+        readable=len(versions),
         redacted_secrets=redacted,
-        claims=dict(sorted(Counter(claim.status for _, claim, _ in claims).items())),
+        claims=dict(sorted(Counter(claim.status for claim in claims).items())),
         git_commit=commit,
-        uncommitted_changes=dirty,
+        uncommitted_changes=bool(changed) if changed is not None else None,
         skipped=dict(sorted(Counter(e.reason for e in entries if e.state == "skipped").items())),
     )

@@ -125,7 +125,7 @@ def test_claims_name_a_commit_only_when_the_tree_is_clean(settings, make_repo):
             summary = index_project(project, store)
             stored = store.claims()
     assert summary.git_commit is not None and summary.uncommitted_changes is True
-    assert all(claim.git_commit is None for claim in stored)
+    assert all(claim.evidence_version.startswith("worktree:") for claim in stored if claim.file == "a.py")
 
 
 def test_the_fact_check_rejects_a_wrong_import_target(settings, make_repo):

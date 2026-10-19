@@ -11,6 +11,7 @@ from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from pydantic import BaseModel
 
 from umbra_engine import __version__
+from umbra_engine.api_map import add_map_routes
 from umbra_engine.claims import Relation, Status, StoredClaim
 from umbra_engine.coverage import CoverageReport, coverage_report
 from umbra_engine.coverage import State as CoverageState
@@ -130,4 +131,5 @@ def create_app(settings: Settings) -> FastAPI:
         with registry.open_store(project) as store:
             return index_project(project, store)
 
+    add_map_routes(app, authorized, known_project, indexed_store)
     return app

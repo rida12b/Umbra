@@ -3,6 +3,7 @@
 import hashlib
 import os
 import re
+import threading
 import unicodedata
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -79,6 +80,8 @@ class Registry:
         self._settings = settings
         settings.home.mkdir(parents=True, exist_ok=True)
         self._db = sqlite_db.connect(settings.registry_path, SCHEMA)
+        # One connection serves the API's whole thread pool: SQLite connections are not thread-safe.
+        self._lock = threading.RLock()
 
     def __enter__(self) -> "Registry":
         return self
@@ -92,36 +95,43 @@ class Registry:
         candidate = Project(
             project_id_for(root), root, root.name, datetime.now(UTC).isoformat(timespec="seconds")
         )
-        cursor = self._db.execute(
-            "INSERT OR IGNORE INTO projects(id, root, root_key, name, created_at) VALUES (?, ?, ?, ?, ?)",
-            (candidate.id, str(candidate.root), root_key(root), candidate.name, candidate.created_at),
-        )
-        project = self._find_by_key(root_key(root))
+        with self._lock:
+            cursor = self._db.execute(
+                "INSERT OR IGNORE INTO projects(id, root, root_key, name, created_at) VALUES (?, ?, ?, ?, ?)",
+                (candidate.id, str(candidate.root), root_key(root), candidate.name, candidate.created_at),
+            )
+            project = self._find_by_key(root_key(root))
         if project is None:
             raise ProjectIdCollisionError(f"project id {candidate.id} is already used by another folder")
         ProjectStore.create(self._settings.projects_dir / project.id).close()
         return project, cursor.rowcount == 1
 
     def get(self, project_id: str) -> Project | None:
-        row = self._db.execute(
-            "SELECT id, root, name, created_at FROM projects WHERE id = ?", (project_id,)
-        ).fetchone()
+        with self._lock:
+            row = self._db.execute(
+                "SELECT id, root, name, created_at FROM projects WHERE id = ?", (project_id,)
+            ).fetchone()
         return _to_project(row) if row else None
 
     def list(self) -> list[Project]:
-        rows = self._db.execute("SELECT id, root, name, created_at FROM projects ORDER BY created_at, id")
+        with self._lock:
+            rows = self._db.execute(
+                "SELECT id, root, name, created_at FROM projects ORDER BY created_at, id"
+            ).fetchall()
         return [_to_project(row) for row in rows]
 
     def open_store(self, project: Project) -> ProjectStore:
         return ProjectStore.open_existing(self._settings.projects_dir / project.id)
 
     def close(self) -> None:
-        self._db.close()
+        with self._lock:
+            self._db.close()
 
     def _find_by_key(self, key: str) -> Project | None:
-        row = self._db.execute(
-            "SELECT id, root, name, created_at FROM projects WHERE root_key = ?", (key,)
-        ).fetchone()
+        with self._lock:
+            row = self._db.execute(
+                "SELECT id, root, name, created_at FROM projects WHERE root_key = ?", (key,)
+            ).fetchone()
         return _to_project(row) if row else None
 
 
