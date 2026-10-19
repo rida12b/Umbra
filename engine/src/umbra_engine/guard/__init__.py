@@ -57,7 +57,7 @@ class Skipped:
 
 
 class SecretGuard:
-    rules_version = RULES_VERSION
+    rules_version = f"{RULES_VERSION}+guard-1"  # bump the suffix when any release rule here changes
 
     def __init__(self, root: Path) -> None:
         self._root = Path(os.path.realpath(root))
@@ -75,12 +75,16 @@ class SecretGuard:
         return list_files(self._root)
 
     def fingerprint(self, rel_path: str) -> str | None:
-        """Size and modification time, without reading: equal fingerprints mean the file is unchanged."""
+        """Size, modification time and resolved target, without reading: equal fingerprints mean the
+        file is unchanged (a link pointed elsewhere changes it). Limit: a same-size edit that keeps the
+        old modification time (`cp -p`, restored backups) is not seen until the next full read."""
+        path = self._root / rel_path
         try:
-            stat = (self._root / rel_path).stat()
+            stat = path.stat()
+            target = self._target(rel_path) if path.is_symlink() else ""
         except OSError:
             return None
-        return f"{stat.st_size}:{stat.st_mtime_ns}"
+        return f"{stat.st_size}:{stat.st_mtime_ns}:{target}"
 
     def check(self, rel_path: str) -> Skipped | None:
         """Path-only verdict: why this file must never be read, or None if it may be read.

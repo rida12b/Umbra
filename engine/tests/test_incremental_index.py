@@ -106,3 +106,24 @@ def test_changed_analyzers_read_everything_again(settings, make_repo, reads):
     reads.clear()
     run(settings, root, analyzers=default_analyzers()[:1])
     assert "app/main.py" in reads
+
+
+def test_a_file_skipped_for_a_passing_reason_is_read_again(settings, make_repo, reads, monkeypatch):
+    """A lock or a permission fixed later changes neither size nor modification time."""
+    from umbra_engine.guard import UNREADABLE, Skipped
+
+    root = write_repo(make_repo("locked"), FILES, git=False)
+    original = SecretGuard.read
+
+    def locked(self, rel_path):
+        if rel_path == "app/util.py":
+            return Skipped(rel_path, UNREADABLE, "PermissionError")
+        return original(self, rel_path)
+
+    monkeypatch.setattr(SecretGuard, "read", locked)
+    _, files, _ = run(settings, root)
+    assert next(f for f in files if f.path == "app/util.py").reason == UNREADABLE
+    monkeypatch.setattr(SecretGuard, "read", original)
+    _, files, claims = run(settings, root)
+    assert next(f for f in files if f.path == "app/util.py").state == "readable"
+    assert any(c.object == "app/util.py::helper" for c in claims)

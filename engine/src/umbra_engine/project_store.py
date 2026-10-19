@@ -81,8 +81,16 @@ class ProjectStore:
                 f"INSERT INTO files({', '.join(FILE_FIELDS)}) VALUES ({placeholders(FILE_FIELDS)})",
                 [
                     (
-                        e.path, e.state, e.reason, e.detail, e.analyzers, e.notes, e.version, e.digest,
-                        e.fingerprint, e.redactions,
+                        e.path,
+                        e.state,
+                        e.reason,
+                        e.detail,
+                        e.analyzers,
+                        e.notes,
+                        e.version,
+                        e.digest,
+                        e.fingerprint,
+                        e.redactions,
                     )  # fmt: skip
                     for e in entries
                 ],

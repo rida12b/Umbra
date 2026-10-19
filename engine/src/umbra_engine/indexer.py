@@ -10,13 +10,14 @@ from umbra_engine.analyzers import Analyzer, default_analyzers
 from umbra_engine.claim_keys import WORKTREE, content_digest, evidence_version, keyed
 from umbra_engine.claims import StoredClaim
 from umbra_engine.gateways.git import changed_files, head_commit
-from umbra_engine.guard import GuardedFile, SecretGuard
+from umbra_engine.guard import BINARY, TOO_LARGE, GuardedFile, SecretGuard
 from umbra_engine.linkers import PRODUCER as LINKER
 from umbra_engine.linkers import link
 from umbra_engine.project_store import INDEXED_SCHEMA, LIST_SEPARATOR, SCHEMA_VERSION, FileEntry, ProjectStore
 from umbra_engine.registry import Project
 from umbra_engine.store_schema import INDEX_ID
 
+LASTING_SKIPS = {BINARY, TOO_LARGE}  # decided by the content itself: unchanged content, same verdict
 ANALYZERS = "analyzers"  # meta: which Analyzers (and versions) produced the stored Claims
 
 
@@ -58,9 +59,10 @@ def index_project(
                 version = versions[rel_path] = _version(commit, changed, rel_path, old.digest)
                 claims += [_reversioned(c, version) for c in previous_claims.get(rel_path, [])]
                 entries.append(_entry(old, version))
-            else:
+                continue
+            if old.reason in LASTING_SKIPS:  # a lock or a race passes: those files are read again
                 entries.append(old)
-            continue
+                continue
         result = guard.read(rel_path)
         if not isinstance(result, GuardedFile):
             entries.append(
