@@ -68,8 +68,9 @@ def create_app(
         if live_projects is not None:
             for project in registry.list():
                 with registry.open_store(project) as store:
-                    if store.index_is_current():
-                        live_projects.follow(project)
+                    if not store.index_is_current():
+                        index_project(project, store)  # indexed by an older Umbra: read it once more
+                live_projects.follow(project)
         yield
         if live_projects is not None:
             live_projects.stop_all()

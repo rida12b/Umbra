@@ -70,6 +70,18 @@ class SecretGuard:
         for rel_path in list_files(self._root):
             yield self.read(rel_path)
 
+    def paths(self) -> list[str]:
+        """The Project's files, as names only (check each one before using it)."""
+        return list_files(self._root)
+
+    def fingerprint(self, rel_path: str) -> str | None:
+        """Size and modification time, without reading: equal fingerprints mean the file is unchanged."""
+        try:
+            stat = (self._root / rel_path).stat()
+        except OSError:
+            return None
+        return f"{stat.st_size}:{stat.st_mtime_ns}"
+
     def check(self, rel_path: str) -> Skipped | None:
         """Path-only verdict: why this file must never be read, or None if it may be read.
 

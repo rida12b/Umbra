@@ -34,6 +34,8 @@ class FileEntry:
     notes: str = ""
     version: str = ""
     digest: str = ""
+    fingerprint: str = ""  # size and modification time when read: unchanged means no need to read again
+    redactions: int = 0
 
 
 class ProjectStore:
@@ -78,7 +80,10 @@ class ProjectStore:
             self._db.executemany(
                 f"INSERT INTO files({', '.join(FILE_FIELDS)}) VALUES ({placeholders(FILE_FIELDS)})",
                 [
-                    (e.path, e.state, e.reason, e.detail, e.analyzers, e.notes, e.version, e.digest)
+                    (
+                        e.path, e.state, e.reason, e.detail, e.analyzers, e.notes, e.version, e.digest,
+                        e.fingerprint, e.redactions,
+                    )  # fmt: skip
                     for e in entries
                 ],
             )
@@ -128,6 +133,15 @@ class ProjectStore:
         return [
             row[0] for row in self._db.execute(f"SELECT key FROM claims WHERE {where} ORDER BY key", values)
         ]
+
+    def claims_not_from(self, producer: str) -> list[StoredClaim]:
+        """Claims from every producer but this one (any version of it): `linker@1.1` → not `linker@…`."""
+        name = producer.split("@", 1)[0]
+        rows = self._db.execute(
+            f"SELECT {', '.join(CLAIM_FIELDS)} FROM claims WHERE producer NOT LIKE ? ORDER BY key",
+            (f"{name}@%",),
+        )
+        return [StoredClaim(*row) for row in rows]
 
     def claims_with_relations(self, relations: tuple[str, ...]) -> list[StoredClaim]:
         marks = placeholders(relations)
