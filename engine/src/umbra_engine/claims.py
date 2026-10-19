@@ -11,7 +11,7 @@ Kind = Literal[
 Relation = Literal[
     "defines", "imports", "calls",
     "declares", "uses_image", "built_from", "depends_on", "exposes", "based_on",
-    "has_labels", "selects", "routes_to",
+    "has_labels", "selects", "routes_to", "mounts",
 ]  # fmt: skip
 
 DEFINES = "defines"
@@ -27,6 +27,7 @@ BASED_ON = "based_on"
 HAS_LABELS = "has_labels"
 SELECTS = "selects"
 ROUTES_TO = "routes_to"
+MOUNTS = "mounts"
 
 
 @dataclass(frozen=True)

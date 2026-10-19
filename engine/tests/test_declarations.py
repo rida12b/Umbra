@@ -114,8 +114,8 @@ def test_dockerfile_base_images_skip_internal_stages(claims):
 def test_kubernetes_service_and_workload_meet_on_labels(claims):
     found, _ = claims
     assert found[("deploy/cart.yaml", "declares", "k8s:Deployment/cart")][:2] == (1, 15)
-    assert ("k8s:Deployment/cart", "has_labels", "labels:app=cart") in found
-    assert ("k8s:Service/cart", "selects", "labels:app=cart") in found
+    assert ("k8s:Deployment/cart", "has_labels", "label:app=cart") in found
+    assert ("k8s:Service/cart", "selects", "label:app=cart") in found
     assert found[("k8s:Deployment/cart", "uses_image", "image:shop/cart:1.0")][:2] == (13, 13)
     assert ("k8s:Ingress/web", "routes_to", "k8s:Service/cart") in found
 
@@ -147,7 +147,7 @@ def test_templated_manifests_are_reported_not_guessed(settings, make_repo):
             index_project(project, store)
             (entry,) = store.files()
             assert store.claims() == []
-    assert "kubernetes@1.0 failed" in entry.detail
+    assert entry.detail == "kubernetes@1.1 failed: TemplatedManifestError"
 
 
 def test_evidence_lines_hold_the_declared_value(settings, make_repo):

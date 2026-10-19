@@ -40,12 +40,26 @@ class YamlText:
         return max(row, start_row) + 1
 
 
+MERGE_KEY = "<<"
+
+
 def items(node: yaml.Node | None) -> Iterator[tuple[str, yaml.Node, yaml.Node]]:
-    """`(key, key node, value node)` of a mapping; nothing for other node types."""
-    if isinstance(node, yaml.MappingNode):
-        for key, value in node.value:
-            if isinstance(key, yaml.ScalarNode):
-                yield str(key.value), key, value
+    """`(key, key node, value node)` of a mapping, merge keys (`<<: *base`) included: inherited
+    entries come after the explicit ones and never override them. Nothing for other node types."""
+    if not isinstance(node, yaml.MappingNode):
+        return
+    explicit = [
+        (str(k.value), k, v) for k, v in node.value if isinstance(k, yaml.ScalarNode) and k.value != MERGE_KEY
+    ]
+    yield from explicit
+    seen = {key for key, _, _ in explicit}
+    for key, value in node.value:
+        if isinstance(key, yaml.ScalarNode) and key.value == MERGE_KEY:
+            for base in value.value if isinstance(value, yaml.SequenceNode) else [value]:
+                for name, key_node, inherited in items(base):
+                    if name not in seen:
+                        seen.add(name)
+                        yield name, key_node, inherited
 
 
 def get(node: yaml.Node | None, *path: str) -> yaml.Node | None:

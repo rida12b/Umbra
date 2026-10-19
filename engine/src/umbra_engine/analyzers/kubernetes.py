@@ -1,10 +1,12 @@
-"""Kubernetes manifests: workloads, their images and labels, Services and what they select, Ingress routes.
+"""Kubernetes manifests: workloads, images, ports, labels, Services, what they select, Ingress routes.
 
-Declarations only. A Service and the workloads it reaches meet on a shared `labels:` key: the
-Service `selects` it and each workload `has_labels` it, so linking needs no guess.
+Declarations only. Labels are one Claim per `key=value`: a Service `selects` each pair of its
+selector and a workload `has_labels` each of its pod labels, so "selector is a subset of the labels"
+is checked from Facts when the map is built, never guessed here. Templated manifests (Helm) are not
+analyzed: their names are not known until rendering.
 """
 
-from collections.abc import Iterable
+from collections.abc import Iterable, Iterator
 
 import yaml
 
@@ -13,19 +15,29 @@ from umbra_engine.claims import DECLARES, EXPOSES, HAS_LABELS, ROUTES_TO, SELECT
 from umbra_engine.guard import GuardedFile
 
 WORKLOADS = {"Deployment", "StatefulSet", "DaemonSet", "ReplicaSet", "Job", "CronJob", "Pod"}
+RESOURCE_KINDS: dict[str, Kind] = {"Service": "k8s-service", "Ingress": "ingress"}
+NOT_RESOURCES = {"Kustomization", "Component"}
 YAML_SUFFIXES = (".yaml", ".yml")
+TEMPLATE_MARKERS = ("{{", "{%")
 
 
-def resource_key(kind: str, name: str) -> str:
-    return f"k8s:{kind}/{name}"
+class TemplatedManifestError(ValueError):
+    """The manifest is a template (Helm, Jinja): names and values are only known after rendering."""
 
 
-def labels_key(labels: dict[str, str]) -> str:
-    return "labels:" + ",".join(f"{key}={value}" for key, value in sorted(labels.items()))
+def resource_key(kind: str, name: str, namespace: str | None = None) -> str:
+    return f"k8s:{namespace}/{kind}/{name}" if namespace else f"k8s:{kind}/{name}"
+
+
+def label_key(key: str, value: str) -> str:
+    return f"label:{key}={value}"
 
 
 class KubernetesAnalyzer:
-    producer = "kubernetes@1.0"
+    producer = "kubernetes@1.1"
+
+    def __init__(self) -> None:
+        self._notes: dict[str, list[str]] = {}
 
     def accepts(self, file: GuardedFile) -> bool:
         if not file.rel_path.lower().endswith(YAML_SUFFIXES):
@@ -33,47 +45,62 @@ class KubernetesAnalyzer:
         return "apiVersion:" in file.text and "kind:" in file.text
 
     def analyze(self, file: GuardedFile) -> Iterable[Claim]:
+        if any(marker in file.text for marker in TEMPLATE_MARKERS):
+            raise TemplatedManifestError(file.rel_path)
         parsed = YamlText(file.text)
         claims: list[Claim] = []
-        for document in parsed.documents:
-            kind, name = scalar(get(document, "kind")), scalar(get(document, "metadata", "name"))
-            if kind is None or name is None or scalar(get(document, "apiVersion")) is None:
+        notes: list[str] = []
+        for document in _resources(parsed.documents):
+            kind = scalar(get(document, "kind"))
+            if kind in NOT_RESOURCES:
+                notes.append(f"{kind} not resolved (overlays and patches are not applied)")
                 continue
-            subject = resource_key(kind, name)
-            span = parsed.located(document)
-            object_kind: Kind = "workload" if kind in WORKLOADS else _kind(kind)
-            claims.append(
-                Claim(file.rel_path, "module", DECLARES, subject, object_kind, "fact", span.start, span.end)
-            )
-            if kind in WORKLOADS:
-                claims += _workload(parsed, subject, kind, document)
-            elif kind == "Service":
-                claims += _service(parsed, subject, document)
-            elif kind == "Ingress":
-                claims += _ingress(parsed, subject, document)
+            claims += _resource(parsed, file.rel_path, document)
+        self._notes[file.rel_path] = notes
         return claims
 
     def limits(self, file: GuardedFile) -> list[str]:
-        try:
-            YamlText(file.text)
-        except yaml.YAMLError:
-            return ["unparsable YAML (templated manifest?)"]
+        return self._notes.pop(file.rel_path, [])
+
+
+def _resources(documents: list[yaml.Node]) -> Iterator[yaml.Node]:
+    """Every document, and every item of a `kind: List`."""
+    for document in documents:
+        if scalar(get(document, "kind")) == "List":
+            yield from sequence(get(document, "items"))
+        else:
+            yield document
+
+
+def _resource(parsed: YamlText, path: str, document: yaml.Node) -> list[Claim]:
+    kind, name = scalar(get(document, "kind")), scalar(get(document, "metadata", "name"))
+    if kind is None or name is None or scalar(get(document, "apiVersion")) is None:
         return []
+    namespace = scalar(get(document, "metadata", "namespace"))
+    subject = resource_key(kind, name, namespace)
+    span = parsed.located(document)
+    object_kind: Kind = "workload" if kind in WORKLOADS else RESOURCE_KINDS.get(kind, "resource")
+    claims = [Claim(path, "module", DECLARES, subject, object_kind, "fact", span.start, span.end)]
+    if kind in WORKLOADS:
+        claims += _workload(parsed, subject, kind, document)
+    elif kind == "Service":
+        claims += _service(parsed, subject, document)
+    elif kind == "Ingress":
+        claims += _ingress(parsed, subject, document, namespace)
+    return claims
 
 
 def _workload(parsed: YamlText, subject: str, kind: str, document: yaml.Node) -> list[Claim]:
-    pod = (
-        get(document, "spec", "jobTemplate", "spec", "template")
-        if kind == "CronJob"
-        else get(document, "spec", "template")
-    )
-    pod = document if kind == "Pod" else pod
-    claims = []
-    labels = get(pod, "metadata", "labels")
-    if labels is not None:
-        claims.append(
-            _at(parsed, subject, "workload", HAS_LABELS, labels_key(_mapping(labels)), "labels", labels)
-        )
+    if kind == "Pod":
+        pod: yaml.Node | None = document
+    elif kind == "CronJob":
+        pod = get(document, "spec", "jobTemplate", "spec", "template")
+    else:
+        pod = get(document, "spec", "template")
+    claims = [
+        _at(parsed, subject, "workload", HAS_LABELS, label_key(key, value), "labels", node)
+        for key, value, node in _pairs(get(pod, "metadata", "labels"))
+    ]
     for section in ("containers", "initContainers"):
         for container in sequence(get(pod, "spec", section)):
             image = get(container, "image")
@@ -91,12 +118,10 @@ def _workload(parsed: YamlText, subject: str, kind: str, document: yaml.Node) ->
 
 
 def _service(parsed: YamlText, subject: str, document: yaml.Node) -> list[Claim]:
-    claims = []
-    selector = get(document, "spec", "selector")
-    if selector is not None and _mapping(selector):
-        claims.append(
-            _at(parsed, subject, "k8s-service", SELECTS, labels_key(_mapping(selector)), "labels", selector)
-        )
+    claims = [
+        _at(parsed, subject, "k8s-service", SELECTS, label_key(key, value), "labels", node)
+        for key, value, node in _pairs(get(document, "spec", "selector"))
+    ]
     for port in sequence(get(document, "spec", "ports")):
         number = get(port, "port")
         if number is not None and scalar(number):
@@ -106,26 +131,23 @@ def _service(parsed: YamlText, subject: str, document: yaml.Node) -> list[Claim]
     return claims
 
 
-def _ingress(parsed: YamlText, subject: str, document: yaml.Node) -> list[Claim]:
-    claims = []
+def _ingress(parsed: YamlText, subject: str, document: yaml.Node, namespace: str | None) -> list[Claim]:
+    backends = [get(document, "spec", "defaultBackend"), get(document, "spec", "backend")]
     for rule in sequence(get(document, "spec", "rules")):
-        for path in sequence(get(rule, "http", "paths")):
-            backend = get(path, "backend", "service", "name") or get(path, "backend", "serviceName")
-            if backend is not None and scalar(backend):
-                target = resource_key("Service", str(scalar(backend)))
-                claims.append(_at(parsed, subject, "ingress", ROUTES_TO, target, "k8s-service", backend))
+        backends += [get(path, "backend") for path in sequence(get(rule, "http", "paths"))]
+    claims = []
+    for backend in backends:
+        service = get(backend, "service", "name") or get(backend, "serviceName")
+        if service is not None and scalar(service):
+            target = resource_key("Service", str(scalar(service)), namespace)
+            claims.append(_at(parsed, subject, "ingress", ROUTES_TO, target, "k8s-service", service))
     return claims
 
 
-def _mapping(node: yaml.Node) -> dict[str, str]:
-    return {key: str(scalar(value)) for key, _, value in items(node) if scalar(value) is not None}
-
-
-RESOURCE_KINDS: dict[str, Kind] = {"Service": "k8s-service", "Ingress": "ingress"}
-
-
-def _kind(kind: str) -> Kind:
-    return RESOURCE_KINDS.get(kind, "resource")
+def _pairs(mapping: yaml.Node | None) -> Iterator[tuple[str, str, yaml.Node]]:
+    for key, key_node, value in items(mapping):
+        if scalar(value) is not None:
+            yield key, str(scalar(value)), key_node
 
 
 def _at(

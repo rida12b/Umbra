@@ -10,6 +10,8 @@ from umbra_engine.claims import BASED_ON, EXPOSES, Claim
 from umbra_engine.guard import GuardedFile
 
 DOCKERFILE_NAME = re.compile(r"(?:^|/)(?:[\w.\-]+\.)?dockerfile(?:\.[\w.\-]+)?$", re.IGNORECASE)
+# Documentation and templates about Dockerfiles are not Dockerfiles.
+NOT_DOCKERFILES = (".md", ".txt", ".rst", ".adoc", ".json", ".yaml", ".yml", ".dockerignore", ".j2", ".tpl")
 _FROM = re.compile(r"^[ \t]*FROM[ \t]+(?:--platform=\S+[ \t]+)?(\S+)(?:[ \t]+AS[ \t]+(\S+))?", re.IGNORECASE)
 _EXPOSE = re.compile(r"^[ \t]*EXPOSE[ \t]+(.+)$", re.IGNORECASE)
 
@@ -22,9 +24,8 @@ class DockerfileAnalyzer:
     producer = "dockerfile@1.0"
 
     def accepts(self, file: GuardedFile) -> bool:
-        return DOCKERFILE_NAME.search(file.rel_path) is not None and not file.rel_path.endswith(
-            ".dockerignore"
-        )
+        path = file.rel_path.lower()
+        return DOCKERFILE_NAME.search(path) is not None and not path.endswith(NOT_DOCKERFILES)
 
     def analyze(self, file: GuardedFile) -> Iterable[Claim]:
         subject = build_key(file.rel_path)
