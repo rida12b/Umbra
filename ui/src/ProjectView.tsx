@@ -4,6 +4,7 @@ import { ElementList } from "./map/ElementList";
 import { MapCanvas, type Selection } from "./map/MapCanvas";
 import { DetailsPanel } from "./panel/DetailsPanel";
 import { useExplanation } from "./panel/useExplanation";
+import { useLive } from "./live";
 import { APPLICATION, navigate, type Route } from "./route";
 import type { Theme } from "./theme";
 
@@ -22,13 +23,13 @@ export function ProjectView({ project, route, theme, narrow }: Props) {
   const [indexing, setIndexing] = useState(false);
   const [attempt, setAttempt] = useState(0);
   const [panelOpen, setPanelOpen] = useState(!narrow);
+  const live = useLive();
   // The card of the level shown: its own explanation, and one sentence per block on the map.
   const levelExplanation = useExplanation(project.id, route.node);
   const roles = levelExplanation?.card?.enfants ?? {};
 
   useEffect(() => {
-    let current = true;
-    setLoading(null);
+    let current = true; // on a live refresh the current map stays on screen until the new one arrives
     api
       .map(project.id, route.node, route.expand)
       .then((view) => current && setLoading({ view }))
@@ -36,7 +37,7 @@ export function ProjectView({ project, route, theme, narrow }: Props) {
     return () => {
       current = false;
     };
-  }, [project.id, route.node, route.expand, attempt]);
+  }, [project.id, route.node, route.expand, attempt, live.revision]);
 
   const open = useCallback(
     (node: MapNode) => {

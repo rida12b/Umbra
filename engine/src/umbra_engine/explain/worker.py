@@ -32,8 +32,14 @@ class Job:
 
 
 class Explainer:
-    def __init__(self, ask: Callable[[str], str], daily_budget: int = DAILY_CARD_BUDGET) -> None:
+    def __init__(
+        self,
+        ask: Callable[[str], str],
+        daily_budget: int = DAILY_CARD_BUDGET,
+        on_saved: Callable[[str, str], None] = lambda project_id, key: None,
+    ) -> None:
         self._ask = ask
+        self._on_saved = on_saved
         self._budget = daily_budget
         self._jobs: queue.Queue[Job] = queue.Queue()
         self._states: dict[tuple[str, str], str] = {}  # "queued", "working" or an error message
@@ -71,6 +77,7 @@ class Explainer:
                 with job.open_store() as store:
                     store.save_card(job.key, job.material.digest, card.to_json(), CARD_PRODUCER, _now())
                 self._set(job, None)
+                self._on_saved(job.project_id, job.key)
             except (ClaudeUnavailableError, CardFormatError) as error:
                 self._set(job, f"explanation failed: {error}")
             except Exception as error:  # the worker must survive any single failure

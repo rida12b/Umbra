@@ -43,7 +43,9 @@ def add_explain_routes(
     indexed_store: Callable[[str], ProjectStore],
     graph_of: Callable[[str], ProjectGraph],
     explainer: Explainer,
-) -> None:
+) -> Callable[[str], int]:
+    """Adds the routes; returns `refresh_cards(project_id)`, which queues every out-of-date card."""
+
     def material_of(project_id: str, node: str) -> Material:
         project = known_project(project_id)
         guard = SecretGuard(project.root)
@@ -86,12 +88,32 @@ def add_explain_routes(
         found = material_of(project_id, node)
         current = explanation(project_id, node, found)
         if current.state in ("missing", "stale", "error"):
-            graph = graph_of(project_id)
-            prompt, parse = (
-                (prompt_for_architecture(found), lambda answer: parse_architecture(answer, graph))
-                if node == ARCHITECTURE
-                else (prompt_for(found), lambda answer: parse_card(answer, found))
-            )
-            explainer.request(Job(project_id, node, found, lambda: indexed_store(project_id), prompt, parse))
+            explainer.request(job(project_id, node, found))
             current = explanation(project_id, node, found)
         return current
+
+    def job(project_id: str, node: str, found: Material) -> Job:
+        graph = graph_of(project_id)
+        prompt, parse = (
+            (prompt_for_architecture(found), lambda answer: parse_architecture(answer, graph))
+            if node == ARCHITECTURE
+            else (prompt_for(found), lambda answer: parse_card(answer, found))
+        )
+        return Job(project_id, node, found, lambda: indexed_store(project_id), prompt, parse)
+
+    def refresh_cards(project_id: str) -> int:
+        """After the code changed: rewrite the cards already written whose material changed since."""
+        with indexed_store(project_id) as store:
+            keys = store.card_keys()
+        queued = 0
+        for node in keys:
+            try:
+                found = material_of(project_id, node)
+            except HTTPException:
+                continue  # the element is gone from the map
+            if explanation(project_id, node, found).state == "stale":
+                explainer.request(job(project_id, node, found))
+                queued += 1
+        return queued
+
+    return refresh_cards

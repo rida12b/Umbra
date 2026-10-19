@@ -12,13 +12,16 @@ from pydantic import BaseModel
 
 from umbra_engine import __version__
 from umbra_engine.api_explain import add_explain_routes
+from umbra_engine.api_live import add_live_routes
 from umbra_engine.api_map import add_map_routes
 from umbra_engine.claims import Relation, Status, StoredClaim
 from umbra_engine.coverage import CoverageReport, coverage_report
 from umbra_engine.coverage import State as CoverageState
+from umbra_engine.events import EventHub
 from umbra_engine.explain.worker import Explainer
 from umbra_engine.gateways import claude
 from umbra_engine.indexer import IndexSummary, index_project
+from umbra_engine.live import LiveProjects
 from umbra_engine.project_store import STALE_INDEX, ProjectStore
 from umbra_engine.registry import Project, ProjectIdCollisionError, ProjectPathError, Registry
 from umbra_engine.settings import LOOPBACK_HOSTS, Settings, load_or_create_token
@@ -43,15 +46,24 @@ class ProjectOut(BaseModel):
         return cls(id=project.id, name=project.name, root=str(project.root), created_at=project.created_at)
 
 
-def create_app(settings: Settings, ask: Callable[[str], str] = claude.ask) -> FastAPI:
-    """`ask` answers one prompt with the user's Claude Code (tests pass a fake)."""
+def create_app(settings: Settings, ask: Callable[[str], str] = claude.ask, live: bool = False) -> FastAPI:
+    """`ask` answers one prompt with the user's Claude Code (tests pass a fake). With `live`, every
+    indexed Project is watched: a change re-indexes it and rewrites the cards it made out of date."""
     registry = Registry(settings)
     token = load_or_create_token(settings).encode()
     sessions = UiSessions()
+    events = EventHub()
 
     @asynccontextmanager
     async def lifespan(_: FastAPI) -> AsyncIterator[None]:
+        if live_projects is not None:
+            for project in registry.list():
+                with registry.open_store(project) as store:
+                    if store.index_is_current():
+                        live_projects.follow(project)
         yield
+        if live_projects is not None:
+            live_projects.stop_all()
         registry.close()
 
     app = FastAPI(title="Umbra engine", version=__version__, lifespan=lifespan)
@@ -143,10 +155,20 @@ def create_app(settings: Settings, ask: Callable[[str], str] = claude.ask) -> Fa
     def index(project_id: str) -> IndexSummary:
         project = known_project(project_id)
         with registry.open_store(project) as store:
-            return index_project(project, store)
+            summary = index_project(project, store)
+        if live_projects is not None:
+            live_projects.follow(project)
+        return summary
 
     graph_of = add_map_routes(app, authorized, known_project, indexed_store)
-    app.state.explainer = Explainer(ask)
-    add_explain_routes(app, authorized, known_project, indexed_store, graph_of, app.state.explainer)
+    app.state.explainer = Explainer(
+        ask, on_saved=lambda project_id, key: events.publish(project_id, {"type": "card", "key": key})
+    )
+    refresh_cards = add_explain_routes(
+        app, authorized, known_project, indexed_store, graph_of, app.state.explainer
+    )
+    add_live_routes(app, authorized, known_project, events)
+    live_projects = LiveProjects(registry.open_store, events, refresh_cards) if live else None
+    app.state.live = live_projects
     add_web_routes(app, authorized, sessions)  # last: the web app is mounted at `/`
     return app

@@ -17,6 +17,7 @@ dependencies = [
     "tree-sitter>=0.25,<1.0",
     "PyYAML>=6.0,<7.0",
     "tree-sitter-language-pack>=1.22,<2.0",
+    "watchfiles>=1.0,<2.0",
 ]
 
 [project.optional-dependencies]

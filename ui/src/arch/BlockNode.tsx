@@ -1,7 +1,7 @@
 import { Handle, Position, type Node, type NodeProps } from "@xyflow/react";
 import type { ArchBlock, BlockType } from "../api";
 
-export type BlockData = { block: ArchBlock };
+export type BlockData = { block: ArchBlock; changed?: boolean };
 export type BlockFlowNode = Node<BlockData, "block">;
 
 export const BLOCK_LABEL: Record<BlockType, string> = {
@@ -50,15 +50,18 @@ export function BlockIcon({ type }: { type: BlockType }) {
 }
 
 export function BlockNode({ data, selected }: NodeProps<BlockFlowNode>) {
-  const { block } = data;
+  const { block, changed } = data;
   return (
-    <div className={`arch-block tone-${block.type}${selected ? " selected" : ""}`}>
+    <div className={`arch-block tone-${block.type}${selected ? " selected" : ""}${changed ? " changed" : ""}`}>
       <Handle type="target" position={Position.Left} />
       <div className="arch-head">
         <BlockIcon type={block.type} />
         <div>
           <div className="arch-kind">{BLOCK_LABEL[block.type]}</div>
-          <div className="arch-name">{block.nom}</div>
+          <div className="arch-name">
+            {changed && <span className="changed-dot" title="Code modifié à l'instant" />}
+            {block.nom}
+          </div>
         </div>
       </div>
       <div className="arch-role">{block.role}</div>

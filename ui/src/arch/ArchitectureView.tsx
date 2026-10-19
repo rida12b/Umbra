@@ -1,6 +1,7 @@
 import { Background, Controls, MarkerType, ReactFlow, type Edge } from "@xyflow/react";
 import { useEffect, useMemo, useState } from "react";
 import { ARCHITECTURE, type ArchBlock, type ArchFlow, type Architecture, type Project } from "../api";
+import { changedUnder, useLive } from "../live";
 import { layoutBoxes } from "../map/layout";
 import { useExplanation } from "../panel/useExplanation";
 import { navigate } from "../route";
@@ -93,6 +94,7 @@ function ArchitectureCanvas({ architecture, theme, picked, onPick }: {
   architecture: Architecture; theme: Theme; picked: Picked; onPick: (p: Picked) => void;
 }) {
   const [nodes, setNodes] = useState<BlockFlowNode[] | null>(null);
+  const live = useLive();
   useEffect(() => {
     let current = true;
     const links = architecture.flux.map((flow) => [flow.de, flow.vers] as [string, string]);
@@ -131,7 +133,11 @@ function ArchitectureCanvas({ architecture, theme, picked, onPick }: {
   if (nodes === null) return <div className="state">Mise en place du schéma…</div>;
   return (
     <ReactFlow
-      nodes={nodes.map((node) => ({ ...node, selected: node.id === pickedId }))}
+      nodes={nodes.map((node) => ({
+        ...node,
+        selected: node.id === pickedId,
+        data: { ...node.data, changed: node.data.block.code.some((code) => changedUnder(live, code.chemin)) },
+      }))}
       edges={edges}
       nodeTypes={nodeTypes}
       colorMode={theme}

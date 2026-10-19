@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { api, type Card, type Explanation } from "../api";
+import { useLive } from "../live";
 
 const POLL_MS = 2500;
 
@@ -9,11 +10,11 @@ const POLL_MS = 2500;
  */
 export function useExplanation<T = Card>(projectId: string, node: string): Explanation<T> | null {
   const [explanation, setExplanation] = useState<Explanation<T> | null>(null);
+  const { revision } = useLive(); // the code changed or a card was rewritten: read again
 
   useEffect(() => {
     let current = true;
     let timer: number | undefined;
-    setExplanation(null);
 
     const follow = (found: Explanation<T>) => {
       if (!current) return;
@@ -37,7 +38,7 @@ export function useExplanation<T = Card>(projectId: string, node: string): Expla
       current = false;
       window.clearTimeout(timer);
     };
-  }, [projectId, node]);
+  }, [projectId, node, revision]);
 
   return explanation;
 }

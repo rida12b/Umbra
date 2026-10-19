@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import { ApiError, api, whenSignedOut, type Project } from "./api";
 import { ArchitectureView } from "./arch/ArchitectureView";
+import { LiveContext, useLiveEvents } from "./live";
+import { LiveStatus } from "./LiveStatus";
 import { ProjectView } from "./ProjectView";
 import { APPLICATION, ARCHITECTURE_VIEW, navigate, takeLoginCode, useRoute } from "./route";
 import { useTheme } from "./theme";
@@ -41,6 +43,7 @@ export function App() {
 
   const project =
     projects && "list" in projects ? projects.list.find((p) => p.id === route.projectId) : undefined;
+  const live = useLiveEvents(project?.id ?? null);
 
   return (
     <div className="app">
@@ -53,6 +56,7 @@ export function App() {
           {theme === "dark" ? "Light" : "Dark"}
         </button>
       </header>
+      <LiveContext.Provider value={live}>
       <main className="main">
         {projects === null && <div className="state">Connecting to the local engine…</div>}
         {projects && "error" in projects && <ConnectionProblem error={projects.error} />}
@@ -77,6 +81,7 @@ export function App() {
             >
               Code
             </button>
+            <LiveStatus />
           </nav>
         )}
         {project && route.node === ARCHITECTURE_VIEW && (
@@ -92,6 +97,7 @@ export function App() {
           />
         )}
       </main>
+      </LiveContext.Provider>
     </div>
   );
 }

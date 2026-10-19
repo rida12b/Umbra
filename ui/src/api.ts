@@ -177,6 +177,12 @@ function keepSession(session: string | null): void {
   }
 }
 
+/** The session header, for requests made outside `call` (the live stream). */
+export function readSessionHeader(): Record<string, string> {
+  const session = readSession();
+  return session ? { "X-Umbra-Session": session } : {};
+}
+
 /** Called once by the app: any 401 means the session is gone (engine restarted, or expired). */
 export function whenSignedOut(handler: () => void): void {
   onUnauthorized = handler;
