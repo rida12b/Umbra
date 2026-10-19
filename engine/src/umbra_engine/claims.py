@@ -4,12 +4,29 @@ from dataclasses import dataclass
 from typing import Literal
 
 Status = Literal["fact", "hypothesis", "observation"]
-Kind = Literal["module", "function", "class", "method", "type", "namespace", "symbol", "import"]
-Relation = Literal["defines", "imports", "calls"]
+Kind = Literal[
+    "module", "function", "class", "method", "type", "namespace", "symbol", "import",
+    "service", "image", "port", "directory", "workload", "k8s-service", "ingress", "labels", "resource",
+]  # fmt: skip
+Relation = Literal[
+    "defines", "imports", "calls",
+    "declares", "uses_image", "built_from", "depends_on", "exposes", "based_on",
+    "has_labels", "selects", "routes_to",
+]  # fmt: skip
 
 DEFINES = "defines"
 IMPORTS = "imports"
 CALLS = "calls"
+# Declarations (Facts about what configuration says, never proof that anything runs):
+DECLARES = "declares"
+USES_IMAGE = "uses_image"
+BUILT_FROM = "built_from"
+DEPENDS_ON = "depends_on"
+EXPOSES = "exposes"
+BASED_ON = "based_on"
+HAS_LABELS = "has_labels"
+SELECTS = "selects"
+ROUTES_TO = "routes_to"
 
 
 @dataclass(frozen=True)
