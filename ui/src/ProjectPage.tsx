@@ -2,6 +2,7 @@ import type { Project } from "./api";
 import { ArchitectureView } from "./arch/ArchitectureView";
 import { JourneysView, journeyHighlight } from "./arch/JourneysView";
 import { LiveStatus } from "./LiveStatus";
+import { SearchBox } from "./SearchBox";
 import { ModelContext, useProjectModel } from "./model";
 import { ProjectView } from "./ProjectView";
 import { APPLICATION, ARCHITECTURE_VIEW, JOURNEYS_VIEW, navigate, type Route } from "./route";
@@ -32,6 +33,7 @@ export function ProjectPage({ project, route, theme, narrow }: { project: Projec
             {tab.label}
           </button>
         ))}
+        <SearchBox projectId={project.id} />
         <LiveStatus />
       </nav>
       {view === ARCHITECTURE_VIEW && (
@@ -40,7 +42,7 @@ export function ProjectPage({ project, route, theme, narrow }: { project: Projec
       {view === JOURNEYS_VIEW && <JourneysView project={project} route={route} />}
       {view === APPLICATION && (
         <ProjectView
-          key={`${project.id}|${route.node}|${route.expand}`} // a new view starts with nothing selected
+          key={`${project.id}|${route.node}|${route.expand}|${route.select ?? ""}`} // a new view starts with nothing selected
           project={project}
           route={route}
           theme={theme}

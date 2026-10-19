@@ -10,6 +10,7 @@ export interface Route {
   expand: boolean;
   journey?: string | null; // on the journeys view: which one, and which step
   step?: number | null;
+  select?: string | null; // on a map view: the element to select (from a search)
 }
 
 export const APPLICATION = "app:";
@@ -34,6 +35,7 @@ export function parseRoute(hash: string): Route {
     expand: params.get("expand") === "1",
     journey: params.get("journey"),
     step: params.get("step") ? Number(params.get("step")) : null,
+    select: params.get("select"),
   };
 }
 
@@ -53,6 +55,7 @@ export function routeHash(route: Route): string {
   if (route.expand) params.set("expand", "1");
   if (route.journey) params.set("journey", route.journey);
   if (route.step) params.set("step", String(route.step));
+  if (route.select) params.set("select", route.select);
   const query = params.toString();
   return `#/p/${encodeURIComponent(route.projectId)}${query ? `?${query}` : ""}`;
 }

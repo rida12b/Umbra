@@ -6,6 +6,7 @@ from collections import defaultdict
 from dataclasses import dataclass, field
 
 from umbra_engine.claims import (
+    CALLS,
     CODE_ROOT,
     DECLARES,
     DEFINES,
@@ -18,6 +19,7 @@ from umbra_engine.claims import (
     StoredClaim,
 )
 from umbra_engine.project_store import FileEntry
+from umbra_engine.projection.calls import resolve_calls
 from umbra_engine.store_schema import LIST_SEPARATOR
 
 # The only relations the map reads (kept small: a large Project holds millions of import Claims).
@@ -31,6 +33,7 @@ MAP_RELATIONS = (
     DEPENDS_ON,
     TARGETS,
     ROUTES_TO,
+    CALLS,
 )
 SERVICE_KINDS = {"service", "workload", "k8s-service", "ingress"}
 SERVICE_LINKS = (DEPENDS_ON, TARGETS, ROUTES_TO)
@@ -81,9 +84,14 @@ class ProjectGraph:
         self.top_definitions: dict[str, list[str]] = defaultdict(list)
         self.module_links: list[StoredClaim] = []
         self.service_links: list[StoredClaim] = []
+        self._calls: list[StoredClaim] = []
         for claim in claims:
             self._add(claim)
         self._nest_definitions()
+        imported: dict[str, set[str]] = defaultdict(set)
+        for link in self.module_links:
+            imported[link.subject].add(link.object)
+        self.calls = resolve_calls(self._calls, set(self.definitions), imported)
         self.directories = _directories(self.files)
 
     def _add(self, claim: StoredClaim) -> None:
@@ -110,6 +118,8 @@ class ProjectGraph:
             self.module_links.append(claim)
         elif claim.relation in SERVICE_LINKS:
             self.service_links.append(claim)
+        elif claim.relation == CALLS:
+            self._calls.append(claim)
 
     def files_in(self, directory: str) -> list[str]:
         """Modules under `directory` (`""` is the root): one contiguous slice of the sorted list."""

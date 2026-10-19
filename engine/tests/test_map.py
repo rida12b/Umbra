@@ -308,3 +308,36 @@ def test_application_level_shows_services_before_large_directories(client, auth,
     project = index_files(client, auth, make_repo, "many-services", files)
     shown = keys_of(view(client, auth, project))
     assert all(k.startswith(("service:", "group:")) for k in shown)
+
+
+def test_calls_link_definitions_only_when_one_candidate_exists(client, auth, make_repo):
+    files = {
+        "app/service.py": (
+            "from .store import save\n\n\ndef helper():\n    return 1\n\n\n"
+            "def handle(order):\n    helper()\n    return save(order)\n"
+        ),
+        "app/store.py": "def save(order):\n    return order\n",
+        "app/other.py": "def save(x):\n    return x\n",  # same name elsewhere, not imported by service.py
+    }
+    project = index_files(client, auth, make_repo, "calls", files)
+    inside = view(client, auth, project, "app/service.py")
+    assert {(e["source"], e["target"], e["relation"], e["status"]) for e in inside["edges"]} == {
+        ("app/service.py::handle", "app/service.py::helper", "calls", "hypothesis")
+    }
+    across = view(client, auth, project, "dir:app")
+    assert ("app/service.py", "app/store.py", "calls") in {
+        (e["source"], e["target"], e["relation"]) for e in across["edges"]
+    }
+    assert ("app/service.py", "app/other.py", "calls") not in {
+        (e["source"], e["target"], e["relation"]) for e in across["edges"]
+    }
+
+
+def test_search_finds_any_element_and_the_view_that_shows_it(client, auth, project):
+    index(client, auth, project)
+    hits = client.get(f"/v1/projects/{project}/search", params={"q": "Settings"}, headers=auth).json()
+    assert hits[0]["key"] == "backend/app/core/config.py::Settings"
+    assert hits[0]["level"] == "backend/app/core/config.py" and hits[0]["kind"] == "class"
+    services = client.get(f"/v1/projects/{project}/search", params={"q": "back"}, headers=auth).json()
+    assert services[0]["key"] == "service:backend" and services[0]["level"] == "app:"
+    assert client.get(f"/v1/projects/{project}/search", params={"q": "zzz"}, headers=auth).json() == []

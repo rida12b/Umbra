@@ -30,7 +30,12 @@ export function ProjectView({ project, route, theme, narrow }: Props) {
     let current = true; // on a live refresh the current map stays on screen until the new one arrives
     api
       .map(project.id, route.node, route.expand)
-      .then((view) => current && setLoading({ view }))
+      .then((view) => {
+        if (!current) return;
+        setLoading({ view });
+        const picked = route.select ? view.nodes.find((n) => n.key === route.select) : undefined;
+        if (picked) setSelection((existing) => existing ?? { type: "node", node: picked });
+      })
       .catch((error: ApiError) => current && setLoading({ error }));
     return () => {
       current = false;

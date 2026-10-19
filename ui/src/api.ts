@@ -79,6 +79,14 @@ export interface IndexSummary {
   claims: Record<string, number>;
 }
 
+export interface SearchHit {
+  key: string;
+  kind: NodeKind;
+  label: string;
+  path: string | null;
+  level: string;
+}
+
 export interface Located {
   texte: string;
   fichier: string | null;
@@ -276,6 +284,7 @@ export const api = {
     call<Explanation>(`${project(id)}/explain?${new URLSearchParams({ node })}`),
   explain: (id: string, node: string) =>
     call<Explanation>(`${project(id)}/explain?${new URLSearchParams({ node })}`, { method: "POST" }),
+  search: (id: string, q: string) => call<SearchHit[]>(`${project(id)}/search?${new URLSearchParams({ q })}`),
   claim: (id: string, key: string) => call<Claim>(`${project(id)}/claims/${encodeURIComponent(key)}`),
   evidence: (id: string, file: string, start: number, end: number) =>
     call<Excerpt>(

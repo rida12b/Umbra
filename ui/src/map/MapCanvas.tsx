@@ -7,7 +7,7 @@ import {
   type EdgeMouseHandler,
   type NodeMouseHandler,
 } from "@xyflow/react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { MapEdge, MapNode, MapView } from "../api";
 import type { Theme } from "../theme";
 import { ElementNode, type ElementFlowNode } from "./ElementNode";
@@ -27,6 +27,7 @@ interface Props {
 }
 
 const nodeTypes = { element: ElementNode };
+const DOUBLE_CLICK_MS = 400;
 
 /** The code an element stands for: its file or folder, or a service's code folder. */
 export function nodePath(element: MapNode): string | null {
@@ -93,12 +94,17 @@ export function MapCanvas({ view, roles, theme, vertical, selection, onSelect, o
     [view.edges, selectedKey],
   );
 
+  // A second click on the same block soon after opens it. Not the browser's dblclick: the first
+  // click selects the block and redraws it, so the second lands on a new element and no dblclick fires.
+  const lastClick = useRef<{ id: string; at: number } | null>(null);
   const clickNode: NodeMouseHandler<ElementFlowNode> = (_, node) => {
     const element = node.data.element;
-    if (element.kind === "group") onOpen(element);
+    const now = Date.now();
+    const again = lastClick.current?.id === node.id && now - lastClick.current.at < DOUBLE_CLICK_MS;
+    lastClick.current = again ? null : { id: node.id, at: now };
+    if (element.kind === "group" || again) onOpen(element);
     else onSelect({ type: "node", node: element });
   };
-  const openNode: NodeMouseHandler<ElementFlowNode> = (_, node) => onOpen(node.data.element);
   const clickEdge: EdgeMouseHandler = (_, edge) => {
     const found = view.edges.find((candidate) => edgeId(candidate) === edge.id);
     if (found) onSelect({ type: "edge", edge: found });
@@ -114,7 +120,7 @@ export function MapCanvas({ view, roles, theme, vertical, selection, onSelect, o
       nodeTypes={nodeTypes}
       colorMode={theme}
       onNodeClick={clickNode}
-      onNodeDoubleClick={openNode}
+      onNodeDoubleClick={(_, node) => onOpen(node.data.element)}
       onEdgeClick={clickEdge}
       onPaneClick={() => onSelect(null)}
       nodesDraggable={false}

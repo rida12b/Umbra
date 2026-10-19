@@ -12,6 +12,7 @@ from umbra_engine.guard import SecretGuard
 from umbra_engine.project_store import ProjectStore
 from umbra_engine.projection.graph import MAP_RELATIONS, ProjectGraph
 from umbra_engine.projection.model import APPLICATION, MapView
+from umbra_engine.projection.search import MAX_HITS, SearchHit, search
 from umbra_engine.projection.view import UnknownElementError, map_view
 from umbra_engine.registry import Project
 from umbra_engine.store_schema import INDEX_ID
@@ -47,6 +48,13 @@ def add_map_routes(
             return map_view(graph_of(project_id), node, expand)
         except UnknownElementError as error:
             raise HTTPException(status.HTTP_404_NOT_FOUND, f"unknown element: {node}") from error
+
+    @app.get("/v1/projects/{project_id}/search", dependencies=authorized)
+    def search_map(
+        project_id: str, q: str, limit: Annotated[int, Query(ge=1, le=50)] = MAX_HITS
+    ) -> list[SearchHit]:
+        """Elements whose name matches `q`, with the view to open for each."""
+        return search(graph_of(project_id), q, limit)
 
     @app.get("/v1/projects/{project_id}/claims/{key}", dependencies=authorized)
     def claim(project_id: str, key: str) -> StoredClaim:
