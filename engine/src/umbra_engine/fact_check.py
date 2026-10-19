@@ -22,8 +22,11 @@ from umbra_engine.claims import (
     HAS_LABELS,
     IMPORTS,
     MOUNTS,
+    REFERENCES,
+    REQUIRES,
     ROUTES_TO,
     SELECTS,
+    SOURCES,
     USES_IMAGE,
     StoredClaim,
 )
@@ -43,6 +46,9 @@ DECLARATION_RELATIONS = (
     BUILT_FROM,
     BUILD_CONTEXT,
     MOUNTS,
+    REQUIRES,
+    REFERENCES,
+    SOURCES,
 )
 CHECKED_RELATIONS = (DEFINES, IMPORTS, *DECLARATION_RELATIONS)
 HEADER_LINES = 15  # decorators, attributes and multi-line signatures before the name
@@ -95,8 +101,14 @@ def _check_declaration(claim: StoredClaim, lines: list[str]) -> FactCheck:
     """The cited lines must hold the declared value: the service, resource name, image, port, labels."""
     cited = lines[claim.line_start - 1 : claim.line_end]
     value = claim.object.split(":", 1)[1]
-    if claim.relation == DECLARES:
+    if claim.relation == DECLARES and claim.object.startswith("tf:"):
+        value = value.rsplit("/", 1)[-1].rsplit(".", 1)[-1]  # `tf:net/aws_vpc.main`: block named "main"
+    elif claim.relation == DECLARES:
         value = value.rsplit("/", 1)[-1]  # `k8s:Deployment/cart` is named `cart` in the manifest
+    elif claim.relation == REQUIRES:
+        value = value.split("/", 1)[1]  # `package:npm/react`: the name as written
+    elif claim.relation == REFERENCES:
+        value = value.rsplit("/", 1)[-1]  # the address as written: `aws_s3_bucket.logs`
     elif claim.relation == BUILT_FROM:
         value = _build_evidence(cited, value)
     elif claim.relation == BUILD_CONTEXT:
