@@ -277,6 +277,14 @@ button:disabled { opacity: 0.6; cursor: wait; }
 .search-path { font: 11px var(--mono); color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 @media (max-width: 720px) { .search { margin-left: 4px; } .search input { width: 140px; } .search-hits { width: 92vw; left: -40vw; } }
 
+/* Claude activity */
+.activity { list-style: none; margin: 0 auto; padding: 24px 16px 48px; max-width: 860px; width: 100%; overflow-y: auto; display: grid; gap: 14px; align-content: start; }
+.turn { background: var(--surface); border: 1px solid var(--border); border-left: 4px solid var(--accent); border-radius: 10px; padding: 12px 16px; }
+.turn-time { font-size: 12px; margin: 0 0 6px; }
+.turn-prompt { font-weight: 600; margin: 0 0 8px; white-space: pre-wrap; }
+.turn-files { list-style: none; margin: 0 0 8px; padding: 0; display: flex; flex-wrap: wrap; gap: 4px 14px; }
+.turn-message { margin: 0; color: var(--muted); white-space: pre-wrap; max-height: 12em; overflow: auto; }
+
 /* Live */
 .live { margin-left: auto; align-self: center; display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); }
 .live-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); }
