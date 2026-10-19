@@ -19,6 +19,8 @@ from umbra_engine.indexer import IndexSummary, index_project
 from umbra_engine.project_store import STALE_INDEX, ProjectStore
 from umbra_engine.registry import Project, ProjectIdCollisionError, ProjectPathError, Registry
 from umbra_engine.settings import LOOPBACK_HOSTS, Settings, load_or_create_token
+from umbra_engine.ui_session import SESSION_HEADER, UiSessions
+from umbra_engine.web import add_web_routes
 
 MAX_PAGE = 1000
 
@@ -41,6 +43,7 @@ class ProjectOut(BaseModel):
 def create_app(settings: Settings) -> FastAPI:
     registry = Registry(settings)
     token = load_or_create_token(settings).encode()
+    sessions = UiSessions()
 
     @asynccontextmanager
     async def lifespan(_: FastAPI) -> AsyncIterator[None]:
@@ -51,8 +54,15 @@ def create_app(settings: Settings) -> FastAPI:
     # A web page can make the browser resolve any host name to 127.0.0.1 (DNS rebinding);
     # requests that do not address the loopback by name are refused before any route runs.
     app.add_middleware(TrustedHostMiddleware, allowed_hosts=list(LOOPBACK_HOSTS))
+    app.state.ui_sessions = sessions
 
-    def require_token(authorization: Annotated[str | None, Header()] = None) -> None:
+    def require_token(
+        authorization: Annotated[str | None, Header()] = None,
+        session: Annotated[str | None, Header(alias=SESSION_HEADER)] = None,
+    ) -> None:
+        """The token (CLI, MCP, dashboard) or a browser session opened with a one-time login code."""
+        if session and sessions.is_valid(session):
+            return
         presented = ""
         if authorization and authorization.lower().startswith("bearer "):
             presented = authorization[7:].strip()
@@ -132,4 +142,5 @@ def create_app(settings: Settings) -> FastAPI:
             return index_project(project, store)
 
     add_map_routes(app, authorized, known_project, indexed_store)
+    add_web_routes(app, authorized, sessions)  # last: the web app is mounted at `/`
     return app

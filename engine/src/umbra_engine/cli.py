@@ -29,7 +29,9 @@ def main(argv: list[str] | None = None) -> int:
     verify.add_argument("project")
     verify.add_argument("--sample", type=int, default=30)
     verify.add_argument("--seed", type=int, default=0)
-    commands.add_parser("serve", help=f"run the local API on {API_HOST}")
+    serve = commands.add_parser("serve", help=f"run the local API and web app on {API_HOST}")
+    serve.add_argument("--no-browser", action="store_true", help="print the login link, do not open it")
+    commands.add_parser("open", help="open the web app of a running engine in the browser")
     commands.add_parser("token", help="print the local API token")
     args = parser.parse_args(argv)
 
@@ -58,7 +60,9 @@ def _run(args: argparse.Namespace) -> int:
     if args.command == "token":
         print(load_or_create_token(settings))
         return 0
-    return _serve(settings)
+    if args.command == "open":
+        return _open(settings)
+    return _serve(settings, open_browser=not args.no_browser)
 
 
 def _use_utf8_output() -> None:
@@ -148,13 +152,52 @@ def _verify_facts(settings: Settings, project_ref: str, sample: int, seed: int) 
     return 0 if checks and correct == len(checks) else 1
 
 
-def _serve(settings: Settings) -> int:
+def _serve(settings: Settings, open_browser: bool) -> int:
+    import threading
+    import webbrowser
+
     import uvicorn
 
     from umbra_engine.api import create_app
 
-    uvicorn.run(create_app(settings), host=API_HOST, port=settings.port, log_level="info")
+    app = create_app(settings)
+    link = _login_link(settings, app.state.ui_sessions.new_login_code())
+    print(f"Umbra web app: {link}")
+    print("(one-time link, valid 2 minutes; `umbra-engine open` makes a new one)")
+    if open_browser:
+        threading.Timer(1.0, webbrowser.open_new_tab, args=(link,)).start()
+    uvicorn.run(app, host=API_HOST, port=settings.port, log_level="info")
     return 0
+
+
+def _open(settings: Settings) -> int:
+    """Ask the running engine for a one-time login code: the token itself never leaves the terminal."""
+    import json
+    import urllib.error
+    import urllib.request
+    import webbrowser
+
+    request = urllib.request.Request(
+        f"http://{API_HOST}:{settings.port}/v1/ui/login-codes",
+        method="POST",
+        headers={"Authorization": f"Bearer {load_or_create_token(settings)}"},
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=5) as response:
+            code = json.loads(response.read())["code"]
+    except (urllib.error.URLError, OSError, ValueError, KeyError) as error:
+        print(f"umbra-engine: no engine answers on {API_HOST}:{settings.port} ({error})", file=sys.stderr)
+        print("Start it with `umbra-engine serve`.", file=sys.stderr)
+        return 1
+    link = _login_link(settings, code)
+    print(link)
+    webbrowser.open_new_tab(link)
+    return 0
+
+
+def _login_link(settings: Settings, code: str) -> str:
+    """The code sits in the fragment: browsers never send it to the server, so no log records it."""
+    return f"http://{API_HOST}:{settings.port}/#login={code}"
 
 
 if __name__ == "__main__":

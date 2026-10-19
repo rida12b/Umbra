@@ -4,12 +4,13 @@ Local daemon that registers Projects, keeps one isolated store per Project and e
 
 ## Install on Windows (from the repository)
 
-Requirements: Python 3.11–3.13 and Git, both on `PATH`.
+Requirements: Python 3.11–3.13, Git and Node.js 20.19+ (for the web app), all on `PATH`.
 
 ```powershell
 git clone https://github.com/rida12b/Umbra.git
 cd Umbra
 python -m pip install -e ".\engine[dev]"
+cd ui; npm ci; npm run build; cd ..   # builds the web app into the engine package
 umbra-engine --help
 ```
 
@@ -20,9 +21,22 @@ The command is `umbra-engine` while the v0.7 `umbra` command still exists; it be
 ```powershell
 umbra-engine add C:\path\to\your\project   # register a Project (idempotent)
 umbra-engine list                          # registered Projects
-umbra-engine serve                         # local API on http://127.0.0.1:7811
+umbra-engine index C:\path\to\your\project # register if needed, then index
+umbra-engine serve                         # local API and web app on http://127.0.0.1:7811
+umbra-engine open                          # new browser login link for a running engine
 umbra-engine token                         # local token for API clients
 ```
+
+`serve` prints a one-time login link (`http://127.0.0.1:7811/#login=…`) and opens it. The code is
+in the URL fragment, which browsers never send to the server; it works once, for 2 minutes, and opens
+a browser session: a secret the page keeps in its own storage and sends in a header (no cookie, which
+browsers would also send to other servers on 127.0.0.1). The API token itself never goes in a URL.
+Restarting the engine signs every browser out: run `umbra-engine open`.
+
+In the web app: click an element for its details and Evidence (file, lines, version, guarded excerpt),
+double-click (or **Open**) to go one level down, click a `+N more` group to show everything. Line
+style tells the status: solid = Fact, dashed = Hypothesis, dotted = Declared (configuration, not proof
+that anything runs). Below 720 px wide the graph becomes a list.
 
 Every `/v1/projects` endpoint needs the token, as `Authorization: Bearer <token>`. `POST /v1/projects` only accepts absolute paths.
 

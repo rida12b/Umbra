@@ -65,15 +65,31 @@ def node(graph: ProjectGraph, parent: str, key: str) -> MapNode:
             "ports": service.ports,
             "declared in": sorted({c.file for c in service.declared_by}),
         }
-        root = [service.code_root] if service.code_root is not None else []
-        if root and service.code_root_status != "fact":
+        details["code"] = [service.code_root] if service.code_root is not None else []
+        if details["code"] and service.code_root_status != "fact":
             details["code status"] = [service.code_root_status]
-        return MapNode(key, kind, service.label, "declaration", count, details=details | {"code": root})
+        evidence = [c.key for c in service.declared_by[:EVIDENCE_SAMPLE]]
+        return MapNode(
+            key,
+            kind,
+            service.label,
+            "declaration",
+            count,
+            details=details,
+            evidence=evidence,
+        )
     if key in graph.definitions:
         definition = graph.definitions[key]
         status = "fact" if definition.status == "fact" else "hypothesis"
         return MapNode(
-            key, kind, label(graph, parent, key), status, count, path=definition.file, lines=definition.lines
+            key,
+            kind,
+            label(graph, parent, key),
+            status,
+            count,
+            path=definition.file,
+            lines=definition.lines,
+            evidence=[definition.claim],
         )
     path = key.removeprefix(DIR) if key.startswith(DIR) else (None if key == APPLICATION else key)
     return MapNode(key, kind, label(graph, parent, key), "fact", count, path=path)

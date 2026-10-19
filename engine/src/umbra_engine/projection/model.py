@@ -25,6 +25,7 @@ class MapNode:
     lines: tuple[int, int] | None = None
     details: dict[str, list[str]] = field(default_factory=dict)
     hidden: list[str] = field(default_factory=list)  # for a `group`: the keys it stands for
+    evidence: list[str] = field(default_factory=list)  # keys of the Claims this element stands on
 
 
 @dataclass(frozen=True)
