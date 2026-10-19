@@ -18,12 +18,15 @@ def add_live_routes(
     app: FastAPI, authorized: list[params.Depends], known_project: Callable[[str], Project], events: EventHub
 ) -> None:
     @app.get("/v1/projects/{project_id}/events", dependencies=authorized)
-    async def project_events(project_id: str, request: Request) -> StreamingResponse:
-        """Server-sent events, from now on: `indexed` (files changed), `rewriting`, `card` (rewritten)."""
+    async def project_events(
+        project_id: str, request: Request, since: int | None = None
+    ) -> StreamingResponse:
+        """Server-sent events: `indexed` (files changed), `studying`, `rewriting`, `card` (written),
+        `failed`. A page that reconnects passes the last id it saw (`since`) and gets what it missed."""
         known_project(project_id)
 
         async def stream() -> AsyncIterator[str]:
-            last_seen, quiet = events.latest(), 0.0
+            last_seen, quiet = (events.latest() if since is None else since), 0.0
             yield ": connected\n\n"
             while not await request.is_disconnected():
                 fresh = events.since(project_id, last_seen)

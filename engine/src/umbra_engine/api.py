@@ -1,6 +1,7 @@
 """Local HTTP API (`/v1`). Every client — UI, MCP server, future dashboard — goes through it."""
 
 import secrets
+import threading
 from collections.abc import AsyncIterator, Callable
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -11,7 +12,7 @@ from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from pydantic import BaseModel
 
 from umbra_engine import __version__
-from umbra_engine.analysis.runner import Study
+from umbra_engine.analysis.runner import MODEL_KEY, Study
 from umbra_engine.api_explain import add_explain_routes
 from umbra_engine.api_live import add_live_routes
 from umbra_engine.api_map import add_map_routes
@@ -31,6 +32,7 @@ from umbra_engine.ui_session import SESSION_HEADER, UiSessions
 from umbra_engine.web import add_web_routes
 
 MAX_PAGE = 1000
+MODEL_FOLLOW_UP_S = 60.0
 
 
 class ProjectIn(BaseModel):
@@ -168,8 +170,17 @@ def create_app(
         return summary
 
     graph_of = add_map_routes(app, authorized, known_project, indexed_store)
+
+    def saved(project_id: str, key: str) -> None:
+        events.publish(project_id, {"type": "card", "key": key})
+        if key == MODEL_KEY:  # changes that landed during the session: one follow-up, a bit later
+            follow_up = threading.Timer(MODEL_FOLLOW_UP_S, lambda: refresh_model(project_id))
+            follow_up.daemon = True
+            follow_up.start()
+
     app.state.explainer = Explainer(
-        on_saved=lambda project_id, key: events.publish(project_id, {"type": "card", "key": key})
+        on_saved=saved,
+        on_failed=lambda project_id, key: events.publish(project_id, {"type": "failed", "key": key}),
     )
     refresh_cards = add_explain_routes(
         app, authorized, known_project, indexed_store, graph_of, app.state.explainer, ask

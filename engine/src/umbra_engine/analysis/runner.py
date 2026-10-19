@@ -52,12 +52,13 @@ def run_session(
         folder = Path(name)
         texts = write_mirror(guard, folder)
         write_index(graph, imports, list(texts), folder)
-        line_counts = {path: text.count("\n") + 1 for path, text in texts.items()}
+        line_counts = {path: len(text.splitlines()) for path, text in texts.items()}
         directories = set(graph.directories)
-        if previous is None:
+        changed = changed_files(previous["digests"], digests) if previous is not None else []
+        if previous is None or len(changed) > MAX_LISTED_CHANGES:
+            # First look, or too much changed to list (a branch switch, a reformat): study it all again.
             model = checked_model(parse_answer(study(study_prompt(), folder)), line_counts, directories)
         else:
-            changed = changed_files(previous["digests"], digests)[:MAX_LISTED_CHANGES]
             (folder / MODEL_FILE).write_text(
                 json.dumps(previous["model"], ensure_ascii=False), encoding="utf-8"
             )

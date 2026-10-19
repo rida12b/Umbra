@@ -52,14 +52,17 @@ def subscription_login() -> bool:
 STUDY_TIMEOUT_S = 40 * 60
 STUDY_MAX_TURNS = 150
 STUDY_COMMAND = [
-    "claude", "-p", "--safe-mode", "--no-session-persistence", "--tools", "Read,Grep,Glob",
-    "--permission-prompts", "none", "--max-turns", str(STUDY_MAX_TURNS), "--output-format", "json",
+    "claude", "-p", "--safe-mode", "--restricted", "--strict-mcp-config", "--no-session-persistence",
+    "--tools", "Read,Grep,Glob", "--permission-prompts", "none", "--max-turns", str(STUDY_MAX_TURNS),
+    "--output-format", "json",
 ]  # fmt: skip
 
 
 def study(prompt: str, folder: Path) -> str:
     """One study session in `folder` (the guarded copy) with read-only tools: Read, Grep, Glob only.
-    Nothing outside the folder can be opened (that would need a permission nobody can give here)."""
+    `--restricted` ignores every user and project settings file (a cloned Project cannot grant
+    itself wider reads) and confines file tools to the folder; anything else would need a
+    permission nobody can give here."""
     # The long form of the path: Windows short names (`RBOUAL~1`) make every read ask for a
     # permission that nobody can give here, so the session would see nothing.
     return _answer(_run(STUDY_COMMAND, prompt, folder.resolve(), STUDY_TIMEOUT_S))

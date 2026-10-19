@@ -17,7 +17,13 @@ const IDLE: Live = { connected: false, revision: 0, changed: new Map(), rewritin
 export const LiveContext = createContext<Live>(IDLE);
 export const useLive = () => useContext(LiveContext);
 
-type Event = { type: "indexed"; changed: string[]; count: number } | { type: "rewriting"; count: number } | { type: "card"; key: string };
+type Event =
+  | { type: "indexed"; changed: string[]; count: number }
+  | { type: "rewriting"; count: number }
+  | { type: "studying" }
+  | { type: "card"; key: string }
+  | { type: "failed"; key: string };
+const MODEL_KEY = "model:";
 
 /** Follows `/events` with fetch (an EventSource could not send the session header). */
 export function useLiveEvents(projectId: string | null): Live {
@@ -27,6 +33,7 @@ export function useLiveEvents(projectId: string | null): Live {
     if (!projectId) return;
     let stopped = false;
     let controller = new AbortController();
+    let lastId: string | null = null; // sent back on reconnect: the engine replays what was missed
     setLive(IDLE);
 
     const apply = (event: Event) =>
@@ -36,20 +43,25 @@ export function useLiveEvents(projectId: string | null): Live {
         let rewriting = previous.rewriting;
         if (event.type === "indexed") event.changed.forEach((path) => changed.set(path, now));
         if (event.type === "rewriting") rewriting += event.count;
-        if (event.type === "card") rewriting = Math.max(0, rewriting - 1);
+        // Element cards count down; the model has its own status line.
+        if ((event.type === "card" || event.type === "failed") && event.key !== MODEL_KEY) {
+          rewriting = Math.max(0, rewriting - 1);
+        }
         return { connected: true, revision: previous.revision + 1, changed, rewriting, lastEvent: now };
       });
 
     const connect = async () => {
       while (!stopped) {
         try {
-          const response = await fetch(`/v1/projects/${encodeURIComponent(projectId)}/events`, {
+          const since = lastId ? `?since=${lastId}` : "";
+          const response = await fetch(`/v1/projects/${encodeURIComponent(projectId)}/events${since}`, {
             headers: readSessionHeader(),
             credentials: "omit",
             signal: controller.signal,
           });
           if (!response.ok || !response.body) throw new Error(String(response.status));
-          setLive((previous) => ({ ...previous, connected: true }));
+          // (Re)connected: read everything again once, in case something changed while away.
+          setLive((previous) => ({ ...previous, connected: true, revision: previous.revision + 1 }));
           const reader = response.body.pipeThrough(new TextDecoderStream()).getReader();
           let buffer = "";
           for (;;) {
@@ -59,7 +71,10 @@ export function useLiveEvents(projectId: string | null): Live {
             const blocks = buffer.split("\n\n");
             buffer = blocks.pop() ?? "";
             for (const block of blocks) {
-              const data = block.split("\n").find((line) => line.startsWith("data: "));
+              const lines = block.split("\n");
+              const id = lines.find((line) => line.startsWith("id: "));
+              const data = lines.find((line) => line.startsWith("data: "));
+              if (id) lastId = id.slice(4);
               if (data) apply(JSON.parse(data.slice(6)) as Event);
             }
           }

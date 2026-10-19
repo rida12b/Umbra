@@ -98,10 +98,7 @@ def _citation(item: dict, line_counts: dict[str, int]) -> dict:
         and lines[0] <= lines[1]
     )  # fmt: skip
     verified = (
-        file is not None
-        and isinstance(lines, list)
-        and valid_lines
-        and lines[1] <= line_counts.get(file, -1) + 1
+        file is not None and isinstance(lines, list) and valid_lines and lines[1] <= line_counts.get(file, 0)
     )
     return {"fichier": file, "lignes": lines if valid_lines else None, "verifie": verified}
 

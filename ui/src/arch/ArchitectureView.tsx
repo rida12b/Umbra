@@ -30,6 +30,8 @@ export function ArchitectureView({ project, theme, narrow, highlight = null }: P
   if (!model) return <ModelPending state={state} />;
 
   const names = new Map(model.blocs.map((block) => [block.id, block.nom]));
+  // The model may have been updated since the click: show the block as it is now (or the overview).
+  const pickedBlock = picked && "block" in picked ? model.blocs.find((b) => b.id === picked.block.id) : undefined;
   return (
     <div className="map-body">
       {narrow ? (
@@ -38,8 +40,8 @@ export function ArchitectureView({ project, theme, narrow, highlight = null }: P
         <ArchitectureCanvas model={model} theme={theme} picked={picked} onPick={setPicked} highlight={highlight} />
       )}
       <aside className="panel" aria-label="Architecture">
-        {picked && "block" in picked ? (
-          <BlockDetails block={picked.block} model={model} project={project} onBack={() => setPicked(null)} />
+        {pickedBlock ? (
+          <BlockDetails block={pickedBlock} model={model} project={project} onBack={() => setPicked(null)} />
         ) : picked && "flow" in picked ? (
           <>
             <button className="link-button back" onClick={() => setPicked(null)}>← Vue d'ensemble</button>

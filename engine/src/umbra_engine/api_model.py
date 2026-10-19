@@ -21,7 +21,7 @@ from umbra_engine.analysis.runner import (
     run_session,
 )
 from umbra_engine.claims import IMPORTS
-from umbra_engine.explain.worker import Explainer, Job
+from umbra_engine.explain.worker import STUDY, Explainer, Job
 from umbra_engine.guard import SecretGuard
 from umbra_engine.project_store import ProjectStore
 from umbra_engine.projection.graph import ProjectGraph
@@ -88,6 +88,7 @@ def add_model_routes(
                 MODEL_PRODUCER,
                 lambda: indexed_store(project_id),
                 lambda: run_session(SecretGuard(project.root), graph, imports, digests, study, previous),
+                STUDY,
             )
         )
         return current(project_id)[0].state
