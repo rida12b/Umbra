@@ -341,3 +341,34 @@ def test_search_finds_any_element_and_the_view_that_shows_it(client, auth, proje
     services = client.get(f"/v1/projects/{project}/search", params={"q": "back"}, headers=auth).json()
     assert services[0]["key"] == "service:backend" and services[0]["level"] == "app:"
     assert client.get(f"/v1/projects/{project}/search", params={"q": "zzz"}, headers=auth).json() == []
+
+
+def test_calls_are_linked_by_scope_never_through_an_unknown_object(client, auth, make_repo):
+    """The review's cases: `d.get()` is not the local `get`; a bare call never reaches a method;
+    `self.load()` reaches its own class; a module-level call does not come from the first function."""
+    files = {
+        "pkg/__init__.py": "",
+        "pkg/store.py": "def save(o):\n    return o\n",
+        "pkg/a.py": (
+            "from .store import save\n\n\ndef get(k):\n    return k\n\n\n"
+            "def use(d):\n    return d.get('x')\n\n\n"
+            "class Repo:\n    def save(self):\n        return 1\n\n"
+            "    def load(self):\n        return self.save()\n\n\n"
+            "def handle(o):\n    return save(o)\n\n\nhandle(1)\n"
+        ),
+    }
+    project = index_files(client, auth, make_repo, "scopes", files)
+    inside = {
+        (e["source"], e["target"])
+        for e in view(client, auth, project, "pkg/a.py")["edges"]
+        if e["relation"] == "calls"
+    }
+    assert (
+        inside == set()
+    )  # use→get and handle→Repo would be wrong; module-level handle(1) has no caller here
+    in_class = {(e["source"], e["target"]) for e in view(client, auth, project, "pkg/a.py::Repo")["edges"]}
+    assert in_class == {("pkg/a.py::Repo.load", "pkg/a.py::Repo.save")}
+    across = {
+        (e["source"], e["target"], e["relation"]) for e in view(client, auth, project, "dir:pkg")["edges"]
+    }
+    assert ("pkg/a.py", "pkg/store.py", "calls") in across  # handle → the imported save

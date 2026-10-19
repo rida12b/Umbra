@@ -11,10 +11,8 @@ export function SearchBox({ projectId }: { projectId: string }) {
   const [hits, setHits] = useState<SearchHit[]>([]);
 
   useEffect(() => {
-    if (query.trim().length < 2) {
-      setHits([]);
-      return;
-    }
+    setHits([]); // results of the previous query must never be opened by Enter
+    if (query.trim().length < 2) return;
     let current = true;
     const timer = window.setTimeout(() => {
       api.search(projectId, query).then((found) => current && setHits(found), () => current && setHits([]));
@@ -38,6 +36,7 @@ export function SearchBox({ projectId }: { projectId: string }) {
         aria-label="Chercher dans le projet"
         value={query}
         onChange={(event) => setQuery(event.target.value)}
+        onBlur={() => window.setTimeout(() => setHits([]), 150)} // after a click on a result registers
         onKeyDown={(event) => {
           if (event.key === "Enter" && hits[0]) open(hits[0]);
           if (event.key === "Escape") setQuery("");
@@ -46,7 +45,7 @@ export function SearchBox({ projectId }: { projectId: string }) {
       {hits.length > 0 && (
         <ul className="search-hits" role="listbox">
           {hits.map((hit) => (
-            <li key={hit.key}>
+            <li key={hit.key} role="option" aria-selected="false">
               <button onClick={() => open(hit)}>
                 <span className="search-kind">{KIND_LABEL[hit.kind]}</span>
                 <span className="search-label">{hit.label}</span>

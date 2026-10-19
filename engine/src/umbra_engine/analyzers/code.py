@@ -42,7 +42,7 @@ NOT_CALLS = {"elixir": {"def", "defp", "defmodule", "defmacro", "alias", "import
 
 
 class CodeAnalyzer:
-    producer = f"code-tree-sitter@1.1+tslp-{tslp.__version__}"
+    producer = f"code-tree-sitter@1.2+tslp-{tslp.__version__}"
 
     def __init__(self) -> None:
         self._queries: dict[str, ts.Query | None] = {}
@@ -115,7 +115,8 @@ class CodeAnalyzer:
             start, end = calls[0].start_point[0], calls[0].end_point[0]
             caller = innermost(found, start)
             subject, kind = (caller.key, caller.kind) if caller else (path, "module")
-            claims.append(Claim(subject, kind, CALLS, callee, "symbol", "hypothesis", start + 1, end + 1))
+            target = _with_receiver(names[0], callee)
+            claims.append(Claim(subject, kind, CALLS, target, "symbol", "hypothesis", start + 1, end + 1))
         return claims
 
     def _query(self, language: str) -> ts.Query | None:
@@ -124,6 +125,30 @@ class CodeAnalyzer:
             source = "\n".join(part for part in parts if part)
             self._queries[language] = ts.Query(tslp.get_language(language), source) if source else None
         return self._queries[language]
+
+
+MEMBER_ACCESS = {
+    "attribute", "member_expression", "field_expression", "selector_expression", "navigation_expression",
+    "method_invocation", "scoped_identifier", "call", "member_access_expression",
+}  # fmt: skip
+SELF = {"self", "cls", "this", "@"}
+
+
+def _with_receiver(name: ts.Node, callee: str) -> str:
+    """`save` for a bare call, `self.save` on the caller's own object, `.save` on anything else: a
+    method of an unknown object (`d.get()`) must never be taken for a local function `get`."""
+    parent = name.parent
+    if (
+        parent is None
+        or parent.type not in MEMBER_ACCESS
+        or parent.child_count < 2
+        or parent.children[0] == name
+    ):
+        return callee
+    receiver = (
+        parent.child_by_field_name("object") or parent.child_by_field_name("receiver") or parent.children[0]
+    )
+    return f"self.{callee}" if _text(receiver) in SELF else f".{callee}"
 
 
 def _import_nodes(node: ts.Node, language: str) -> Iterator[ts.Node]:

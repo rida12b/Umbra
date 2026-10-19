@@ -91,7 +91,7 @@ class ProjectGraph:
         imported: dict[str, set[str]] = defaultdict(set)
         for link in self.module_links:
             imported[link.subject].add(link.object)
-        self.calls = resolve_calls(self._calls, set(self.definitions), imported)
+        self.calls = resolve_calls(self._calls, {k: d.kind for k, d in self.definitions.items()}, imported)
         self.directories = _directories(self.files)
 
     def _add(self, claim: StoredClaim) -> None:
