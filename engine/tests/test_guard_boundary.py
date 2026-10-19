@@ -64,6 +64,7 @@ ALLOWED: dict[str, set[str]] = {
     "settings.py": {"open", "fdopen", "read_text"},  # Umbra's own token file under UMBRA_HOME
     "sqlite_db.py": {"sqlite3"},  # Umbra's own stores under UMBRA_HOME
     "cli.py": {"sqlite3", "getattr"},  # catch sqlite3.Error; optional stream.reconfigure()
+    "journal.py": {"iterdir", "read_text"},  # Umbra's own event spool under UMBRA_HOME, never a Project
 }
 
 
@@ -190,7 +191,7 @@ def test_external_programs_are_allowed_only_from_gateways():
 
 def test_the_allowlist_stays_minimal():
     assert all((ENGINE / name).exists() for name in ALLOWED)
-    assert sum(len(entries) for entries in ALLOWED.values()) == 6
+    assert sum(len(entries) for entries in ALLOWED.values()) == 8
 
 
 def test_a_guarded_file_cannot_be_built_outside_the_guard(make_repo):

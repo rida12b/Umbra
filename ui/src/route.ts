@@ -16,6 +16,7 @@ export interface Route {
 export const APPLICATION = "app:";
 export const ARCHITECTURE_VIEW = "arch:"; // a Project opens on its architecture
 export const JOURNEYS_VIEW = "parcours:";
+export const ACTIVITY_VIEW = "activite:";
 const LOGIN = "#login=";
 
 export function takeLoginCode(): string | null {

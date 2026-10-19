@@ -79,6 +79,15 @@ export interface IndexSummary {
   claims: Record<string, number>;
 }
 
+export interface Turn {
+  session: string;
+  started: string;
+  prompt: string;
+  files: string[];
+  message: string;
+  ended: string | null;
+}
+
 export interface SearchHit {
   key: string;
   kind: NodeKind;
@@ -292,6 +301,7 @@ export const api = {
     call<Explanation>(`${project(id)}/explain?${new URLSearchParams({ node })}`),
   explain: (id: string, node: string) =>
     call<Explanation>(`${project(id)}/explain?${new URLSearchParams({ node })}`, { method: "POST" }),
+  activity: (id: string) => call<Turn[]>(`${project(id)}/activity`),
   search: (id: string, q: string) => call<SearchHit[]>(`${project(id)}/search?${new URLSearchParams({ q })}`),
   claim: (id: string, key: string) => call<Claim>(`${project(id)}/claims/${encodeURIComponent(key)}`),
   evidence: (id: string, file: string, start: number, end: number) =>

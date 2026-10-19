@@ -8,15 +8,33 @@ from fastapi import FastAPI, Request, params
 from fastapi.responses import StreamingResponse
 
 from umbra_engine.events import EventHub
+from umbra_engine.journal import Turn, stored_events, turns
+from umbra_engine.project_store import ProjectStore
 from umbra_engine.registry import Project
 
 POLL_S = 0.5
 HEARTBEAT_S = 15.0
 
 
+MAX_TURNS = 100
+MAX_EVENTS = 5000  # enough for the last MAX_TURNS turns; the page never reads the whole history
+
+
 def add_live_routes(
-    app: FastAPI, authorized: list[params.Depends], known_project: Callable[[str], Project], events: EventHub
+    app: FastAPI,
+    authorized: list[params.Depends],
+    known_project: Callable[[str], Project],
+    events: EventHub,
+    open_store: Callable[[Project], ProjectStore],
 ) -> None:
+    @app.get("/v1/projects/{project_id}/activity", dependencies=authorized)
+    def activity(project_id: str) -> list[Turn]:
+        """What Claude Code did in the Project, turn by turn (prompt, edited files, final message),
+        newest first."""
+        project = known_project(project_id)
+        with open_store(project) as store:
+            return turns(stored_events(store, MAX_EVENTS), project)[:MAX_TURNS]
+
     @app.get("/v1/projects/{project_id}/events", dependencies=authorized)
     async def project_events(
         project_id: str, request: Request, since: int | None = None

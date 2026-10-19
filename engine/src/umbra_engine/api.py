@@ -24,6 +24,7 @@ from umbra_engine.events import EventHub
 from umbra_engine.explain.worker import Explainer
 from umbra_engine.gateways import claude
 from umbra_engine.indexer import IndexSummary, index_project
+from umbra_engine.journal import ingest
 from umbra_engine.live import LiveProjects
 from umbra_engine.project_store import INDEXED_SCHEMA, STALE_INDEX, ProjectStore
 from umbra_engine.registry import Project, ProjectIdCollisionError, ProjectPathError, Registry
@@ -33,6 +34,7 @@ from umbra_engine.web import add_web_routes
 
 MAX_PAGE = 1000
 MODEL_FOLLOW_UP_S = 60.0
+JOURNAL_POLL_S = 0.5
 
 
 class ProjectIn(BaseModel):
@@ -73,12 +75,26 @@ def create_app(
                     live_projects.follow(project)
                 elif ever:  # indexed by an older Umbra: read it again in the background, then follow it
                     threading.Thread(target=reindex_and_follow, args=(project,), daemon=True).start()
+        if live_projects is not None:
+            threading.Thread(target=pump_journal, name="umbra-journal", daemon=True).start()
         yield
+        journal_stop.set()
         for timer in follow_ups:
             timer.cancel()
         if live_projects is not None:
             live_projects.stop_all()
         registry.close()
+
+    journal_stop = threading.Event()
+
+    def pump_journal() -> None:
+        """Move what Claude Code's hooks reported into the Projects, and tell the pages."""
+        while not journal_stop.wait(JOURNAL_POLL_S):
+            try:
+                for project_id, count in ingest(settings.home, registry.list(), registry.open_store).items():
+                    events.publish(project_id, {"type": "activity", "count": count})
+            except Exception:  # noqa: BLE001 — a bad spool file must not stop the journal
+                continue
 
     def reindex_and_follow(project: Project) -> None:
         with registry.open_store(project) as store:
@@ -208,7 +224,7 @@ def create_app(
     refresh_model = add_model_routes(
         app, authorized, known_project, indexed_store, graph_of, app.state.explainer, study
     )
-    add_live_routes(app, authorized, known_project, events)
+    add_live_routes(app, authorized, known_project, events, registry.open_store)
     live_projects = LiveProjects(registry.open_store, events, refresh_cards, refresh_model) if live else None
     app.state.live = live_projects
     add_web_routes(app, authorized, sessions)  # last: the web app is mounted at `/`
