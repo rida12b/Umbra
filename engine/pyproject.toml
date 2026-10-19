@@ -15,6 +15,7 @@ dependencies = [
     "google-re2>=1.1.20250722,<2.0",
     "pathspec>=0.12,<2.0",
     "tree-sitter>=0.25,<1.0",
+    "PyYAML>=6.0,<7.0",
     "tree-sitter-language-pack>=1.22,<2.0",
 ]
 

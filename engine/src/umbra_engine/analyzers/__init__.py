@@ -28,5 +28,8 @@ class Analyzer(Protocol):
 
 def default_analyzers() -> list[Analyzer]:
     from umbra_engine.analyzers.code import CodeAnalyzer
+    from umbra_engine.analyzers.compose import ComposeAnalyzer
+    from umbra_engine.analyzers.dockerfile import DockerfileAnalyzer
+    from umbra_engine.analyzers.kubernetes import KubernetesAnalyzer
 
-    return [CodeAnalyzer()]
+    return [CodeAnalyzer(), ComposeAnalyzer(), DockerfileAnalyzer(), KubernetesAnalyzer()]

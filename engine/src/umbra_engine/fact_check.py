@@ -11,12 +11,38 @@ from dataclasses import dataclass
 
 from umbra_engine.analyzers.code import language_of
 from umbra_engine.analyzers.imports import JS_LIKE
-from umbra_engine.claims import DEFINES, IMPORTS, StoredClaim
+from umbra_engine.claims import (
+    BASED_ON,
+    BUILT_FROM,
+    DECLARES,
+    DEFINES,
+    DEPENDS_ON,
+    EXPOSES,
+    HAS_LABELS,
+    IMPORTS,
+    MOUNTS,
+    ROUTES_TO,
+    SELECTS,
+    USES_IMAGE,
+    StoredClaim,
+)
 from umbra_engine.guard import GuardedFile, SecretGuard
 from umbra_engine.project_store import ProjectStore
 from umbra_engine.registry import Project
 
-CHECKED_RELATIONS = (DEFINES, IMPORTS)
+DECLARATION_RELATIONS = (
+    DECLARES,
+    USES_IMAGE,
+    EXPOSES,
+    BASED_ON,
+    DEPENDS_ON,
+    HAS_LABELS,
+    SELECTS,
+    ROUTES_TO,
+    BUILT_FROM,
+    MOUNTS,
+)
+CHECKED_RELATIONS = (DEFINES, IMPORTS, *DECLARATION_RELATIONS)
 HEADER_LINES = 15  # decorators, attributes and multi-line signatures before the name
 QUOTED_MODULE_LANGUAGES = JS_LIKE | {"go", "ruby", "c", "cpp"}
 DEFINITION_WORDS = re.compile(
@@ -49,7 +75,32 @@ def _check(guard: SecretGuard, claim: StoredClaim) -> FactCheck:
         return FactCheck(claim, False, "<lines out of range>")
     if claim.relation == DEFINES:
         return _check_definition(claim, lines)
-    return _check_import(claim, lines)
+    if claim.relation == IMPORTS:
+        return _check_import(claim, lines)
+    return _check_declaration(claim, lines)
+
+
+def _build_evidence(cited: list[str], target: str) -> str:
+    """A build entry names its context or its Dockerfile; with defaults it may only say `build: .`."""
+    parts = target.split("/")
+    for candidate in (parts[-1], parts[-2] if len(parts) > 1 else "", "context"):
+        if candidate and candidate != "Dockerfile" and any(candidate in line for line in cited):
+            return candidate
+    return "build:"
+
+
+def _check_declaration(claim: StoredClaim, lines: list[str]) -> FactCheck:
+    """The cited lines must hold the declared value: the service, resource name, image, port, labels."""
+    cited = lines[claim.line_start - 1 : claim.line_end]
+    value = claim.object.split(":", 1)[1]
+    if claim.relation == DECLARES:
+        value = value.rsplit("/", 1)[-1]  # `k8s:Deployment/cart` is named `cart` in the manifest
+    elif claim.relation == BUILT_FROM:
+        value = _build_evidence(cited, value)
+    elif claim.relation in (HAS_LABELS, SELECTS):
+        value = value.split("=", 1)[0]
+    hit = next((line for line in cited if value in line), None)
+    return FactCheck(claim, hit is not None and bool(cited[0].strip()), (hit or cited[0]).strip()[:160])
 
 
 def _check_definition(claim: StoredClaim, lines: list[str]) -> FactCheck:
