@@ -76,7 +76,11 @@ function JourneyDetail({ journey, model, project, focus }: {
                   {component?.nom ?? step.composant}
                   {block && <span className="muted"> · {block.nom} ({BLOCK_LABEL[block.type]})</span>}
                 </span>
+                {step.manuel && <span className="badge manual">Action manuelle</span>}
                 <p>{step.texte}</p>
+                {(step.conditions ?? []).length > 0 && (
+                  <p className="step-conditions">Seulement si : {(step.conditions ?? []).join(" ; ")}</p>
+                )}
                 {step.touche.length > 0 && (
                   <p className="step-reaches">
                     → {step.touche.map((id) => blocks.get(id)?.nom ?? id).join(", ")}
@@ -91,6 +95,18 @@ function JourneyDetail({ journey, model, project, focus }: {
       <footer>
         <strong>Résultat :</strong> {journey.resultat}
       </footer>
+      {(journey.branches ?? []).length > 0 && (
+        <section className="branches">
+          <h2>Autres chemins</h2>
+          <ul className="card-list">
+            {(journey.branches ?? []).map((branch, index) => (
+              <li key={index}>
+                <strong>Si {branch.quand}</strong> : {branch.alors} <CitedCode projectId={project.id} cited={branch} />
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
     </article>
   );
 }
