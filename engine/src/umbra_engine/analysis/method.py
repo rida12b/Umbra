@@ -75,8 +75,9 @@ UPDATE = """The project in the current folder changed since you last studied it.
 in UMBRA_MODEL.json and UMBRA_INDEX.md is up to date. These files were added, changed or removed:
 {changed}
 Open the changed files and what depends on them (use Grep), then update the model. Same rules as
-before: cite files and lines you read, French, plain sentences. Line numbers in untouched entries
-may have moved: return the entries whose citations you know moved.
+before: cite files and lines you read, French, plain sentences; a journey you return is whole, in
+real order, with each step's conditions and manual flag and the journey's other branches. Line numbers
+in untouched entries may have moved: return the entries whose citations you know moved.
 
 Answer with ONLY one JSON object containing just what changed, with the same shapes as the model:
 {{"resume": "only if it changed", "blocs": [...], "flux": [...], "composants": [...], "parcours": [...],
