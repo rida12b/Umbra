@@ -55,6 +55,7 @@ class Definition:
     status: str
     file: str
     lines: tuple[int, int]
+    claim: str
 
 
 class ProjectGraph:
@@ -92,7 +93,12 @@ class ProjectGraph:
             service.code_root, service.code_root_status = ("" if root == "." else root), claim.status
         elif claim.relation == DEFINES:
             self.definitions[claim.object] = Definition(
-                claim.object, claim.object_kind, claim.status, claim.file, (claim.line_start, claim.line_end)
+                claim.object,
+                claim.object_kind,
+                claim.status,
+                claim.file,
+                (claim.line_start, claim.line_end),
+                claim.key,
             )
         elif claim.relation == IMPORTS_MODULE:
             self.module_links.append(claim)
