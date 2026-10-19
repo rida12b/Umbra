@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from umbra_engine.project_store import STORE_FILE, ProjectStore
+from umbra_engine.project_store import SCHEMA_VERSION, STORE_FILE, ProjectStore
 from umbra_engine.registry import ProjectPathError, Registry, project_id_for
 
 
@@ -18,7 +18,7 @@ def test_add_creates_isolated_store_under_umbra_home(settings, make_repo):
     assert created
     assert project.root == repo.resolve()
     assert (settings.projects_dir / project.id / STORE_FILE).is_file()
-    assert ProjectStore.open_existing(settings.projects_dir / project.id).schema_version() == 1
+    assert ProjectStore.open_existing(settings.projects_dir / project.id).schema_version() == SCHEMA_VERSION
     assert not any(repo.iterdir()), "nothing may be written inside the registered folder"
 
 

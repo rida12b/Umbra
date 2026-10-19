@@ -20,6 +20,10 @@ def main(argv: list[str] | None = None) -> int:
     commands.add_parser("list", help="list registered Projects")
     index = commands.add_parser("index", help="index a registered Project (id or path)")
     index.add_argument("project")
+    verify = commands.add_parser("verify-facts", help="check a random sample of Facts against the code")
+    verify.add_argument("project")
+    verify.add_argument("--sample", type=int, default=30)
+    verify.add_argument("--seed", type=int, default=0)
     commands.add_parser("serve", help=f"run the local API on {API_HOST}")
     commands.add_parser("token", help="print the local API token")
     args = parser.parse_args(argv)
@@ -37,6 +41,8 @@ def _run(args: argparse.Namespace) -> int:
         return _add(settings, args.path)
     if args.command == "index":
         return _index(settings, args.project)
+    if args.command == "verify-facts":
+        return _verify_facts(settings, args.project, args.sample, args.seed)
     if args.command == "list":
         with Registry(settings) as registry:
             for project in registry.list():
@@ -82,9 +88,29 @@ def _index(settings: Settings, project_ref: str) -> int:
             summary = index_project(project, store)
     print(
         f"indexed {project.id}: {summary.files} files, {summary.readable} readable "
-        f"({summary.redacted_secrets} secrets redacted), skipped {summary.skipped}"
+        f"({summary.redacted_secrets} secrets redacted), skipped {summary.skipped}, claims {summary.claims}"
     )
     return 0
+
+
+def _verify_facts(settings: Settings, project_ref: str, sample: int, seed: int) -> int:
+    from umbra_engine.fact_check import check_facts
+
+    with Registry(settings) as registry:
+        project = registry.get(project_ref)
+        if project is None:
+            print(f"umbra-engine: unknown project: {project_ref}", file=sys.stderr)
+            return 2
+        with registry.open_store(project) as store:
+            checks = check_facts(project, store, sample, seed)
+    for check in checks:
+        c = check.claim
+        mark = "ok  " if check.correct else "FAIL"
+        where = f"{c.file}:{c.line_start}-{c.line_end}"
+        print(f"{mark} {c.relation:8} {c.object[:70]:70} {where}  | {check.cited_line}")
+    correct = sum(check.correct for check in checks)
+    print(f"{correct}/{len(checks)} Facts correct (seed {seed})")
+    return 0 if checks and correct == len(checks) else 1
 
 
 def _serve(settings: Settings) -> int:

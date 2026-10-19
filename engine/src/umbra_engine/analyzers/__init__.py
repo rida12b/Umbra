@@ -1,0 +1,28 @@
+"""Analyzers: pluggable units that turn guarded content into Claims.
+
+An Analyzer never sees a path it could open: it receives `GuardedFile`s released by the Secret Guard
+(ADR-0004). To add one, implement the `Analyzer` protocol and list it in `default_analyzers()`.
+"""
+
+from collections.abc import Iterable
+from typing import Protocol
+
+from umbra_engine.claims import Claim
+from umbra_engine.guard import GuardedFile
+
+
+class Analyzer(Protocol):
+    @property
+    def producer(self) -> str:
+        """`name@version`, stored with every Claim it produces."""
+        ...
+
+    def accepts(self, file: GuardedFile) -> bool: ...
+
+    def analyze(self, file: GuardedFile) -> Iterable[Claim]: ...
+
+
+def default_analyzers() -> list[Analyzer]:
+    from umbra_engine.analyzers.code import CodeAnalyzer
+
+    return [CodeAnalyzer()]

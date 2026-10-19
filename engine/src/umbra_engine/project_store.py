@@ -6,9 +6,10 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from umbra_engine import sqlite_db
+from umbra_engine.claims import Claim, StoredClaim
 
 STORE_FILE = "store.sqlite"
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS meta (
     key TEXT PRIMARY KEY,
@@ -18,9 +19,34 @@ CREATE TABLE IF NOT EXISTS files (
     path TEXT PRIMARY KEY,
     state TEXT NOT NULL CHECK (state IN ('readable', 'skipped')),
     reason TEXT NOT NULL DEFAULT '',
-    detail TEXT NOT NULL DEFAULT ''
+    detail TEXT NOT NULL DEFAULT '',
+    analyzers TEXT NOT NULL DEFAULT ''
 );
+CREATE TABLE IF NOT EXISTS claims (
+    id INTEGER PRIMARY KEY,
+    file TEXT NOT NULL,
+    subject TEXT NOT NULL,
+    subject_kind TEXT NOT NULL,
+    relation TEXT NOT NULL,
+    object TEXT NOT NULL,
+    object_kind TEXT NOT NULL,
+    status TEXT NOT NULL CHECK (status IN ('fact', 'hypothesis', 'observation')),
+    line_start INTEGER NOT NULL,
+    line_end INTEGER NOT NULL,
+    producer TEXT NOT NULL,
+    git_commit TEXT
+);
+CREATE INDEX IF NOT EXISTS claims_by_file ON claims(file);
+CREATE INDEX IF NOT EXISTS claims_by_subject ON claims(subject);
+CREATE INDEX IF NOT EXISTS claims_by_object ON claims(object);
 """
+CLAIM_FIELDS = (
+    "file", "subject", "subject_kind", "relation", "object", "object_kind", "status",
+    "line_start", "line_end", "producer", "git_commit",
+)  # fmt: skip
+CLAIM_COLUMNS = ", ".join(("id", *CLAIM_FIELDS))
+INSERT_CLAIM = f"INSERT INTO claims({', '.join(CLAIM_FIELDS)}) VALUES ({', '.join('?' * len(CLAIM_FIELDS))})"
+CLAIM_FILTERS = ("file", "subject", "object", "relation", "status")
 
 
 @dataclass(frozen=True)
@@ -29,12 +55,14 @@ class FileEntry:
     state: str
     reason: str = ""
     detail: str = ""
+    analyzers: str = ""
 
 
 class ProjectStore:
     def __init__(self, path: Path, *, create: bool = False) -> None:
         self.path = path
         self._db = sqlite_db.connect(path, SCHEMA)
+        self._migrate()
         if create:
             self._db.execute(
                 "INSERT OR IGNORE INTO meta(key, value) VALUES ('schema_version', ?)", (str(SCHEMA_VERSION),)
@@ -62,22 +90,89 @@ class ProjectStore:
         row = self._db.execute("SELECT value FROM meta WHERE key = 'schema_version'").fetchone()
         return int(row[0])
 
-    def replace_files(self, entries: list[FileEntry], meta: dict[str, str]) -> None:
-        """Atomically replace the file inventory of the last index run."""
+    def replace_index(
+        self,
+        entries: list[FileEntry],
+        claims: list[tuple[str, Claim, str]],
+        git_commit: str | None,
+        meta: dict[str, str],
+    ) -> None:
+        """Atomically replace the inventory and every Claim with the result of one index run.
+
+        `claims` holds `(file, claim, producer)`; the file is the Claim's Evidence location.
+        """
         with self._transaction():
             self._db.execute("DELETE FROM files")
+            self._db.execute("DELETE FROM claims")
             self._db.executemany(
-                "INSERT INTO files(path, state, reason, detail) VALUES (?, ?, ?, ?)",
-                [(e.path, e.state, e.reason, e.detail) for e in entries],
+                "INSERT INTO files(path, state, reason, detail, analyzers) VALUES (?, ?, ?, ?, ?)",
+                [(e.path, e.state, e.reason, e.detail, e.analyzers) for e in entries],
             )
+            self._db.executemany(
+                INSERT_CLAIM,
+                [
+                    (file, c.subject, c.subject_kind, c.relation, c.object, c.object_kind, c.status,
+                     c.line_start, c.line_end, producer, git_commit)
+                    for file, c, producer in claims
+                ],
+            )  # fmt: skip
             self._db.executemany("INSERT OR REPLACE INTO meta(key, value) VALUES (?, ?)", list(meta.items()))
 
     def files(self) -> list[FileEntry]:
-        rows = self._db.execute("SELECT path, state, reason, detail FROM files ORDER BY path")
+        rows = self._db.execute("SELECT path, state, reason, detail, analyzers FROM files ORDER BY path")
         return [FileEntry(*row) for row in rows]
+
+    def claims(self, limit: int = 1000, offset: int = 0, **filters: str | None) -> list[StoredClaim]:
+        """Claims matching every given filter (`file`, `subject`, `relation`, `status`), in id order."""
+        active = self._filters(filters)
+        where = " AND ".join(f"{key} = ?" for key in active) or "1 = 1"
+        rows = self._db.execute(
+            f"SELECT {CLAIM_COLUMNS} FROM claims WHERE {where} ORDER BY id LIMIT ? OFFSET ?",
+            (*active.values(), limit, offset),
+        )
+        return [StoredClaim(*row) for row in rows]
+
+    def claim_ids(self, **filters: str | None) -> list[int]:
+        active = self._filters(filters)
+        where = " AND ".join(f"{key} = ?" for key in active) or "1 = 1"
+        return [
+            row[0] for row in self._db.execute(f"SELECT id FROM claims WHERE {where}", tuple(active.values()))
+        ]
+
+    def claims_by_id(self, ids: list[int]) -> list[StoredClaim]:
+        rows = [
+            self._db.execute(f"SELECT {CLAIM_COLUMNS} FROM claims WHERE id = ?", (i,)).fetchone() for i in ids
+        ]
+        return [StoredClaim(*row) for row in rows if row]
+
+    def count_claims_matching(self, **filters: str | None) -> int:
+        active = self._filters(filters)
+        where = " AND ".join(f"{key} = ?" for key in active) or "1 = 1"
+        return self._db.execute(
+            f"SELECT COUNT(*) FROM claims WHERE {where}", tuple(active.values())
+        ).fetchone()[0]
+
+    def count_claims(self) -> dict[str, int]:
+        return dict(self._db.execute("SELECT status, COUNT(*) FROM claims GROUP BY status").fetchall())
 
     def meta(self) -> dict[str, str]:
         return dict(self._db.execute("SELECT key, value FROM meta").fetchall())
+
+    @staticmethod
+    def _filters(filters: dict[str, str | None]) -> dict[str, str]:
+        active = {key: value for key, value in filters.items() if value is not None}
+        unknown = set(active) - set(CLAIM_FILTERS)
+        if unknown:
+            raise ValueError(f"unknown claim filters: {sorted(unknown)}")
+        return active
+
+    def _migrate(self) -> None:
+        """Stores created before schema 2 lack `files.analyzers`; add it and record the version."""
+        columns = {row[1] for row in self._db.execute("PRAGMA table_info(files)")}
+        if "analyzers" not in columns:
+            self._db.execute("ALTER TABLE files ADD COLUMN analyzers TEXT NOT NULL DEFAULT ''")
+        if self._db.execute("SELECT 1 FROM meta WHERE key = 'schema_version'").fetchone():
+            self._db.execute("UPDATE meta SET value = ? WHERE key = 'schema_version'", (str(SCHEMA_VERSION),))
 
     @contextmanager
     def _transaction(self) -> Iterator[None]:

@@ -6,14 +6,17 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Annotated
 
-from fastapi import Depends, FastAPI, Header, HTTPException, status
+from fastapi import Depends, FastAPI, Header, HTTPException, Query, Response, status
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from pydantic import BaseModel
 
 from umbra_engine import __version__
+from umbra_engine.claims import Relation, Status, StoredClaim
 from umbra_engine.indexer import IndexSummary, index_project
 from umbra_engine.registry import Project, ProjectIdCollisionError, ProjectPathError, Registry
 from umbra_engine.settings import LOOPBACK_HOSTS, Settings, load_or_create_token
+
+MAX_PAGE = 1000
 
 
 class ProjectIn(BaseModel):
@@ -83,6 +86,23 @@ def create_app(settings: Settings) -> FastAPI:
     @app.get("/v1/projects/{project_id}", dependencies=authorized)
     def get_project(project_id: str) -> ProjectOut:
         return ProjectOut.of(known_project(project_id))
+
+    @app.get("/v1/projects/{project_id}/claims", dependencies=authorized)
+    def claims(
+        project_id: str,
+        response: Response,
+        file: str | None = None,
+        subject: str | None = None,
+        object: str | None = None,
+        relation: Relation | None = None,
+        status: Status | None = None,
+        limit: Annotated[int, Query(ge=1, le=MAX_PAGE)] = 200,
+        offset: Annotated[int, Query(ge=0)] = 0,
+    ) -> list[StoredClaim]:
+        filters = {"file": file, "subject": subject, "object": object, "relation": relation, "status": status}
+        with registry.open_store(known_project(project_id)) as store:
+            response.headers["X-Total-Count"] = str(store.count_claims_matching(**filters))
+            return store.claims(limit, offset, **filters)
 
     @app.post("/v1/projects/{project_id}/index", dependencies=authorized)
     def index(project_id: str) -> IndexSummary:
