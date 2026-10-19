@@ -97,13 +97,15 @@ def test_languages_without_extraction_are_gaps_not_partial(settings, make_repo):
     files = {
         "api/demo.proto": 'syntax = "proto3";\nmessage Cart { string id = 1; }\n',
         "requirements.txt": "fastapi\n",
+        "notes.txt": "remember the milk\n",
         "web/index.ts": 'export { login } from "./auth"\nexport * from "./types"\n',
     }
     root = write_repo(make_repo("gaps"), files, git=False)
     _, report = indexed_report(settings, root)
     by_path = {f.path: f for f in report.files}
     assert by_path["api/demo.proto"].reasons == ["no analyzer for proto"]
-    assert by_path["requirements.txt"].reasons == ["no analyzer for *.txt"]
+    assert by_path["notes.txt"].reasons == ["no analyzer for *.txt"]
+    assert by_path["requirements.txt"].state == "covered"  # a manifest: its dependencies are read
     assert by_path["web/index.ts"].state == "covered"
 
 

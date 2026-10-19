@@ -22,8 +22,11 @@ from umbra_engine.claims import (
     HAS_LABELS,
     IMPORTS,
     MOUNTS,
+    REFERENCES,
+    REQUIRES,
     ROUTES_TO,
     SELECTS,
+    SOURCES,
     USES_IMAGE,
     StoredClaim,
 )
@@ -43,6 +46,9 @@ DECLARATION_RELATIONS = (
     BUILT_FROM,
     BUILD_CONTEXT,
     MOUNTS,
+    REQUIRES,
+    REFERENCES,
+    SOURCES,
 )
 CHECKED_RELATIONS = (DEFINES, IMPORTS, *DECLARATION_RELATIONS)
 HEADER_LINES = 15  # decorators, attributes and multi-line signatures before the name
@@ -95,8 +101,14 @@ def _check_declaration(claim: StoredClaim, lines: list[str]) -> FactCheck:
     """The cited lines must hold the declared value: the service, resource name, image, port, labels."""
     cited = lines[claim.line_start - 1 : claim.line_end]
     value = claim.object.split(":", 1)[1]
-    if claim.relation == DECLARES:
+    if claim.relation == DECLARES and claim.object.startswith("tf:"):
+        value = value.rsplit("/", 1)[-1].rsplit(".", 1)[-1]  # `tf:net/aws_vpc.main`: block named "main"
+    elif claim.relation == DECLARES:
         value = value.rsplit("/", 1)[-1]  # `k8s:Deployment/cart` is named `cart` in the manifest
+    elif claim.relation == REQUIRES:
+        value = value.split("/", 1)[1]  # `package:npm/react`: the name as written
+    elif claim.relation == REFERENCES:
+        value = value.rsplit("/", 1)[-1]  # the address as written: `aws_s3_bucket.logs`
     elif claim.relation == BUILT_FROM:
         value = _build_evidence(cited, value)
     elif claim.relation == BUILD_CONTEXT:
@@ -108,8 +120,37 @@ def _check_declaration(claim: StoredClaim, lines: list[str]) -> FactCheck:
         )
     elif claim.relation in (HAS_LABELS, SELECTS):
         value = value.split("=", 1)[0]
-    hit = next((line for line in cited if value in line), None)
+    if claim.relation in (REQUIRES, REFERENCES):
+        # A whole name, not a part of a longer one (`serde` is not in `serde_json`); package names
+        # are case-insensitive (`PyYAML`). Comments are not declarations.
+        word = re.compile(rf"(?<![\w.-]){re.escape(value)}(?![\w-])", re.IGNORECASE)
+        interpolations = re.compile(r"\$\{[^}]*\}")  # `${module.eks.x}` inside a string or heredoc
+        hit = next(
+            (
+                line
+                for line in cited
+                if word.search(_without_comment(line))
+                or any(word.search(part) for part in interpolations.findall(line))
+            ),
+            None,
+        )
+    else:
+        hit = next((line for line in cited if value in line), None)
     return FactCheck(claim, hit is not None and bool(cited[0].strip()), (hit or cited[0]).strip()[:160])
+
+
+def _without_comment(line: str) -> str:
+    """The line up to a comment (`#`, `//`, `/*`) that starts outside a string: `"https://${x}"` stays."""
+    quote = None
+    for index, char in enumerate(line):
+        if quote:
+            if char == quote and line[index - 1] != "\\":
+                quote = None
+        elif char in "\"'":
+            quote = char
+        elif char == "#" or line.startswith(("//", "/*"), index):
+            return line[:index]
+    return line
 
 
 def _check_definition(claim: StoredClaim, lines: list[str]) -> FactCheck:
