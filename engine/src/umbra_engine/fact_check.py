@@ -120,8 +120,37 @@ def _check_declaration(claim: StoredClaim, lines: list[str]) -> FactCheck:
         )
     elif claim.relation in (HAS_LABELS, SELECTS):
         value = value.split("=", 1)[0]
-    hit = next((line for line in cited if value in line), None)
+    if claim.relation in (REQUIRES, REFERENCES):
+        # A whole name, not a part of a longer one (`serde` is not in `serde_json`); package names
+        # are case-insensitive (`PyYAML`). Comments are not declarations.
+        word = re.compile(rf"(?<![\w.-]){re.escape(value)}(?![\w-])", re.IGNORECASE)
+        interpolations = re.compile(r"\$\{[^}]*\}")  # `${module.eks.x}` inside a string or heredoc
+        hit = next(
+            (
+                line
+                for line in cited
+                if word.search(_without_comment(line))
+                or any(word.search(part) for part in interpolations.findall(line))
+            ),
+            None,
+        )
+    else:
+        hit = next((line for line in cited if value in line), None)
     return FactCheck(claim, hit is not None and bool(cited[0].strip()), (hit or cited[0]).strip()[:160])
+
+
+def _without_comment(line: str) -> str:
+    """The line up to a comment (`#`, `//`, `/*`) that starts outside a string: `"https://${x}"` stays."""
+    quote = None
+    for index, char in enumerate(line):
+        if quote:
+            if char == quote and line[index - 1] != "\\":
+                quote = None
+        elif char in "\"'":
+            quote = char
+        elif char == "#" or line.startswith(("//", "/*"), index):
+            return line[:index]
+    return line
 
 
 def _check_definition(claim: StoredClaim, lines: list[str]) -> FactCheck:

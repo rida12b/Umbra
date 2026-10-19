@@ -41,7 +41,7 @@ def test_manifest_dependencies_are_declared_with_their_line(settings, make_repo)
         ("web/package.json", "package:npm/react", 4),
         ("web/package.json", "package:npm/vite", 7),
         ("api/pyproject.toml", "package:pypi/fastapi", 4),
-        ("api/pyproject.toml", "package:pypi/pyyaml", 5),
+        ("api/pyproject.toml", "package:pypi/PyYAML", 5),
         ("api/requirements-dev.txt", "package:pypi/pytest", 2),
         ("api/requirements-dev.txt", "package:pypi/ruff", 5),
         ("svc/go.mod", "package:go/github.com/gin-gonic/gin", 4),
