@@ -2,12 +2,14 @@
 is down, half-written files ignored, parallel sessions kept apart, turns rebuilt in order."""
 
 import json
+import os
+import time
 import uuid
 from pathlib import Path
 
 from secret_fixtures import PLANTED, write_repo
 
-from umbra_engine.journal import ingest, spool_folder, stored_events, turns
+from umbra_engine.journal import ABANDONED_TMP_S, ingest, spool_folder, stored_events, turns
 from umbra_engine.registry import Registry
 
 
@@ -91,8 +93,13 @@ def test_a_half_written_event_is_ignored_and_the_rest_goes_through(settings, mak
     folder.mkdir(parents=True)
     (folder / "20261019T100001-cut.tmp").write_text('{"id": "cut", "kind": "ed')
     (folder / "20261019T100002-bad.json").write_text("{not json")
+    old = folder / "20261019T090000-dead.tmp"
+    old.write_text('{"id": "dead"')
+    os.utime(old, (time.time() - 2 * ABANDONED_TMP_S,) * 2)
     drop(settings.home, "prompt", "s1", "2026-10-19T10:00:03", root, text="Fix the bug")
     assert run_ingest(settings, registry) == {project.id: 1}
+    # the fresh temporary file may still be renamed; the bad and the abandoned ones are cleared away
+    assert [p.name for p in folder.iterdir()] == ["20261019T100001-cut.tmp"]
     registry.close()
 
 

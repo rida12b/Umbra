@@ -7,6 +7,7 @@ Events are grouped into turns: a prompt, the files Claude edited, Claude's final
 """
 
 import json
+import time
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -17,6 +18,7 @@ from umbra_engine.registry import Project
 SPOOL = "spool"  # under <UMBRA_HOME>/journal/
 MAX_TEXT = 4000  # prompts and messages are kept short: they label a change, they are not a transcript
 KINDS = ("prompt", "edit", "stop", "session_start", "session_end")
+ABANDONED_TMP_S = 3600  # a hook writes its temporary file in milliseconds
 
 
 @dataclass(frozen=True)
@@ -114,6 +116,8 @@ def ingest(home: Path, projects: list[Project], open_store) -> dict[str, int]:
     for path in sorted(folder.iterdir()):
         event = read_event(path)
         if event is None:
+            if path.suffix == ".json" or _abandoned(path):  # renamed whole: it can never become valid
+                path.unlink(missing_ok=True)
             continue
         for project in (p for p in projects if belongs_to(event, p)):
             with open_store(project) as store:
@@ -142,6 +146,14 @@ def _row(event: Event) -> tuple[str, ...]:
         event.tool,
         event.prompt_id,
     )
+
+
+def _abandoned(path: Path) -> bool:
+    """A temporary file left by a hook that died before its rename."""
+    try:
+        return path.suffix == ".tmp" and time.time() - path.stat().st_mtime > ABANDONED_TMP_S
+    except OSError:
+        return False
 
 
 def _norm(path: str) -> str:
