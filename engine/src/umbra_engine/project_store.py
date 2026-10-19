@@ -198,10 +198,14 @@ class ProjectStore:
         )
         return cursor.rowcount == 1
 
-    def events(self) -> list[tuple[str, ...]]:
-        return self._db.execute(
-            "SELECT id, at, kind, session, cwd, files, text, tool, prompt_id FROM events ORDER BY at, id"
+    def events(self, latest: int | None = None) -> list[tuple[str, ...]]:
+        """In time order; with `latest`, only the newest ones (the oldest turn may come out cut)."""
+        rows = self._db.execute(
+            "SELECT id, at, kind, session, cwd, files, text, tool, prompt_id FROM events"
+            " ORDER BY at DESC, id DESC LIMIT ?",
+            (-1 if latest is None else latest,),
         ).fetchall()
+        return rows[::-1]
 
     def card_keys(self) -> list[str]:
         return [row[0] for row in self._db.execute("SELECT key FROM cards ORDER BY key")]

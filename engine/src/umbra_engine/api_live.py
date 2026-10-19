@@ -17,6 +17,7 @@ HEARTBEAT_S = 15.0
 
 
 MAX_TURNS = 100
+MAX_EVENTS = 5000  # enough for the last MAX_TURNS turns; the page never reads the whole history
 
 
 def add_live_routes(
@@ -32,7 +33,7 @@ def add_live_routes(
         newest first."""
         project = known_project(project_id)
         with open_store(project) as store:
-            return turns(stored_events(store), project)[:MAX_TURNS]
+            return turns(stored_events(store, MAX_EVENTS), project)[:MAX_TURNS]
 
     @app.get("/v1/projects/{project_id}/events", dependencies=authorized)
     async def project_events(

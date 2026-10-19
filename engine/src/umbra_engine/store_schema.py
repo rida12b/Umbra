@@ -58,6 +58,7 @@ CREATE TABLE IF NOT EXISTS events (
     tool TEXT NOT NULL,
     prompt_id TEXT NOT NULL DEFAULT ''
 );
+CREATE INDEX IF NOT EXISTS events_by_time ON events(at);
 CREATE INDEX IF NOT EXISTS claims_by_file ON claims(file);
 CREATE INDEX IF NOT EXISTS claims_by_subject ON claims(subject);
 CREATE INDEX IF NOT EXISTS claims_by_object ON claims(object);

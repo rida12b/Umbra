@@ -4,6 +4,8 @@ import sqlite3
 import time
 from pathlib import Path
 
+StoreError = sqlite3.Error  # what a store can raise, for callers that must not import sqlite3
+
 BUSY_TIMEOUT_S = 10
 OPEN_RETRY_S = 10
 

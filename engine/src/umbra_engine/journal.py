@@ -14,6 +14,7 @@ from pathlib import Path
 from umbra_engine.guard import redact_output
 from umbra_engine.project_store import ProjectStore
 from umbra_engine.registry import Project
+from umbra_engine.sqlite_db import StoreError
 
 SPOOL = "spool"  # under <UMBRA_HOME>/journal/
 MAX_TEXT = 4000  # prompts and messages are kept short: they label a change, they are not a transcript
@@ -73,8 +74,9 @@ def belongs_to(event: Event, project: Project) -> bool:
 
 
 def relative_files(event: Event, project: Project) -> list[str]:
+    """Compared without case on Windows, but kept as written: the index keys keep their case."""
     root = _norm(str(project.root))
-    return [_norm(f)[len(root) + 1 :] for f in event.files if _norm(f).startswith(root + "/")]
+    return [f.replace("\\", "/")[len(root) + 1 :] for f in event.files if _norm(f).startswith(root + "/")]
 
 
 def turns(events: list[Event], project: Project) -> list[Turn]:
@@ -119,18 +121,23 @@ def ingest(home: Path, projects: list[Project], open_store) -> dict[str, int]:
             if path.suffix == ".json" or _abandoned(path):  # renamed whole: it can never become valid
                 path.unlink(missing_ok=True)
             continue
+        stored_everywhere = True
         for project in (p for p in projects if belongs_to(event, p)):
-            with open_store(project) as store:
-                if store.add_event(_row(event)):
-                    added[project.id] = added.get(project.id, 0) + 1
-        path.unlink(missing_ok=True)
+            try:
+                with open_store(project) as store:
+                    if store.add_event(_row(event)):
+                        added[project.id] = added.get(project.id, 0) + 1
+            except (OSError, StoreError):  # one unreachable store must not hold back the others
+                stored_everywhere = False
+        if stored_everywhere:
+            path.unlink(missing_ok=True)
     return added
 
 
-def stored_events(store: ProjectStore) -> list[Event]:
+def stored_events(store: ProjectStore, latest: int | None = None) -> list[Event]:
     return [
         Event(row[0], row[1], row[2], row[3], row[4], json.loads(row[5]), row[6], row[7], row[8])
-        for row in store.events()
+        for row in store.events(latest)
     ]
 
 

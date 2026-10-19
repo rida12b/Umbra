@@ -95,7 +95,8 @@ def test_a_half_written_event_is_ignored_and_the_rest_goes_through(settings, mak
     (folder / "20261019T100002-bad.json").write_text("{not json")
     old = folder / "20261019T090000-dead.tmp"
     old.write_text('{"id": "dead"')
-    os.utime(old, (time.time() - 2 * ABANDONED_TMP_S,) * 2)
+    long_ago = time.time() - 2 * ABANDONED_TMP_S
+    os.utime(old, (long_ago, long_ago))
     drop(settings.home, "prompt", "s1", "2026-10-19T10:00:03", root, text="Fix the bug")
     assert run_ingest(settings, registry) == {project.id: 1}
     # the fresh temporary file may still be renamed; the bad and the abandoned ones are cleared away
@@ -135,4 +136,28 @@ def test_events_of_other_folders_are_not_stored_and_secrets_are_masked(settings,
     assert run_ingest(settings, registry) == {project.id: 1}
     [turn] = project_turns(registry, project)
     assert PLANTED["github"] not in turn.prompt
+    registry.close()
+
+
+def test_file_names_keep_their_case_so_links_find_the_file(settings, make_repo):
+    registry, project, root = setup(settings, make_repo)
+    upper = str(root / "app" / "Cart.tsx")
+    shouted = upper[:1].swapcase() + upper[1:] if upper[1:2] == ":" else upper  # Windows: other drive case
+    drop(settings.home, "edit", "s1", "2026-10-19T10:00:00", root, files=[shouted])
+    run_ingest(settings, registry)
+    [turn] = project_turns(registry, project)
+    assert turn.files == ["app/Cart.tsx"]
+    registry.close()
+
+
+def test_an_unreachable_store_holds_back_neither_other_projects_nor_its_own_events(settings, make_repo):
+    registry, project, root = setup(settings, make_repo)
+    drop(settings.home, "prompt", "s1", "2026-10-19T10:00:00", root, text="kept for later")
+
+    def broken(_project):
+        raise OSError("store missing")
+
+    assert ingest(settings.home, registry.list(), broken) == {}
+    assert len(list(spool_folder(settings.home).iterdir())) == 1  # not lost: retried next pass
+    assert run_ingest(settings, registry) == {project.id: 1}
     registry.close()
