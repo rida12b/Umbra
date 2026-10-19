@@ -30,7 +30,9 @@ def parse_answer(answer: str) -> dict:
     return raw
 
 
-def checked_model(raw: dict, line_counts: dict[str, int], directories: set[str]) -> dict:
+def checked_model(
+    raw: dict, line_counts: dict[str, int], directories: set[str], known_blocks: set[str] | None = None
+) -> dict:
     """A complete model, every field in its expected shape, every citation checked."""
     if not isinstance(raw.get("resume"), str):
         raise ModelFormatError("missing resume")
@@ -42,7 +44,6 @@ def checked_model(raw: dict, line_counts: dict[str, int], directories: set[str])
         "composants": [
             c for c in (_component(item, line_counts) for item in _list(raw.get("composants"))) if c
         ],
-        "parcours": [j for j in (_journey(item, line_counts) for item in _list(raw.get("parcours"))) if j],
         "modules": {
             p: r for p, r in _dict(raw.get("modules")).items() if p in line_counts and isinstance(r, str)
         },
@@ -53,13 +54,19 @@ def checked_model(raw: dict, line_counts: dict[str, int], directories: set[str])
         },
         "incertitudes": _texts(raw.get("incertitudes")),
     }
-    model["flux"] = _flows(raw.get("flux"), {b["id"] for b in model["blocs"]})
+    # An update returns some blocks only: its journeys and flows may name blocks kept from before.
+    block_ids = {b["id"] for b in model["blocs"]} | (known_blocks or set())
+    model["parcours"] = [
+        j for j in (_journey(item, line_counts, block_ids) for item in _list(raw.get("parcours"))) if j
+    ]
+    model["flux"] = _flows(raw.get("flux"), block_ids)
     return model
 
 
 def updated_model(model: dict, raw_patch: dict, line_counts: dict[str, int], directories: set[str]) -> dict:
     """Entries returned by an update session replace the ones with the same id; `supprime` removes."""
-    patch = checked_model({"resume": model["resume"], **raw_patch}, line_counts, directories)
+    known = {b["id"] for b in model["blocs"]}
+    patch = checked_model({"resume": model["resume"], **raw_patch}, line_counts, directories, known)
     removed = _dict(raw_patch.get("supprime"))
     merged = dict(model)
     for section in ("blocs", "composants", "parcours"):
@@ -149,7 +156,7 @@ def _component(item: object, line_counts: dict[str, int]) -> dict | None:
     }
 
 
-def _journey(item: object, line_counts: dict[str, int]) -> dict | None:
+def _journey(item: object, line_counts: dict[str, int], block_ids: set[str]) -> dict | None:
     if (
         not isinstance(item, dict)
         or not isinstance(item.get("id"), str)
@@ -160,6 +167,7 @@ def _journey(item: object, line_counts: dict[str, int]) -> dict | None:
         {
             "texte": str(s.get("texte", "")),
             "composant": str(s.get("composant", "")),
+            "touche": [b for b in _texts(s.get("touche")) if b in block_ids],
             **_citation(s, line_counts),
         }
         for s in _list(item.get("etapes"))

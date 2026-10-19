@@ -47,6 +47,7 @@ SCHEMA = """{
                   "utilise": ["other composant ids or bloc ids"], "fichiers": ["paths"]}],
   "parcours": [{"id": "short-id", "nom": "what the user or system does", "declencheur": "...",
                 "etapes": [{"texte": "what happens", "composant": "composant id",
+                            "touche": ["bloc ids this step reaches: user, database, model, outside service"],
                             "fichier": "...", "lignes": [a, b]}],
                 "resultat": "what the user gets or what changes"}],
   "modules": {"path/to/file": "one-sentence role"},

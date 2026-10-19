@@ -117,16 +117,57 @@ export interface ArchFlow {
   quoi: string;
 }
 
-/** The Project drawn as running parts, stores and outside services: Claude Code's reading (Hypothesis). */
-export interface Architecture {
+/** A place in the code the model cites; `verifie` = Umbra found the file and those lines. */
+export interface Cited {
+  fichier: string | null;
+  lignes: [number, number] | null;
+  verifie: boolean;
+}
+
+export interface Component {
+  id: string;
+  nom: string;
+  bloc: string;
+  role: string;
+  responsabilites: string[];
+  expose: (Cited & { quoi: string })[];
+  utilise: string[];
+  fichiers: string[];
+}
+
+export interface JourneyStep extends Cited {
+  texte: string;
+  composant: string;
+  touche: string[]; // blocks this step reaches: the user, a database, a model, an outside service
+}
+
+export interface Journey {
+  id: string;
+  nom: string;
+  declencheur: string;
+  etapes: JourneyStep[];
+  resultat: string;
+}
+
+/** What Claude Code understood of the whole Project in one study (a Hypothesis, citations checked). */
+export interface ProjectModel {
   resume: string;
   blocs: ArchBlock[];
   flux: ArchFlow[];
-  parcours: string[];
+  composants: Component[];
+  parcours: Journey[];
+  modules: Record<string, string>;
+  dossiers: Record<string, string>;
   incertitudes: string[];
 }
 
-export const ARCHITECTURE = "arch:";
+export interface ModelState {
+  state: "ready" | "stale" | "missing" | "queued" | "working" | "error";
+  model: ProjectModel | null;
+  created_at: string | null;
+  changed: string[];
+  message: string | null;
+}
 
 export interface Explanation<T = Card> {
   state: "ready" | "stale" | "missing" | "queued" | "working" | "error";
@@ -229,6 +270,8 @@ export const api = {
   index: (id: string) => call<IndexSummary>(`${project(id)}/index`, { method: "POST" }),
   map: (id: string, node: string, expand: boolean) =>
     call<MapView>(`${project(id)}/map?${new URLSearchParams({ node, expand: String(expand) })}`),
+  model: (id: string) => call<ModelState>(`${project(id)}/model`),
+  study: (id: string) => call<ModelState>(`${project(id)}/model`, { method: "POST" }),
   explanation: (id: string, node: string) =>
     call<Explanation>(`${project(id)}/explain?${new URLSearchParams({ node })}`),
   explain: (id: string, node: string) =>

@@ -1,10 +1,8 @@
 import { useEffect, useState } from "react";
 import { ApiError, api, whenSignedOut, type Project } from "./api";
-import { ArchitectureView } from "./arch/ArchitectureView";
 import { LiveContext, useLiveEvents } from "./live";
-import { LiveStatus } from "./LiveStatus";
-import { ProjectView } from "./ProjectView";
-import { APPLICATION, ARCHITECTURE_VIEW, navigate, takeLoginCode, useRoute } from "./route";
+import { ProjectPage } from "./ProjectPage";
+import { takeLoginCode, useRoute } from "./route";
 import { useTheme } from "./theme";
 
 type Projects = { list: Project[] } | { error: ApiError } | null;
@@ -67,35 +65,7 @@ export function App() {
             <a href="#/">All Projects</a>
           </div>
         )}
-        {project && (
-          <nav className="tabs" aria-label="Views">
-            <button
-              className={route.node === ARCHITECTURE_VIEW ? "tab active" : "tab"}
-              onClick={() => navigate({ projectId: project.id, node: ARCHITECTURE_VIEW, expand: false })}
-            >
-              Architecture
-            </button>
-            <button
-              className={route.node !== ARCHITECTURE_VIEW ? "tab active" : "tab"}
-              onClick={() => navigate({ projectId: project.id, node: APPLICATION, expand: false })}
-            >
-              Code
-            </button>
-            <LiveStatus />
-          </nav>
-        )}
-        {project && route.node === ARCHITECTURE_VIEW && (
-          <ArchitectureView key={project.id} project={project} theme={theme} narrow={narrow} />
-        )}
-        {project && route.node !== ARCHITECTURE_VIEW && (
-          <ProjectView
-            key={`${project.id}|${route.node}|${route.expand}`} // a new view starts with nothing selected
-            project={project}
-            route={route}
-            theme={theme}
-            narrow={narrow}
-          />
-        )}
+        {project && <ProjectPage key={project.id} project={project} route={route} theme={theme} narrow={narrow} />}
       </main>
       </LiveContext.Provider>
     </div>

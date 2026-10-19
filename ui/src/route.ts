@@ -8,10 +8,13 @@ export interface Route {
   projectId: string | null;
   node: string;
   expand: boolean;
+  journey?: string | null; // on the journeys view: which one, and which step
+  step?: number | null;
 }
 
 export const APPLICATION = "app:";
 export const ARCHITECTURE_VIEW = "arch:"; // a Project opens on its architecture
+export const JOURNEYS_VIEW = "parcours:";
 const LOGIN = "#login=";
 
 export function takeLoginCode(): string | null {
@@ -29,6 +32,8 @@ export function parseRoute(hash: string): Route {
     projectId: match?.[1] ? safeDecode(match[1]) : null,
     node: params.get("node") ?? ARCHITECTURE_VIEW,
     expand: params.get("expand") === "1",
+    journey: params.get("journey"),
+    step: params.get("step") ? Number(params.get("step")) : null,
   };
 }
 
@@ -46,6 +51,8 @@ export function routeHash(route: Route): string {
   const params = new URLSearchParams();
   if (route.node !== ARCHITECTURE_VIEW) params.set("node", route.node);
   if (route.expand) params.set("expand", "1");
+  if (route.journey) params.set("journey", route.journey);
+  if (route.step) params.set("step", String(route.step));
   const query = params.toString();
   return `#/p/${encodeURIComponent(route.projectId)}${query ? `?${query}` : ""}`;
 }
