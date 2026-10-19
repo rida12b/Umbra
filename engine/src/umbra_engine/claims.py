@@ -11,7 +11,7 @@ Kind = Literal[
 Relation = Literal[
     "defines", "imports", "calls",
     "declares", "uses_image", "built_from", "depends_on", "exposes", "based_on",
-    "has_labels", "selects", "routes_to", "mounts",
+    "has_labels", "selects", "routes_to", "mounts", "imports_module", "targets", "code_root",
 ]  # fmt: skip
 
 DEFINES = "defines"
@@ -28,6 +28,10 @@ HAS_LABELS = "has_labels"
 SELECTS = "selects"
 ROUTES_TO = "routes_to"
 MOUNTS = "mounts"
+# Links computed across files once every file is analyzed:
+IMPORTS_MODULE = "imports_module"  # a Module's import resolved to another Module (or package directory)
+TARGETS = "targets"  # a Kubernetes Service reaches a workload (its selector is a subset of the labels)
+CODE_ROOT = "code_root"  # a service is built from the code under this directory
 
 
 @dataclass(frozen=True)
@@ -49,9 +53,14 @@ class Claim:
 
 @dataclass(frozen=True)
 class StoredClaim:
-    """A Claim as kept in the store, with its full Evidence and provenance."""
+    """A Claim as kept in the store, with its full Evidence and provenance.
 
-    id: int
+    `key` is stable across index runs: it is derived from the Claim itself, never from a row id.
+    `evidence_version` says which text the lines refer to: the commit for an unmodified file,
+    `worktree:<content hash>` for a modified or untracked one.
+    """
+
+    key: str
     file: str
     subject: str
     subject_kind: str
@@ -62,4 +71,4 @@ class StoredClaim:
     line_start: int
     line_end: int
     producer: str
-    git_commit: str | None
+    evidence_version: str

@@ -60,10 +60,10 @@ class FactCheck:
 
 
 def check_facts(project: Project, store: ProjectStore, sample: int = 30, seed: int = 0) -> list[FactCheck]:
-    ids = [i for relation in CHECKED_RELATIONS for i in store.claim_ids(relation=relation, status="fact")]
-    chosen = sorted(random.Random(seed).sample(ids, min(sample, len(ids))))
+    keys = [k for relation in CHECKED_RELATIONS for k in store.claim_keys(relation=relation, status="fact")]
+    chosen = sorted(random.Random(seed).sample(keys, min(sample, len(keys))))
     guard = SecretGuard(project.root)
-    return [_check(guard, claim) for claim in store.claims_by_id(chosen)]
+    return [_check(guard, claim) for claim in store.claims_by_key(chosen)]
 
 
 def _check(guard: SecretGuard, claim: StoredClaim) -> FactCheck:

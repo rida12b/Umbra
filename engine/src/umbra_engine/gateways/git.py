@@ -1,4 +1,4 @@
-"""Git metadata for Evidence: the commit a Claim was read from."""
+"""Git metadata for Evidence: which commit a Claim was read from, and which files differ from it."""
 
 import re
 import subprocess
@@ -25,14 +25,31 @@ def head_commit(root: Path) -> str | None:
     return commit if result.returncode == 0 and _COMMIT.match(commit) else None
 
 
-def has_uncommitted_changes(root: Path) -> bool | None:
-    """True when the working tree differs from HEAD, untracked files included."""
+def changed_files(root: Path) -> set[str] | None:
+    """Paths that differ from HEAD (modified, added, renamed or untracked); None when git cannot tell.
+
+    A path holding a secret comes back redacted, so it never matches: that file is then treated as
+    changed, which is the safe side.
+    """
     try:
         result = subprocess.run(
-            ["git", "-C", str(root), "status", "--porcelain"],
+            ["git", "-C", str(root), "status", "--porcelain", "-z", "--untracked-files=all"],
             capture_output=True,
             timeout=GIT_TIMEOUT_S,
         )
     except (OSError, subprocess.TimeoutExpired):
         return None
-    return bool(result.stdout.strip()) if result.returncode == 0 else None
+    if result.returncode != 0:
+        return None
+    entries = [e.decode("utf-8", errors="replace") for e in result.stdout.split(b"\0") if e]
+    changed: set[str] = set()
+    skip_next = False
+    for entry in entries:
+        if skip_next:  # the original path of a rename
+            skip_next = False
+            changed.add(redact_output(entry, "git status"))
+            continue
+        status, path = entry[:2], entry[3:]
+        changed.add(redact_output(path, "git status"))
+        skip_next = "R" in status or "C" in status
+    return changed

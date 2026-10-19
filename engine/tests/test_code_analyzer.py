@@ -119,7 +119,9 @@ def test_index_stores_claims_with_evidence_commit_and_no_secret(settings, repo):
             inventory = {e.path: e for e in store.files()}
     assert summary.claims["fact"] > 0 and summary.claims["hypothesis"] > 0
     assert summary.git_commit is not None and len(summary.git_commit) == 40
-    assert all(c.git_commit == summary.git_commit and c.producer == CodeAnalyzer.producer for c in stored)
+    assert all(
+        c.evidence_version == summary.git_commit and c.producer == CodeAnalyzer.producer for c in stored
+    )
     assert checks and all(check.correct for check in checks)
     assert inventory["app/service.py"].analyzers == CodeAnalyzer.producer
     assert inventory["config.yaml"].analyzers == ""
