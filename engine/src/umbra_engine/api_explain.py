@@ -21,9 +21,11 @@ from umbra_engine.guard import SecretGuard
 from umbra_engine.project_store import ProjectStore
 from umbra_engine.projection.graph import ProjectGraph
 from umbra_engine.projection.model import APPLICATION
+from umbra_engine.projection.tree import DIR, children
 from umbra_engine.projection.view import UnknownElementError
 from umbra_engine.registry import Project
 
+WARM_UP_CARDS = 20  # first views written when a Project is followed; the rest when opened
 CardState = Literal["ready", "stale", "missing", "queued", "working", "error"]
 
 
@@ -43,7 +45,7 @@ def add_explain_routes(
     indexed_store: Callable[[str], ProjectStore],
     graph_of: Callable[[str], ProjectGraph],
     explainer: Explainer,
-) -> Callable[[str], int]:
+) -> Callable[..., int]:
     """Adds the routes; returns `refresh_cards(project_id)`, which queues every out-of-date card."""
 
     def material_of(project_id: str, node: str) -> Material:
@@ -101,17 +103,26 @@ def add_explain_routes(
         )
         return Job(project_id, node, found, lambda: indexed_store(project_id), prompt, parse)
 
-    def refresh_cards(project_id: str) -> int:
-        """After the code changed: rewrite the cards already written whose material changed since."""
+    def refresh_cards(project_id: str, warm_up: bool = False) -> int:
+        """After the code changed: rewrite the cards already written whose material changed since.
+        With `warm_up`, also write the first views a reader opens: the architecture, the
+        Application and the two levels below it (folders and services, not single files)."""
         with indexed_store(project_id) as store:
             keys = store.card_keys()
+        if warm_up:
+            graph = graph_of(project_id)
+            first = [c for c in children(graph, APPLICATION) if c.startswith(DIR) or c in graph.services]
+            second = [g for c in first for g in children(graph, c) if g.startswith(DIR)]
+            keys = list(dict.fromkeys([ARCHITECTURE, APPLICATION, *first, *second][:WARM_UP_CARDS] + keys))
         queued = 0
         for node in keys:
             try:
                 found = material_of(project_id, node)
             except HTTPException:
                 continue  # the element is gone from the map
-            if explanation(project_id, node, found).state == "stale":
+            if explanation(project_id, node, found).state in (
+                ("stale", "missing") if warm_up else ("stale",)
+            ):
                 explainer.request(job(project_id, node, found))
                 queued += 1
         return queued

@@ -18,7 +18,7 @@ class LiveProjects:
         self,
         open_store: Callable[[Project], ProjectStore],
         events: EventHub,
-        refresh_cards: Callable[[str], int],
+        refresh_cards: Callable[..., int],
     ) -> None:
         self._open_store = open_store
         self._events = events
@@ -35,6 +35,9 @@ class LiveProjects:
             stop = self._watched[project.id] = threading.Event()
             self._locks[project.id] = threading.Lock()
         watch_project(project.root, lambda: self.refresh(project), stop)
+        queued = self._refresh_cards(project.id, warm_up=True)  # first look: written once, in the background
+        if queued:
+            self._events.publish(project.id, {"type": "rewriting", "count": queued})
 
     def stop_all(self) -> None:
         with self._guard:

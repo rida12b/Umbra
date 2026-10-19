@@ -32,9 +32,13 @@ def test_a_change_on_disk_reindexes_and_rewrites_only_what_changed(settings, aut
         client.post(f"/v1/projects/{project}/index", headers=auth)
         for node in ("app/a.py", "app/b.py"):
             client.post(f"/v1/projects/{project}/explain", params={"node": node}, headers=auth)
-        wait_for(lambda: len(prompts) == 2)
+        wait_for(
+            lambda: any("FILE app/b.py" in p for p in prompts) and any("FILE app/a.py" in p for p in prompts)
+        )
+        time.sleep(1)  # let the first look (architecture, Application, folders) finish
         events = app.state.live._events  # noqa: SLF001 — read what the pages would receive
         seen = events.latest()
+        before = len(prompts)
 
         (root / "app/a.py").write_text("def a():\n    return 42\n")
         wait_for(lambda: any(e["type"] == "indexed" for _, e in events.since(project, seen)))
@@ -44,4 +48,6 @@ def test_a_change_on_disk_reindexes_and_rewrites_only_what_changed(settings, aut
         wait_for(
             lambda: any(e == {"type": "card", "key": "app/a.py"} for _, e in events.since(project, seen))
         )
-        assert len(prompts) == 3 and "return 42" in prompts[-1]  # b.py untouched: not asked again
+        asked_after = prompts[before:]
+        assert any("return 42" in p for p in asked_after)
+        assert not any("FILE app/b.py" in p for p in asked_after)  # b.py untouched: not asked again
