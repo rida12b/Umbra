@@ -33,6 +33,7 @@ class Explanation(BaseModel):
     producer: str | None = None
     created_at: str | None = None
     message: str | None = None
+    level: str | None = None  # application, group, code, doc, test or architecture: how to read the card
 
 
 def add_explain_routes(
@@ -66,12 +67,14 @@ def add_explain_routes(
             created_at=row[3],
         )  # fmt: skip
         if working in ("queued", "working"):
-            return (card or Explanation(state="missing")).model_copy(update={"state": working})
+            return (card or Explanation(state="missing")).model_copy(
+                update={"state": working, "level": found.level}
+            )
         if working is not None:
             return (card or Explanation(state="error")).model_copy(
-                update={"state": "error", "message": working}
+                update={"state": "error", "message": working, "level": found.level}
             )
-        return card or Explanation(state="missing")
+        return (card or Explanation(state="missing")).model_copy(update={"level": found.level})
 
     @app.get("/v1/projects/{project_id}/explain", dependencies=authorized)
     def get_explanation(project_id: str, node: str = APPLICATION) -> Explanation:

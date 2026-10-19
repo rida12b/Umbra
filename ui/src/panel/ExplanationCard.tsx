@@ -9,6 +9,13 @@ interface Props {
   defaultFile: string | null;
 }
 
+// Each kind of element is read in its own terms: a document has key points, tests check things.
+const TITLES: Record<string, { entrees: string; sorties: string; etapes: string }> = {
+  doc: { entrees: "Ce qui entre", sorties: "Ce qui sort", etapes: "Ce que dit ce document" },
+  test: { entrees: "Les situations testées", sorties: "Ce qui est vérifié", etapes: "Les scénarios" },
+};
+const DEFAULT_TITLES = { entrees: "Ce qui entre", sorties: "Ce qui sort", etapes: "Ce qui se passe" };
+
 /** The card first: what it is for, what goes in and out, what happens. Code only on demand. */
 export function ExplanationCard({ projectId, explanation, defaultFile }: Props) {
   if (explanation === null) return <p className="muted">Lecture de l'explication…</p>;
@@ -18,14 +25,15 @@ export function ExplanationCard({ projectId, explanation, defaultFile }: Props) 
     if (writing) return <p className="writing">Claude Code lit le code et écrit l'explication (environ 30 s)…</p>;
     return <p className="error-text">Pas d'explication : {explanation.message ?? "inconnue"}</p>;
   }
+  const titles = TITLES[explanation.level ?? ""] ?? DEFAULT_TITLES;
   return (
     <section className="card">
       <p className="card-role">{card.role}</p>
-      <List title="Ce qui entre" items={card.entrees} />
-      <List title="Ce qui sort" items={card.sorties} />
+      <List title={titles.entrees} items={card.entrees} />
+      <List title={titles.sorties} items={card.sorties} />
       {card.etapes.length > 0 && (
         <>
-          <h3 className="card-title">Ce qui se passe</h3>
+          <h3 className="card-title">{titles.etapes}</h3>
           <ol className="card-steps">
             {card.etapes.map((step, index) => (
               <Step key={index} projectId={projectId} step={step} defaultFile={defaultFile} />

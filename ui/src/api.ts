@@ -134,6 +134,7 @@ export interface Explanation<T = Card> {
   producer: string | null;
   created_at: string | null;
   message: string | null;
+  level?: string | null;
 }
 
 /** Why a request failed, in the terms the page shows. */

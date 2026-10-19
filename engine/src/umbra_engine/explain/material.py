@@ -3,10 +3,12 @@ plus the map's own structure. The same material gives the same digest, so a card
 the code it was written from changes."""
 
 import hashlib
+import posixpath
+import re
 from dataclasses import dataclass
 
 from umbra_engine.guard import GuardedFile, SecretGuard
-from umbra_engine.projection.graph import ProjectGraph
+from umbra_engine.projection.graph import DOCUMENTS, ProjectGraph
 from umbra_engine.projection.model import APPLICATION
 from umbra_engine.projection.tree import DIR, children, files_under, label
 from umbra_engine.projection.view import map_view
@@ -14,6 +16,7 @@ from umbra_engine.projection.view import map_view
 MAX_FILE_LINES = 700
 MAX_CONTEXT_CHARS = 90_000
 DEFINITIONS_PER_MODULE = 12
+TEST_FILE = re.compile(r"(^test_|_test\.|\.test\.|\.spec\.|Tests?\.)")
 README_NAMES = ("README.md", "readme.md", "README.rst", "README.txt", "README")
 
 
@@ -35,9 +38,19 @@ def material(graph: ProjectGraph, guard: SecretGuard, key: str) -> Material:
     if key in graph.definitions:
         return Material("code", title, _definition(graph, guard, key), [])
     if view.parent.kind == "module":
-        return Material("code", title, numbered_file(guard, key, 1, MAX_FILE_LINES), [])
+        return Material(_file_level(key), title, numbered_file(guard, key, 1, MAX_FILE_LINES), [])
     level = "application" if key == APPLICATION else "group"
     return Material(level, title, _structure(graph, guard, key, view), children(graph, key))
+
+
+def _file_level(path: str) -> str:
+    """Code, a document or tests: each is explained in its own terms."""
+    if posixpath.splitext(path)[1].lower() in DOCUMENTS:
+        return "doc"
+    name = posixpath.basename(path)
+    if TEST_FILE.search(name) or "/tests/" in f"/{path}" or "/test/" in f"/{path}":
+        return "test"
+    return "code"
 
 
 def _definition(graph: ProjectGraph, guard: SecretGuard, key: str) -> str:

@@ -35,6 +35,7 @@ MAP_RELATIONS = (
 SERVICE_KINDS = {"service", "workload", "k8s-service", "ingress"}
 SERVICE_LINKS = (DEPENDS_ON, TARGETS, ROUTES_TO)
 CODE_PRODUCER = "code-"
+DOCUMENTS = {".md", ".mdx", ".rst"}
 
 
 @dataclass
@@ -61,7 +62,12 @@ class Definition:
 class ProjectGraph:
     def __init__(self, name: str, files: list[FileEntry], claims: list[StoredClaim]) -> None:
         self.name = name
-        self.files = sorted(f.path for f in files if f.state == "readable" and f.analyzers)
+        # Analysed files, plus documents: no Claims come from them, but they explain the Project.
+        self.files = sorted(
+            f.path
+            for f in files
+            if f.state == "readable" and (f.analyzers or posixpath.splitext(f.path)[1].lower() in DOCUMENTS)
+        )
         # Files that only declare deployment (compose, Dockerfile, manifests): Evidence of services,
         # not Modules to browse at the Application level.
         self.declaration_files = {
