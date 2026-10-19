@@ -11,16 +11,17 @@ from collections.abc import Iterable, Iterator
 import tree_sitter as ts
 import tree_sitter_language_pack as tslp
 
-from umbra_engine.analyzers.definitions import Definition, definition_status, definitions, innermost
-from umbra_engine.analyzers.imports import has_import_rule, import_targets
+from umbra_engine.analyzers.definitions import (
+    CODE_LANGUAGES,
+    Definition,
+    definition_status,
+    definitions,
+    innermost,
+)
+from umbra_engine.analyzers.imports import JS_LIKE, has_import_rule, import_targets
 from umbra_engine.claims import CALLS, DEFINES, IMPORTS, Claim
 from umbra_engine.guard import GuardedFile
 
-# Languages handled by configuration Analyzers (or reported as Coverage Gaps), not as code.
-DATA_LANGUAGES = {
-    "json", "jsonc", "yaml", "toml", "ini", "dotenv", "markdown", "html", "css", "scss", "xml", "csv",
-    "properties", "requirements", "gitignore", "gitattributes", "vimdoc", "po", "diff", "sql",
-}  # fmt: skip
 # The upstream TypeScript tags query only adds TS-specific rules on top of the JavaScript one.
 INHERITED_TAGS = {"typescript": ("javascript",), "tsx": ("javascript",)}
 # Languages whose import statements tree-sitter-language-pack does not report: taken from the syntax
@@ -30,7 +31,12 @@ TREE_IMPORTS = {
     "c": {"preproc_include"},
     "cpp": {"preproc_include"},
     "kotlin": {"import_header"},
+    # JS/TS: the pack misses `export ... from "m"` and `require("m")`.
+    "javascript": {"import_statement", "export_statement"},
+    "typescript": {"import_statement", "export_statement"},
+    "tsx": {"import_statement", "export_statement"},
 }
+JS_LOADERS = {"require"}
 RUBY_LOADERS = {"require", "require_relative", "load"}
 NOT_CALLS = {"elixir": {"def", "defp", "defmodule", "defmacro", "alias", "import", "use", "require"}}
 
@@ -42,8 +48,7 @@ class CodeAnalyzer:
         self._queries: dict[str, ts.Query | None] = {}
 
     def accepts(self, file: GuardedFile) -> bool:
-        language = language_of(file.rel_path)
-        return language is not None and language not in DATA_LANGUAGES
+        return language_of(file.rel_path) in CODE_LANGUAGES
 
     def analyze(self, file: GuardedFile) -> Iterable[Claim]:
         language = language_of(file.rel_path)
@@ -131,11 +136,21 @@ def _import_nodes(node: ts.Node, language: str) -> Iterator[ts.Node]:
         ):
             yield node
             return
-    elif node.type in TREE_IMPORTS[language]:
+    elif node.type in TREE_IMPORTS[language] and not _plain_export(node):
         yield node
         return
+    elif node.type == "call_expression" and language in JS_LIKE:
+        function = node.child_by_field_name("function")
+        if function is not None and _text(function) in JS_LOADERS:
+            yield node
+            return
     for child in node.children:
         yield from _import_nodes(child, language)
+
+
+def _plain_export(node: ts.Node) -> bool:
+    """`export function f() {...}` is not an import: look inside it (a `require()` keeps its own line)."""
+    return node.type == "export_statement" and node.child_by_field_name("source") is None
 
 
 def _text(node: ts.Node) -> str:

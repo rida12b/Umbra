@@ -186,3 +186,13 @@ def test_imports_inside_comments_or_strings_are_ignored_and_groups_expand(
         if c.relation == IMPORTS
     ]
     assert imports == expected
+
+
+def test_a_require_inside_an_exported_function_cites_its_own_line(make_repo):
+    text = 'export default function App() {\n  const font = require("./font.ttf")\n  return font\n}\n'
+    imports = [
+        (c.object, c.line_start, c.line_end)
+        for c in analyze(make_repo, "app.tsx", text)
+        if c.relation == IMPORTS
+    ]
+    assert imports == [("./font.ttf", 2, 2)]

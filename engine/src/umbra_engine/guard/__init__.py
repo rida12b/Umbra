@@ -11,7 +11,7 @@ from collections.abc import Iterator
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from umbra_engine.guard._listing import UNDECODABLE, list_files
+from umbra_engine.guard._listing import UNDECODABLE, git_links, list_files
 from umbra_engine.guard.content import RULES_VERSION, Finding, default_rules, redact
 from umbra_engine.guard.paths import load_umbraignore, sensitive_reason
 
@@ -28,6 +28,7 @@ BINARY = "binary"
 UNREADABLE = "unreadable"
 UNREADABLE_NAME = "unreadable name"
 CHANGED_DURING_READ = "changed during read"
+LINK_AS_TEXT = "link stored as text"
 
 _SEAL = object()
 
@@ -62,6 +63,7 @@ class SecretGuard:
         self._root = Path(os.path.realpath(root))
         self._rules = default_rules()
         self._umbraignore = load_umbraignore(self._root)
+        self._links = git_links(self._root)
 
     def files(self) -> Iterator[GuardedFile | Skipped]:
         """Every file of the Project, each one already decided: released or skipped."""
@@ -102,6 +104,8 @@ class SecretGuard:
             return Skipped(redact(rel_path, path_secrets), EXCLUDED_SENSITIVE, SECRET_IN_PATH), None
         if UNDECODABLE in rel_path:
             return Skipped(rel_path, UNREADABLE_NAME), None
+        if rel_path in self._links and not (self._root / rel_path).is_symlink():
+            return Skipped(rel_path, LINK_AS_TEXT), None
         target = self._target(rel_path)
         if target is None:
             return Skipped(rel_path, EXCLUDED_OUTSIDE), None

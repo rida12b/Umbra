@@ -9,6 +9,9 @@ from umbra_engine import sqlite_db
 from umbra_engine.claims import Claim, StoredClaim
 
 STORE_FILE = "store.sqlite"
+LIST_SEPARATOR = "\n"  # several analyzers, failures or notes in one column
+INDEXED_SCHEMA = "indexed_schema"  # schema of the store when the last index run wrote it
+STALE_INDEX = "this Project is not indexed, or was indexed by an older Umbra: index it again"
 SCHEMA_VERSION = 3
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS meta (
@@ -157,6 +160,12 @@ class ProjectStore:
 
     def count_claims(self) -> dict[str, int]:
         return dict(self._db.execute("SELECT status, COUNT(*) FROM claims GROUP BY status").fetchall())
+
+    def index_is_current(self) -> bool:
+        """False when the Project was never indexed, or indexed by an older Umbra: its rows would be
+        read with the wrong meaning, so callers must ask for a new index instead."""
+        row = self._db.execute("SELECT value FROM meta WHERE key = ?", (INDEXED_SCHEMA,)).fetchone()
+        return row is not None and row[0] == str(SCHEMA_VERSION)
 
     def meta(self) -> dict[str, str]:
         return dict(self._db.execute("SELECT key, value FROM meta").fetchall())

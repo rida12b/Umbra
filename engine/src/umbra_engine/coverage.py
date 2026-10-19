@@ -10,9 +10,10 @@ from dataclasses import dataclass
 from typing import Literal
 
 from umbra_engine.analyzers.code import language_of
-from umbra_engine.project_store import FileEntry
+from umbra_engine.project_store import LIST_SEPARATOR, FileEntry
 
 State = Literal["covered", "partial", "gap"]
+MISDETECTED = {"vimdoc"}  # tree-sitter-language-pack labels any *.txt as Vim help
 
 
 @dataclass(frozen=True)
@@ -34,20 +35,22 @@ class CoverageReport:
 
 
 def file_coverage(entry: FileEntry) -> FileCoverage:
-    analyzers = [a for a in entry.analyzers.split(",") if a]
+    analyzers = [a for a in entry.analyzers.split(LIST_SEPARATOR) if a]
     if entry.state == "skipped":
         return FileCoverage(entry.path, "gap", [_join(entry.reason, entry.detail)], [])
-    failures = [f for f in entry.detail.split("; ") if f]
+    failures = [f for f in entry.detail.split(LIST_SEPARATOR) if f]
     if not analyzers:
         return FileCoverage(entry.path, "gap", failures or [f"no analyzer for {_kind(entry.path)}"], [])
-    notes = [n for n in entry.notes.split("; ") if n]
+    notes = [n for n in entry.notes.split(LIST_SEPARATOR) if n]
     return FileCoverage(
         entry.path, "partial" if failures or notes else "covered", failures + notes, analyzers
     )
 
 
-def coverage_report(entries: list[FileEntry], only: State | None = None) -> CoverageReport:
-    """Counts cover every file; `only` narrows the listed files to one state."""
+def coverage_report(
+    entries: list[FileEntry], only: State | None = None, limit: int | None = None, offset: int = 0
+) -> CoverageReport:
+    """Counts cover every file; `only`, `limit` and `offset` narrow the listed files."""
     files = [file_coverage(entry) for entry in entries]
     states = Counter(f.state for f in files)
     gap_reasons = Counter(reason for f in files if f.state == "gap" for reason in f.reasons)
@@ -57,13 +60,16 @@ def coverage_report(entries: list[FileEntry], only: State | None = None) -> Cove
         partial=states["partial"],
         gap=states["gap"],
         gap_reasons=dict(gap_reasons.most_common()),
-        files=[f for f in files if only is None or f.state == only],
+        files=[f for f in files if only is None or f.state == only][
+            offset : None if limit is None else offset + limit
+        ],
     )
 
 
 def _kind(path: str) -> str:
+    """The language when detection is reliable, else the file extension or name."""
     language = language_of(path)
-    if language:
+    if language and language not in MISDETECTED:
         return language
     name = path.rsplit("/", 1)[-1]
     return f"*.{name.rsplit('.', 1)[-1]}" if "." in name else name

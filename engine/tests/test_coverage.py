@@ -76,3 +76,68 @@ def test_coverage_cli_prints_counts_and_reasons(settings, repo, monkeypatch, cap
     out = capsys.readouterr().out
     assert out.startswith(f"{len(FILES) + 1} files: 1 covered, 2 partial, 5 Coverage Gaps")
     assert "no analyzer for yaml" in out
+
+
+def test_a_never_indexed_or_older_index_is_refused_not_misread(client, auth, settings, repo):
+    project = client.post("/v1/projects", json={"path": str(repo)}, headers=auth).json()
+    url = f"/v1/projects/{project['id']}/coverage"
+    assert client.get(url, headers=auth).status_code == 409
+    client.post(f"/v1/projects/{project['id']}/index", headers=auth)
+    assert client.get(url, headers=auth).status_code == 200
+
+    import sqlite3
+
+    with sqlite3.connect(settings.projects_dir / project["id"] / "store.sqlite") as db:
+        db.execute("UPDATE meta SET value = '2' WHERE key = 'indexed_schema'")
+    assert client.get(url, headers=auth).status_code == 409
+    assert client.get(f"/v1/projects/{project['id']}/claims", headers=auth).status_code == 409
+
+
+def test_languages_without_extraction_are_gaps_not_partial(settings, make_repo):
+    files = {
+        "api/demo.proto": 'syntax = "proto3";\nmessage Cart { string id = 1; }\n',
+        "requirements.txt": "fastapi\n",
+        "web/index.ts": 'export { login } from "./auth"\nexport * from "./types"\n',
+    }
+    root = write_repo(make_repo("gaps"), files, git=False)
+    _, report = indexed_report(settings, root)
+    by_path = {f.path: f for f in report.files}
+    assert by_path["api/demo.proto"].reasons == ["no analyzer for proto"]
+    assert by_path["requirements.txt"].reasons == ["no analyzer for *.txt"]
+    assert by_path["web/index.ts"].state == "covered"
+
+
+def test_reexports_are_import_facts(settings, make_repo):
+    root = write_repo(make_repo("reexport"), {"web/index.ts": 'export { login } from "./auth"\n'}, git=False)
+    with Registry(settings) as registry:
+        project, _ = registry.add(root)
+        with registry.open_store(project) as store:
+            index_project(project, store)
+            imports = [(c.object, c.line_start) for c in store.claims(relation="imports")]
+    assert imports == [("./auth", 1)]
+
+
+def test_git_links_written_as_text_are_not_read_as_code(settings, make_repo):
+    import subprocess
+
+    root = write_repo(make_repo("links"), {"real.py": "def f():\n    pass\n", "alias.py": "real.py"})
+    blob = subprocess.run(
+        ["git", "-C", str(root), "hash-object", "-w", "alias.py"], capture_output=True, text=True, check=True
+    ).stdout.strip()
+    subprocess.run(
+        ["git", "-C", str(root), "update-index", "--add", "--cacheinfo", f"120000,{blob},alias.py"],
+        check=True,
+    )
+    subprocess.run(["git", "-C", str(root), "add", "real.py"], check=True)
+    _, report = indexed_report(settings, root)
+    by_path = {f.path: f for f in report.files}
+    assert by_path["alias.py"].reasons == ["link stored as text"]
+    assert by_path["real.py"].state == "covered"
+
+
+def test_coverage_cli_lists_files_of_one_state(settings, repo, monkeypatch, capsys):
+    project, _ = indexed_report(settings, repo)
+    monkeypatch.setenv("UMBRA_HOME", str(settings.home))
+    assert cli.main(["coverage", project.id, "--state", "gap"]) == 0
+    listed = [line for line in capsys.readouterr().out.splitlines() if line.startswith("gap ")]
+    assert len(listed) == 5 and any("config.yaml" in line for line in listed)

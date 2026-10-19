@@ -15,6 +15,7 @@ from umbra_engine.claims import Relation, Status, StoredClaim
 from umbra_engine.coverage import CoverageReport, coverage_report
 from umbra_engine.coverage import State as CoverageState
 from umbra_engine.indexer import IndexSummary, index_project
+from umbra_engine.project_store import STALE_INDEX, ProjectStore
 from umbra_engine.registry import Project, ProjectIdCollisionError, ProjectPathError, Registry
 from umbra_engine.settings import LOOPBACK_HOSTS, Settings, load_or_create_token
 
@@ -85,6 +86,13 @@ def create_app(settings: Settings) -> FastAPI:
             raise HTTPException(status.HTTP_404_NOT_FOUND, f"unknown project: {project_id}")
         return project
 
+    def indexed_store(project_id: str) -> ProjectStore:
+        store = registry.open_store(known_project(project_id))
+        if not store.index_is_current():
+            store.close()
+            raise HTTPException(status.HTTP_409_CONFLICT, STALE_INDEX)
+        return store
+
     @app.get("/v1/projects/{project_id}", dependencies=authorized)
     def get_project(project_id: str) -> ProjectOut:
         return ProjectOut.of(known_project(project_id))
@@ -102,14 +110,19 @@ def create_app(settings: Settings) -> FastAPI:
         offset: Annotated[int, Query(ge=0)] = 0,
     ) -> list[StoredClaim]:
         filters = {"file": file, "subject": subject, "object": object, "relation": relation, "status": status}
-        with registry.open_store(known_project(project_id)) as store:
+        with indexed_store(project_id) as store:
             response.headers["X-Total-Count"] = str(store.count_claims_matching(**filters))
             return store.claims(limit, offset, **filters)
 
     @app.get("/v1/projects/{project_id}/coverage", dependencies=authorized)
-    def coverage(project_id: str, state: CoverageState | None = None) -> CoverageReport:
-        with registry.open_store(known_project(project_id)) as store:
-            return coverage_report(store.files(), only=state)
+    def coverage(
+        project_id: str,
+        state: CoverageState | None = None,
+        limit: Annotated[int, Query(ge=1, le=MAX_PAGE)] = MAX_PAGE,
+        offset: Annotated[int, Query(ge=0)] = 0,
+    ) -> CoverageReport:
+        with indexed_store(project_id) as store:
+            return coverage_report(store.files(), only=state, limit=limit, offset=offset)
 
     @app.post("/v1/projects/{project_id}/index", dependencies=authorized)
     def index(project_id: str) -> IndexSummary:
