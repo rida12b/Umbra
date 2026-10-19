@@ -3,6 +3,7 @@ import { ApiError, api, type MapNode, type MapView, type Project } from "./api";
 import { ElementList } from "./map/ElementList";
 import { MapCanvas, type Selection } from "./map/MapCanvas";
 import { DetailsPanel } from "./panel/DetailsPanel";
+import { useExplanation } from "./panel/useExplanation";
 import { APPLICATION, navigate, type Route } from "./route";
 import type { Theme } from "./theme";
 
@@ -20,6 +21,10 @@ export function ProjectView({ project, route, theme, narrow }: Props) {
   const [selection, setSelection] = useState<Selection>(null);
   const [indexing, setIndexing] = useState(false);
   const [attempt, setAttempt] = useState(0);
+  const [panelOpen, setPanelOpen] = useState(!narrow);
+  // The card of the level shown: its own explanation, and one sentence per block on the map.
+  const levelExplanation = useExplanation(project.id, route.node);
+  const roles = levelExplanation?.card?.enfants ?? {};
 
   useEffect(() => {
     let current = true;
@@ -85,8 +90,9 @@ export function ProjectView({ project, route, theme, narrow }: Props) {
 
   const { view } = loading;
   const labels = new Map(view.nodes.map((node) => [node.key, node.label]));
+  const showPanel = selection !== null || panelOpen;
   return (
-    <div className={`project${selection ? " with-panel" : ""}`}>
+    <div className={`project${showPanel ? " with-panel" : ""}`}>
       <div className="map-header">
         <nav className="breadcrumbs" aria-label="Zoom levels">
           {view.breadcrumbs.map((crumb, index) => {
@@ -114,15 +120,21 @@ export function ProjectView({ project, route, theme, narrow }: Props) {
           )}
         </span>
         <Legend />
+        {!showPanel && (
+          <button className="explain-button" onClick={() => setPanelOpen(true)}>
+            Expliquer ce niveau
+          </button>
+        )}
       </div>
       <div className="map-body">
         {view.nodes.length === 0 ? (
           <div className="state">Nothing inside this element was found in the code.</div>
         ) : narrow ? (
-          <ElementList view={view} selection={selection} onSelect={setSelection} onOpen={open} />
+          <ElementList view={view} roles={roles} selection={selection} onSelect={setSelection} onOpen={open} />
         ) : (
           <MapCanvas
             view={view}
+            roles={roles}
             theme={theme}
             vertical={false}
             selection={selection}
@@ -130,13 +142,18 @@ export function ProjectView({ project, route, theme, narrow }: Props) {
             onOpen={open}
           />
         )}
-        {selection && (
+        {showPanel && (
           <DetailsPanel
             projectId={project.id}
             selection={selection}
+            level={view.parent}
+            levelExplanation={levelExplanation}
             labelOf={(key) => labels.get(key) ?? key}
             onOpen={open}
-            onClose={() => setSelection(null)}
+            onClose={() => {
+              setSelection(null);
+              setPanelOpen(false);
+            }}
           />
         )}
       </div>

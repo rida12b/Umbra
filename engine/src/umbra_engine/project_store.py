@@ -155,6 +155,21 @@ class ProjectStore:
         row = self._db.execute("SELECT value FROM meta WHERE key = ?", (INDEXED_SCHEMA,)).fetchone()
         return row is not None and row[0] == str(SCHEMA_VERSION)
 
+    def card(self, key: str) -> tuple[str, str, str, str] | None:
+        """`(digest, card JSON, producer, created_at)` of the explanation card of a map element."""
+        return self._db.execute(
+            "SELECT digest, card, producer, created_at FROM cards WHERE key = ?", (key,)
+        ).fetchone()
+
+    def save_card(self, key: str, digest: str, card: str, producer: str, created_at: str) -> None:
+        self._db.execute(
+            "INSERT OR REPLACE INTO cards(key, digest, card, producer, created_at) VALUES (?, ?, ?, ?, ?)",
+            (key, digest, card, producer, created_at),
+        )
+
+    def cards_written_since(self, since: str) -> int:
+        return self._db.execute("SELECT COUNT(*) FROM cards WHERE created_at >= ?", (since,)).fetchone()[0]
+
     def meta(self) -> dict[str, str]:
         return dict(self._db.execute("SELECT key, value FROM meta").fetchall())
 

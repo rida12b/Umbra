@@ -1,7 +1,7 @@
 """Local HTTP API (`/v1`). Every client — UI, MCP server, future dashboard — goes through it."""
 
 import secrets
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Callable
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Annotated
@@ -11,10 +11,13 @@ from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from pydantic import BaseModel
 
 from umbra_engine import __version__
+from umbra_engine.api_explain import add_explain_routes
 from umbra_engine.api_map import add_map_routes
 from umbra_engine.claims import Relation, Status, StoredClaim
 from umbra_engine.coverage import CoverageReport, coverage_report
 from umbra_engine.coverage import State as CoverageState
+from umbra_engine.explain.worker import Explainer
+from umbra_engine.gateways import claude
 from umbra_engine.indexer import IndexSummary, index_project
 from umbra_engine.project_store import STALE_INDEX, ProjectStore
 from umbra_engine.registry import Project, ProjectIdCollisionError, ProjectPathError, Registry
@@ -40,7 +43,8 @@ class ProjectOut(BaseModel):
         return cls(id=project.id, name=project.name, root=str(project.root), created_at=project.created_at)
 
 
-def create_app(settings: Settings) -> FastAPI:
+def create_app(settings: Settings, ask: Callable[[str], str] = claude.ask) -> FastAPI:
+    """`ask` answers one prompt with the user's Claude Code (tests pass a fake)."""
     registry = Registry(settings)
     token = load_or_create_token(settings).encode()
     sessions = UiSessions()
@@ -141,6 +145,8 @@ def create_app(settings: Settings) -> FastAPI:
         with registry.open_store(project) as store:
             return index_project(project, store)
 
-    add_map_routes(app, authorized, known_project, indexed_store)
+    graph_of = add_map_routes(app, authorized, known_project, indexed_store)
+    app.state.explainer = Explainer(ask)
+    add_explain_routes(app, authorized, known_project, indexed_store, graph_of, app.state.explainer)
     add_web_routes(app, authorized, sessions)  # last: the web app is mounted at `/`
     return app

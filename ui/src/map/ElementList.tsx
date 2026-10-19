@@ -4,6 +4,7 @@ import type { Selection } from "./MapCanvas";
 
 interface Props {
   view: MapView;
+  roles: Record<string, string>;
   selection: Selection;
   onSelect: (selection: Selection) => void;
   onOpen: (node: MapNode) => void;
@@ -13,7 +14,7 @@ interface Props {
  * The same view as the graph, for narrow screens where a graph of 12 boxes is unreadable:
  * one row per element, with the links it starts listed under it.
  */
-export function ElementList({ view, selection, onSelect, onOpen }: Props) {
+export function ElementList({ view, roles, selection, onSelect, onOpen }: Props) {
   const labels = new Map(view.nodes.map((node) => [node.key, node.label]));
   return (
     <ul className="element-list">
@@ -33,6 +34,7 @@ export function ElementList({ view, selection, onSelect, onOpen }: Props) {
                 )}
               </span>
               <span className="element-label">{node.label}</span>
+              {roles[node.key] && <span className="element-role">{roles[node.key]}</span>}
               {childrenLabel(node) && <span className="element-inside">{childrenLabel(node)}</span>}
             </button>
             {outgoing.length > 0 && (

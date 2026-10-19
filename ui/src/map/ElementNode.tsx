@@ -1,7 +1,7 @@
 import { Handle, Position, type Node, type NodeProps } from "@xyflow/react";
 import type { MapNode, MapStatus, NodeKind } from "../api";
 
-export type ElementData = { element: MapNode; vertical: boolean };
+export type ElementData = { element: MapNode; vertical: boolean; role?: string };
 export type ElementFlowNode = Node<ElementData, "element">;
 
 export const KIND_LABEL: Record<NodeKind, string> = {
@@ -29,7 +29,7 @@ export function childrenLabel(element: MapNode): string {
 }
 
 export function ElementNode({ data, selected }: NodeProps<ElementFlowNode>) {
-  const { element, vertical } = data;
+  const { element, vertical, role } = data;
   const inside = childrenLabel(element);
   return (
     <div
@@ -44,6 +44,7 @@ export function ElementNode({ data, selected }: NodeProps<ElementFlowNode>) {
         )}
       </div>
       <div className="element-label">{element.label}</div>
+      {role && <div className="element-role">{role}</div>}
       {inside && <div className="element-inside">{inside}</div>}
       <Handle type="source" position={vertical ? Position.Bottom : Position.Right} />
     </div>

@@ -79,6 +79,32 @@ export interface IndexSummary {
   claims: Record<string, number>;
 }
 
+export interface Located {
+  texte: string;
+  fichier: string | null;
+  lignes: [number, number] | null;
+}
+
+/** What Claude Code wrote about one element: an LLM's reading of the code, so a Hypothesis. */
+export interface Card {
+  role: string;
+  entrees: string[];
+  sorties: string[];
+  etapes: Located[];
+  points_entree: Located[];
+  depend_de: string[];
+  enfants: Record<string, string>;
+  incertitudes: string[];
+}
+
+export interface Explanation {
+  state: "ready" | "stale" | "missing" | "queued" | "working" | "error";
+  card: Card | null;
+  producer: string | null;
+  created_at: string | null;
+  message: string | null;
+}
+
 /** Why a request failed, in the terms the page shows. */
 export class ApiError extends Error {
   constructor(
@@ -165,6 +191,10 @@ export const api = {
   index: (id: string) => call<IndexSummary>(`${project(id)}/index`, { method: "POST" }),
   map: (id: string, node: string, expand: boolean) =>
     call<MapView>(`${project(id)}/map?${new URLSearchParams({ node, expand: String(expand) })}`),
+  explanation: (id: string, node: string) =>
+    call<Explanation>(`${project(id)}/explain?${new URLSearchParams({ node })}`),
+  explain: (id: string, node: string) =>
+    call<Explanation>(`${project(id)}/explain?${new URLSearchParams({ node })}`, { method: "POST" }),
   claim: (id: string, key: string) => call<Claim>(`${project(id)}/claims/${encodeURIComponent(key)}`),
   evidence: (id: string, file: string, start: number, end: number) =>
     call<Excerpt>(
