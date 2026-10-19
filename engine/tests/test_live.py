@@ -19,7 +19,7 @@ MODEL = {
     "parcours": [
         {"id": "p", "nom": "Appel", "declencheur": "t", "resultat": "r",
          "etapes": [{"texte": "a répond", "composant": "api", "fichier": "app/a.py", "lignes": [1, 2]},
-                    {"texte": "hors du fichier", "composant": "api", "fichier": "app/a.py", "lignes": [1, 99]}]}
+                    {"texte": "trop loin", "composant": "api", "fichier": "app/a.py", "lignes": [1, 99]}]}
     ],
     "modules": {"app/a.py": "renvoie 1", "app/b.py": "renvoie 2", "invented.py": "x"},
     "incertitudes": [],
