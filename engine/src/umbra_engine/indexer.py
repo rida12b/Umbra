@@ -1,6 +1,7 @@
 """Index a Project: every file goes through the Secret Guard, then through every Analyzer that accepts it;
 then Linkers add the Claims that need the whole Project."""
 
+import time
 import uuid
 from collections import Counter
 from dataclasses import dataclass, field
@@ -17,6 +18,7 @@ from umbra_engine.project_store import INDEXED_SCHEMA, LIST_SEPARATOR, SCHEMA_VE
 from umbra_engine.registry import Project
 from umbra_engine.store_schema import INDEX_ID
 
+RACY_WINDOW_NS = 3_000_000_000
 LASTING_SKIPS = {BINARY, TOO_LARGE}  # decided by the content itself: unchanged content, same verdict
 ANALYZERS = "analyzers"  # meta: which Analyzers (and versions) produced the stored Claims
 
@@ -38,6 +40,7 @@ def index_project(
     """Index the Project again. A file whose fingerprint (size, modification time) did not change
     since the last run is not read again: its entry and Claims are reused, re-versioned. Everything is
     read again when the Secret Guard's rules or the Analyzers changed."""
+    started = time.time_ns()
     commit = head_commit(project.root)
     changed = changed_files(project.root) if commit else None
     guard = SecretGuard(project.root)
@@ -54,7 +57,7 @@ def index_project(
             continue
         fingerprint = guard.fingerprint(rel_path)
         old = previous.get(rel_path)
-        if old is not None and fingerprint is not None and old.fingerprint == fingerprint:
+        if old is not None and fingerprint is not None and old.fingerprint == fingerprint and not old.detail:
             if old.state == "readable":
                 version = versions[rel_path] = _version(commit, changed, rel_path, old.digest)
                 claims += [_reversioned(c, version) for c in previous_claims.get(rel_path, [])]
@@ -67,7 +70,11 @@ def index_project(
         if not isinstance(result, GuardedFile):
             entries.append(
                 FileEntry(
-                    result.rel_path, "skipped", result.reason, result.detail, fingerprint=fingerprint or ""
+                    result.rel_path,
+                    "skipped",
+                    result.reason,
+                    result.detail,
+                    fingerprint=_trusted(fingerprint, started),
                 )
             )
             continue
@@ -91,11 +98,13 @@ def index_project(
                 notes=LIST_SEPARATOR.join(notes),
                 version=version,
                 digest=content_digest(result.text),
-                fingerprint=fingerprint or "",
+                fingerprint=_trusted(fingerprint, started),
                 redactions=len(result.redacted),
             )
         )
 
+    # Links are ranked in input order: give them the same order whether Claims were read or reused.
+    claims.sort(key=lambda c: (c.file, c.line_start, c.line_end, c.key))
     by_file: dict[str, list] = {}
     for file, derived in link(claims, set(versions)):
         by_file.setdefault(file, []).append(derived)
@@ -138,6 +147,15 @@ def _reusable(
     for claim in store.claims_not_from(LINKER):
         by_file.setdefault(claim.file, []).append(claim)
     return {e.path: e for e in store.files() if e.fingerprint}, by_file
+
+
+def _trusted(fingerprint: str | None, started_ns: int) -> str:
+    """A fingerprint modified around this run's start is not kept: a same-size edit within the clock's
+    resolution (2 s on FAT) would keep it, and the file would never be read again ("racily clean")."""
+    if fingerprint is None:
+        return ""
+    modified_ns = int(fingerprint.split(":")[1])
+    return "" if modified_ns >= started_ns - RACY_WINDOW_NS else fingerprint
 
 
 def _version(commit: str | None, changed: set[str] | None, path: str, digest: str) -> str:

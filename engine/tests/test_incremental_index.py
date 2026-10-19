@@ -2,6 +2,7 @@
 
 import os
 import subprocess
+import time
 from pathlib import Path
 
 import pytest
@@ -11,6 +12,7 @@ from umbra_engine.analyzers import default_analyzers
 from umbra_engine.guard import SecretGuard
 from umbra_engine.indexer import index_project
 from umbra_engine.registry import Registry
+from umbra_engine.settings import Settings
 
 FILES = {
     "app/main.py": "from .db import save\n\n\ndef handle(order):\n    return save(order)\n",
@@ -33,6 +35,16 @@ def reads(monkeypatch) -> list[str]:
     return seen
 
 
+def aged(root: Path) -> Path:
+    """Files last modified a minute ago, like a real Project: a fingerprint taken right after a write
+    is not trusted (the clock may not have moved), so fresh files would be read every time."""
+    old = time.time_ns() - 60_000_000_000
+    for path in root.rglob("*"):
+        if path.is_file() and ".git" not in path.parts:
+            os.utime(path, ns=(old, old))
+    return root
+
+
 def run(settings, root: Path, analyzers=None):
     with Registry(settings) as registry:
         project, _ = registry.add(root)
@@ -49,7 +61,7 @@ def touch_later(path: Path, text: str) -> None:
 
 
 def test_nothing_changed_reads_nothing_and_gives_the_same_index(settings, make_repo, reads):
-    root = write_repo(make_repo("same"), FILES, git=False)
+    root = aged(write_repo(make_repo("same"), FILES, git=False))
     first = run(settings, root)
     reads.clear()
     second = run(settings, root)
@@ -58,7 +70,7 @@ def test_nothing_changed_reads_nothing_and_gives_the_same_index(settings, make_r
 
 
 def test_one_changed_file_is_the_only_one_read(settings, make_repo, reads):
-    root = write_repo(make_repo("one"), FILES, git=False)
+    root = aged(write_repo(make_repo("one"), FILES, git=False))
     run(settings, root)
     reads.clear()
     touch_later(
@@ -75,7 +87,7 @@ def test_one_changed_file_is_the_only_one_read(settings, make_repo, reads):
 
 
 def test_a_file_excluded_since_is_dropped_without_being_read(settings, make_repo, reads):
-    root = write_repo(make_repo("excluded"), FILES, git=False)
+    root = aged(write_repo(make_repo("excluded"), FILES, git=False))
     run(settings, root)
     reads.clear()
     (root / ".umbraignore").write_text("app/util.py\n")
@@ -86,7 +98,7 @@ def test_a_file_excluded_since_is_dropped_without_being_read(settings, make_repo
 
 
 def test_reused_claims_follow_the_new_commit(settings, make_repo, reads):
-    root = write_repo(make_repo("commit"), FILES)
+    root = aged(write_repo(make_repo("commit"), FILES))
     run(settings, root)  # nothing committed yet: worktree versions
     git = ["git", "-C", str(root), "-c", "user.name=t", "-c", "user.email=t@t"]
     subprocess.run([*git, "add", "."], check=True, capture_output=True)
@@ -101,7 +113,7 @@ def test_reused_claims_follow_the_new_commit(settings, make_repo, reads):
 
 
 def test_changed_analyzers_read_everything_again(settings, make_repo, reads):
-    root = write_repo(make_repo("analyzers"), FILES, git=False)
+    root = aged(write_repo(make_repo("analyzers"), FILES, git=False))
     run(settings, root)
     reads.clear()
     run(settings, root, analyzers=default_analyzers()[:1])
@@ -112,7 +124,7 @@ def test_a_file_skipped_for_a_passing_reason_is_read_again(settings, make_repo, 
     """A lock or a permission fixed later changes neither size nor modification time."""
     from umbra_engine.guard import UNREADABLE, Skipped
 
-    root = write_repo(make_repo("locked"), FILES, git=False)
+    root = aged(write_repo(make_repo("locked"), FILES, git=False))
     original = SecretGuard.read
 
     def locked(self, rel_path):
@@ -127,3 +139,26 @@ def test_a_file_skipped_for_a_passing_reason_is_read_again(settings, make_repo, 
     _, files, claims = run(settings, root)
     assert next(f for f in files if f.path == "app/util.py").state == "readable"
     assert any(c.object == "app/util.py::helper" for c in claims)
+
+
+def test_links_are_the_same_whether_claims_were_read_or_reused(settings, make_repo, tmp_path):
+    """Two imports of one module in a file: each link keeps its own lines across runs."""
+    main = "".join(f"import mod{i}\n" for i in range(8)) + "".join(
+        f"from mod{i} import x\n" for i in range(8)
+    )
+    files = {"app/main.py": main, **{f"mod{i}.py": "x = 1\n" for i in range(8)}}
+    root = aged(write_repo(make_repo("dup"), files, git=False))
+    first = run(settings, root)
+    assert run(settings, root)[2] == first[2]
+    touch_later(root / "mod0.py", "x = 2\n")
+    incremental = run(settings, root)
+    full = run(Settings(home=tmp_path / "full"), root)
+    assert incremental[2] == full[2]
+
+
+def test_a_file_written_during_the_run_is_read_again_next_time(settings, make_repo, reads):
+    root = write_repo(make_repo("racy"), FILES, git=False)  # just written: mtimes are "now"
+    run(settings, root)
+    reads.clear()
+    run(settings, root)
+    assert "app/db.py" in reads  # not trusted yet: a same-size edit in the same tick would be missed
