@@ -1,7 +1,7 @@
 """Schema of a Project store. Bump SCHEMA_VERSION whenever the meaning of a column changes: an index
 written by another version is then refused until the Project is indexed again."""
 
-SCHEMA_VERSION = 4
+SCHEMA_VERSION = 5
 INDEXED_SCHEMA = "indexed_schema"  # schema of the store when the last index run wrote it
 INDEX_ID = "index_id"  # unique per index run
 STALE_INDEX = "this Project is not indexed, or was indexed by an older Umbra: index it again"
@@ -20,7 +20,9 @@ CREATE TABLE IF NOT EXISTS files (
     analyzers TEXT NOT NULL DEFAULT '',
     notes TEXT NOT NULL DEFAULT '',
     version TEXT NOT NULL DEFAULT '',
-    digest TEXT NOT NULL DEFAULT ''
+    digest TEXT NOT NULL DEFAULT '',
+    fingerprint TEXT NOT NULL DEFAULT '',
+    redactions INTEGER NOT NULL DEFAULT 0
 );
 CREATE TABLE IF NOT EXISTS claims (
     key TEXT PRIMARY KEY,
@@ -50,7 +52,10 @@ CREATE INDEX IF NOT EXISTS claims_by_object ON claims(object);
 CREATE INDEX IF NOT EXISTS claims_by_relation ON claims(relation);
 """
 
-FILE_FIELDS = ("path", "state", "reason", "detail", "analyzers", "notes", "version", "digest")
+FILE_FIELDS = (
+    "path", "state", "reason", "detail", "analyzers", "notes", "version", "digest",
+    "fingerprint", "redactions",
+)  # fmt: skip
 CLAIM_FIELDS = (
     "key", "file", "subject", "subject_kind", "relation", "object", "object_kind", "status",
     "line_start", "line_end", "producer", "evidence_version",

@@ -25,7 +25,7 @@ from umbra_engine.explain.worker import Explainer
 from umbra_engine.gateways import claude
 from umbra_engine.indexer import IndexSummary, index_project
 from umbra_engine.live import LiveProjects
-from umbra_engine.project_store import STALE_INDEX, ProjectStore
+from umbra_engine.project_store import INDEXED_SCHEMA, STALE_INDEX, ProjectStore
 from umbra_engine.registry import Project, ProjectIdCollisionError, ProjectPathError, Registry
 from umbra_engine.settings import LOOPBACK_HOSTS, Settings, load_or_create_token
 from umbra_engine.ui_session import SESSION_HEADER, UiSessions
@@ -68,12 +68,23 @@ def create_app(
         if live_projects is not None:
             for project in registry.list():
                 with registry.open_store(project) as store:
-                    if store.index_is_current():
-                        live_projects.follow(project)
+                    current, ever = store.index_is_current(), INDEXED_SCHEMA in store.meta()
+                if current:
+                    live_projects.follow(project)
+                elif ever:  # indexed by an older Umbra: read it again in the background, then follow it
+                    threading.Thread(target=reindex_and_follow, args=(project,), daemon=True).start()
         yield
+        for timer in follow_ups:
+            timer.cancel()
         if live_projects is not None:
             live_projects.stop_all()
         registry.close()
+
+    def reindex_and_follow(project: Project) -> None:
+        with registry.open_store(project) as store:
+            index_project(project, store)
+        if live_projects is not None:
+            live_projects.follow(project)
 
     app = FastAPI(title="Umbra engine", version=__version__, lifespan=lifespan)
     # A web page can make the browser resolve any host name to 127.0.0.1 (DNS rebinding);
@@ -171,12 +182,21 @@ def create_app(
 
     graph_of = add_map_routes(app, authorized, known_project, indexed_store)
 
+    follow_ups: list[threading.Timer] = []  # cancelled when the engine stops
+
+    def follow_up(project_id: str) -> None:
+        try:
+            refresh_model(project_id)
+        except Exception:  # noqa: BLE001 — a late follow-up must never take the engine down
+            return
+
     def saved(project_id: str, key: str) -> None:
         events.publish(project_id, {"type": "card", "key": key})
         if key == MODEL_KEY:  # changes that landed during the session: one follow-up, a bit later
-            follow_up = threading.Timer(MODEL_FOLLOW_UP_S, lambda: refresh_model(project_id))
-            follow_up.daemon = True
-            follow_up.start()
+            timer = threading.Timer(MODEL_FOLLOW_UP_S, follow_up, args=(project_id,))
+            timer.daemon = True
+            follow_ups.append(timer)
+            timer.start()
 
     app.state.explainer = Explainer(
         on_saved=saved,
