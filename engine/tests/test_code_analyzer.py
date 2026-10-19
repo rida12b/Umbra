@@ -95,7 +95,8 @@ def test_calls_are_hypotheses_attributed_to_their_caller(repo):
     calls = [c for c in claims_of(repo, "app/service.py") if c.relation == CALLS]
     assert calls and all(c.status == "hypothesis" for c in calls)
     assert ("app/service.py::Svc.run", "login") in {(c.subject, c.object) for c in calls}
-    assert ("app/service.py::login", "create_session") in {(c.subject, c.object) for c in calls}
+    # `db.create_session(user)`: a method of another object, kept apart from a local `create_session`
+    assert ("app/service.py::login", ".create_session") in {(c.subject, c.object) for c in calls}
 
 
 def test_arrow_functions_count_as_definitions(repo):

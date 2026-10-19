@@ -171,8 +171,16 @@ def test_circular_imports_give_one_edge_each_way(client, auth, make_repo):
         "pkg/b.py": "from .a import f\n\n\ndef g():\n    return f()\n",
     }
     project = make_project(client, auth, make_repo, "cycle", files)
-    edges = {(e["source"], e["target"], e["status"]) for e in view(client, auth, project, "dir:pkg")["edges"]}
-    assert edges == {("pkg/a.py", "pkg/b.py", "fact"), ("pkg/b.py", "pkg/a.py", "fact")}
+    edges = {
+        (e["source"], e["target"], e["relation"], e["status"])
+        for e in view(client, auth, project, "dir:pkg")["edges"]
+    }
+    assert edges == {
+        ("pkg/a.py", "pkg/b.py", "imports", "fact"),
+        ("pkg/b.py", "pkg/a.py", "imports", "fact"),
+        ("pkg/a.py", "pkg/b.py", "calls", "hypothesis"),  # f() calls the imported g(): names matched
+        ("pkg/b.py", "pkg/a.py", "calls", "hypothesis"),
+    }
 
 
 def test_edges_to_hidden_children_go_to_the_group(client, auth, make_repo):

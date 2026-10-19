@@ -43,3 +43,25 @@ jobs:
       - run: npm ci
       - run: npm run build # type-check, then build into the engine package
       - run: npm audit --omit=dev
+
+  e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: ui/package-lock.json
+      - run: python -m pip install -e "./engine"
+      - run: npm ci
+        working-directory: ui
+      - run: npm run build # the engine serves the built app
+        working-directory: ui
+      - run: npx playwright install --with-deps chromium
+        working-directory: ui
+      - run: npx playwright test --reporter=line # the real engine, Claude Code replaced by a fixed model
+        working-directory: ui

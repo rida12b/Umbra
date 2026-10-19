@@ -308,3 +308,67 @@ def test_application_level_shows_services_before_large_directories(client, auth,
     project = index_files(client, auth, make_repo, "many-services", files)
     shown = keys_of(view(client, auth, project))
     assert all(k.startswith(("service:", "group:")) for k in shown)
+
+
+def test_calls_link_definitions_only_when_one_candidate_exists(client, auth, make_repo):
+    files = {
+        "app/service.py": (
+            "from .store import save\n\n\ndef helper():\n    return 1\n\n\n"
+            "def handle(order):\n    helper()\n    return save(order)\n"
+        ),
+        "app/store.py": "def save(order):\n    return order\n",
+        "app/other.py": "def save(x):\n    return x\n",  # same name elsewhere, not imported by service.py
+    }
+    project = index_files(client, auth, make_repo, "calls", files)
+    inside = view(client, auth, project, "app/service.py")
+    assert {(e["source"], e["target"], e["relation"], e["status"]) for e in inside["edges"]} == {
+        ("app/service.py::handle", "app/service.py::helper", "calls", "hypothesis")
+    }
+    across = view(client, auth, project, "dir:app")
+    assert ("app/service.py", "app/store.py", "calls") in {
+        (e["source"], e["target"], e["relation"]) for e in across["edges"]
+    }
+    assert ("app/service.py", "app/other.py", "calls") not in {
+        (e["source"], e["target"], e["relation"]) for e in across["edges"]
+    }
+
+
+def test_search_finds_any_element_and_the_view_that_shows_it(client, auth, project):
+    index(client, auth, project)
+    hits = client.get(f"/v1/projects/{project}/search", params={"q": "Settings"}, headers=auth).json()
+    assert hits[0]["key"] == "backend/app/core/config.py::Settings"
+    assert hits[0]["level"] == "backend/app/core/config.py" and hits[0]["kind"] == "class"
+    services = client.get(f"/v1/projects/{project}/search", params={"q": "back"}, headers=auth).json()
+    assert services[0]["key"] == "service:backend" and services[0]["level"] == "app:"
+    assert client.get(f"/v1/projects/{project}/search", params={"q": "zzz"}, headers=auth).json() == []
+
+
+def test_calls_are_linked_by_scope_never_through_an_unknown_object(client, auth, make_repo):
+    """The review's cases: `d.get()` is not the local `get`; a bare call never reaches a method;
+    `self.load()` reaches its own class; a module-level call does not come from the first function."""
+    files = {
+        "pkg/__init__.py": "",
+        "pkg/store.py": "def save(o):\n    return o\n",
+        "pkg/a.py": (
+            "from .store import save\n\n\ndef get(k):\n    return k\n\n\n"
+            "def use(d):\n    return d.get('x')\n\n\n"
+            "class Repo:\n    def save(self):\n        return 1\n\n"
+            "    def load(self):\n        return self.save()\n\n\n"
+            "def handle(o):\n    return save(o)\n\n\nhandle(1)\n"
+        ),
+    }
+    project = index_files(client, auth, make_repo, "scopes", files)
+    inside = {
+        (e["source"], e["target"])
+        for e in view(client, auth, project, "pkg/a.py")["edges"]
+        if e["relation"] == "calls"
+    }
+    assert (
+        inside == set()
+    )  # use→get and handle→Repo would be wrong; module-level handle(1) has no caller here
+    in_class = {(e["source"], e["target"]) for e in view(client, auth, project, "pkg/a.py::Repo")["edges"]}
+    assert in_class == {("pkg/a.py::Repo.load", "pkg/a.py::Repo.save")}
+    across = {
+        (e["source"], e["target"], e["relation"]) for e in view(client, auth, project, "dir:pkg")["edges"]
+    }
+    assert ("pkg/a.py", "pkg/store.py", "calls") in across  # handle → the imported save

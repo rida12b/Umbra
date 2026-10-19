@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { ApiError, api, type MapNode, type MapView, type Project } from "./api";
 import { ElementList } from "./map/ElementList";
 import { MapCanvas, type Selection } from "./map/MapCanvas";
@@ -23,6 +23,7 @@ export function ProjectView({ project, route, theme, narrow }: Props) {
   const [indexing, setIndexing] = useState(false);
   const [attempt, setAttempt] = useState(0);
   const [panelOpen, setPanelOpen] = useState(!narrow);
+  const selectApplied = useRef(false);
   const live = useLive();
   const model = useModel()?.model ?? null;
 
@@ -30,7 +31,16 @@ export function ProjectView({ project, route, theme, narrow }: Props) {
     let current = true; // on a live refresh the current map stays on screen until the new one arrives
     api
       .map(project.id, route.node, route.expand)
-      .then((view) => current && setLoading({ view }))
+      .then((view) => {
+        if (!current) return;
+        setLoading({ view });
+        // A searched element is selected once; a live refresh must not select it again.
+        const picked = route.select && !selectApplied.current ? view.nodes.find((n) => n.key === route.select) : undefined;
+        if (picked) {
+          selectApplied.current = true;
+          setSelection({ type: "node", node: picked });
+        }
+      })
       .catch((error: ApiError) => current && setLoading({ error }));
     return () => {
       current = false;

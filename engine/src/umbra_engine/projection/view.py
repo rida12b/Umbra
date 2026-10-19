@@ -3,7 +3,7 @@
 import posixpath
 from collections import defaultdict
 
-from umbra_engine.claims import IMPORTS_MODULE, StoredClaim
+from umbra_engine.claims import CALLS, IMPORTS_MODULE, StoredClaim
 from umbra_engine.projection.graph import ProjectGraph
 from umbra_engine.projection.model import (
     APPLICATION,
@@ -132,6 +132,19 @@ def _edges(graph: ProjectGraph, child_keys: list[str], representative: dict[str,
         target = owner.get(claim.object) or package_owner.get(claim.object)
         if target and source != target:
             grouped[(representative[source], representative[target], "imports")].append(claim)
+    shown = set(child_keys)
+    # Inside a file or a class the children are definitions: a call from outside them (module level,
+    # another class) has no place there. Elsewhere, a call belongs to the element owning its file.
+    by_file = not any(child in graph.definitions for child in child_keys)
+    for caller, callee, claim in graph.calls:
+        source = _definition_owner(caller, shown) or (
+            owner.get(caller.split("::", 1)[0]) if by_file else None
+        )
+        target = _definition_owner(callee, shown) or (
+            owner.get(callee.split("::", 1)[0]) if by_file else None
+        )
+        if source and target and source != target:
+            grouped[(representative[source], representative[target], "calls")].append(claim)
     for claim in graph.service_links:
         if claim.subject in representative and claim.object in representative:
             grouped[(representative[claim.subject], representative[claim.object], claim.relation)].append(
@@ -147,7 +160,22 @@ def _edges(graph: ProjectGraph, child_keys: list[str], representative: dict[str,
 
 
 def _status(claims: list[StoredClaim]) -> NodeStatus:
-    """Service links are Declarations; an import link is a Fact as soon as one Fact backs it."""
-    if any(c.relation != IMPORTS_MODULE for c in claims):
+    """Service links are Declarations; imports and calls are Facts as soon as one Fact backs them
+    (resolved calls are matched names: Hypotheses)."""
+    if any(c.relation not in (IMPORTS_MODULE, CALLS) for c in claims):
         return "declaration"
+    if any(c.relation == CALLS for c in claims):
+        return "hypothesis"
     return "fact" if any(c.status == "fact" for c in claims) else "hypothesis"
+
+
+def _definition_owner(key: str, shown: set[str]) -> str | None:
+    """The shown element a definition belongs to: itself, or its enclosing class or function."""
+    while key:
+        if key in shown:
+            return key
+        head, _, rest = key.partition("::")
+        if "." not in rest:
+            return None
+        key = f"{head}::{rest.rsplit('.', 1)[0]}"
+    return None
