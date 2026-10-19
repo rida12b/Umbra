@@ -36,6 +36,14 @@ CREATE TABLE IF NOT EXISTS claims (
     producer TEXT NOT NULL,
     evidence_version TEXT NOT NULL
 );
+-- Explanation cards survive re-indexing: each one is checked against the digest of its material.
+CREATE TABLE IF NOT EXISTS cards (
+    key TEXT PRIMARY KEY,
+    digest TEXT NOT NULL,
+    card TEXT NOT NULL,
+    producer TEXT NOT NULL,
+    created_at TEXT NOT NULL
+);
 CREATE INDEX IF NOT EXISTS claims_by_file ON claims(file);
 CREATE INDEX IF NOT EXISTS claims_by_subject ON claims(subject);
 CREATE INDEX IF NOT EXISTS claims_by_object ON claims(object);

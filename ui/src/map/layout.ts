@@ -2,8 +2,8 @@ import ELK from "elkjs/lib/elk.bundled.js";
 import type { ElkNode } from "elkjs/lib/elk-api";
 import type { MapEdge, MapNode } from "../api";
 
-export const NODE_WIDTH = 216;
-export const NODE_HEIGHT = 72;
+export const NODE_WIDTH = 240;
+export const NODE_HEIGHT = 112; // room for a two-line role under the name
 
 export interface Placed {
   node: MapNode;

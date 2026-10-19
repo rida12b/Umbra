@@ -24,7 +24,8 @@ def add_map_routes(
     authorized: list[params.Depends],
     known_project: Callable[[str], Project],
     indexed_store: Callable[[str], ProjectStore],
-) -> None:
+) -> Callable[[str], ProjectGraph]:
+    """Adds the map routes; returns the cached graph of a Project, for other routes to share."""
     graphs: dict[tuple[str, str], ProjectGraph] = {}
     lock = threading.Lock()
 
@@ -73,3 +74,5 @@ def add_map_routes(
             return excerpt(SecretGuard(project.root), entry, start, end)
         except EvidenceUnavailableError as error:
             raise HTTPException(status.HTTP_404_NOT_FOUND, str(error)) from error
+
+    return graph_of

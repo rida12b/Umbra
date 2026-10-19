@@ -17,6 +17,7 @@ export type Selection = { type: "node"; node: MapNode } | { type: "edge"; edge: 
 
 interface Props {
   view: MapView;
+  roles: Record<string, string>;
   theme: Theme;
   vertical: boolean;
   selection: Selection;
@@ -30,7 +31,7 @@ export function edgeId(edge: MapEdge): string {
   return `${edge.source}->${edge.target}:${edge.relation}`;
 }
 
-export function MapCanvas({ view, theme, vertical, selection, onSelect, onOpen }: Props) {
+export function MapCanvas({ view, roles, theme, vertical, selection, onSelect, onOpen }: Props) {
   const [nodes, setNodes] = useState<ElementFlowNode[] | null>(null);
   const [failed, setFailed] = useState(false);
 
@@ -60,8 +61,13 @@ export function MapCanvas({ view, theme, vertical, selection, onSelect, onOpen }
     selection?.type === "node" ? selection.node.key : selection ? edgeId(selection.edge) : null;
 
   const shownNodes = useMemo(
-    () => nodes?.map((node) => ({ ...node, selected: node.id === selectedKey })) ?? [],
-    [nodes, selectedKey],
+    () =>
+      nodes?.map((node) => ({
+        ...node,
+        selected: node.id === selectedKey,
+        data: { ...node.data, role: roles[node.id] },
+      })) ?? [],
+    [nodes, selectedKey, roles],
   );
 
   const edges: Edge[] = useMemo(
