@@ -95,7 +95,7 @@ export function Sidebar({ project, route, view, model, narrow }: Props) {
                   >
                     {journey.nom}
                     <span className="mt-0.5 block text-[12px] text-faint">
-                      {journey.etapes.length} étapes{manual > 0 ? `, dont ${manual} manuelle${manual > 1 ? "s" : ""}` : ""}
+                      {journey.etapes.length} étapes{manual > 0 ? `, dont ${manual} à faire soi-même` : ""}
                     </span>
                   </button>
                 </li>

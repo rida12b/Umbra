@@ -123,6 +123,7 @@ export interface ArchBlock {
   nom: string;
   type: BlockType;
   role: string;
+  en_bref?: string; // a few plain words for the diagram (models studied before v1.4 have none)
   techno: string;
   code: { chemin: string; element: string }[];
   indices: string;
@@ -155,6 +156,7 @@ export interface Component {
 export interface JourneyStep extends Cited {
   texte: string;
   action?: string; // 2-5 words for the diagram (models studied before v1.3 have none)
+  simple?: string; // the step in one plain sentence, for a reader who does not code (v1.4)
   composant: string;
   touche: string[]; // blocks this step reaches: the user, a database, a model, an outside service
   conditions?: string[]; // what must hold for the step to happen at all
@@ -177,6 +179,7 @@ export interface Journey {
 
 /** What Claude Code understood of the whole Project in one study (a Hypothesis, citations checked). */
 export interface ProjectModel {
+  pitch?: string; // one plain sentence: what the product does, for whom (v1.4)
   resume: string;
   blocs: ArchBlock[];
   flux: ArchFlow[];
@@ -250,6 +253,12 @@ export function readSessionHeader(): Record<string, string> {
   return session ? { "X-Umbra-Session": session } : {};
 }
 
+/** The session is gone (engine restarted, or expired): forget it and ask the person to sign in again. */
+export function signedOut(): void {
+  keepSession(null);
+  onUnauthorized();
+}
+
 /** Called once by the app: any 401 means the session is gone (engine restarted, or expired). */
 export function whenSignedOut(handler: () => void): void {
   onUnauthorized = handler;
@@ -270,10 +279,7 @@ async function call<T>(path: string, init: RequestInit = {}): Promise<T> {
   } catch {
     throw new ApiError(0, "The Umbra engine does not answer. Is `umbra-engine serve` running?");
   }
-  if (response.status === 401 && !path.startsWith("/v1/ui/")) {
-    keepSession(null);
-    onUnauthorized();
-  }
+  if (response.status === 401 && !path.startsWith("/v1/ui/")) signedOut();
   if (!response.ok) {
     const body = await response.json().catch(() => ({}));
     const detail = typeof body.detail === "string" ? body.detail : response.statusText;

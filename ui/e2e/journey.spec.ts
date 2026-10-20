@@ -24,22 +24,27 @@ async function signIn(page: Page): Promise<string> {
   return project;
 }
 
-test("a journey lit on the map, its steps linked both ways with the timeline", async ({ page, isMobile }) => {
+test("a journey as a sequence: blocks across, steps in order, linked with the step list", async ({ page, isMobile }) => {
   const project = await signIn(page);
   await page.goto(`/#/p/${project}`);
   await expect(page.getByText("Une boutique de test").first()).toBeVisible();
   if (isMobile) await page.getByLabel("Suivre un parcours").selectOption("order");
   else await page.getByRole("region", { name: "Parcours" }).getByRole("button", { name: /Passer une commande/ }).click();
   await expect(page.getByRole("heading", { name: "Passer une commande" })).toBeVisible();
-  await expect(page.getByRole("button", { name: /^Étape \d/ })).toHaveCount(2);
-  // Step 1 is active: its cited code is open.
+  await expect(page.getByRole("button", { name: /^Étape \d$/ })).toHaveCount(2);
+  // Plain words first; the code only on demand.
+  await page.getByRole("button", { name: "Détail technique et code" }).click();
+  await page.getByRole("button", { name: "web/src/app.ts:1–3" }).click();
   await expect(page.locator('[data-cited="true"]').first()).toContainText("submit");
-  if (isMobile) return; // phones get the timeline without the map
+  if (isMobile) return; // phones get the step list without the diagram
   const map = page.getByRole("region", { name: "Carte de l'architecture" });
-  await expect(map.locator(".react-flow__node")).toHaveCount(3); // the journey's blocks only: no "Client"
   await expect(map.getByRole("button", { name: /Envoie POST \/orders/ })).toBeVisible(); // the short action
-  await map.getByRole("button", { name: /L'API valide puis/ }).click(); // a step without action: its first words
+  await expect(map.getByRole("button", { name: /Base PostgreSQL/ })).toBeVisible(); // a block the journey reaches
+  await expect(map.getByRole("button", { name: /^Client/ })).toHaveCount(0); // a block it does not
+  await map.getByRole("button", { name: /^Étape 2 :/ }).click();
   await expect(page).toHaveURL(/journey=order&step=2/);
+  await page.getByRole("button", { name: "Détail technique et code" }).click();
+  await page.getByRole("button", { name: "api/app/orders.py:8–10" }).click();
   await expect(page.locator('[data-cited="true"]').first()).toContainText("def create_order");
 });
 
@@ -47,7 +52,7 @@ test("old journey links open the journey on the architecture", async ({ page }) 
   const project = await signIn(page);
   await page.goto(`/#/p/${project}?node=parcours%3A&journey=order&step=abc`);
   await expect(page.getByRole("heading", { name: "Passer une commande" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Étape 1" })).toHaveAttribute("aria-current", "step"); // a bad step is step 1
+  await expect(page.getByRole("button", { name: "Étape 1", exact: true })).toHaveAttribute("aria-current", "step"); // a bad step is step 1
   await expect(page.getByText("NaN")).toHaveCount(0);
 });
 

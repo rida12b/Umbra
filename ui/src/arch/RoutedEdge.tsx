@@ -1,85 +1,50 @@
 import { BaseEdge, EdgeLabelRenderer, type Edge, type EdgeProps } from "@xyflow/react";
 import { roundedPath, type Point } from "./archLayout";
-import type { StepMark } from "./journeyPath";
 
-export type EdgeLook = "plain" | "lit" | "dim";
 export type RoutedData = {
   points: Point[];
-  labelAt: Point[];
-  look: EdgeLook;
-  flowText: string | null; // overview: what goes through
-  steps: StepMark[]; // journey: the steps written on this arrow
-  activeStep: number | null;
-  onStep: (number: number) => void;
+  labelAt: Point | null;
+  text: string; // what goes through, shortened
 };
 export type RoutedFlowEdge = Edge<RoutedData, "routed">;
 
-export const STEP_LABEL_HEIGHT = 26;
-export const FLOW_LABEL_HEIGHT = 18;
+export const FLOW_LABEL_HEIGHT = 20;
 
-const STROKE = { plain: "var(--u-faint)", lit: "var(--u-lamp)", dim: "var(--u-line)" };
-
-/** An arrow drawn where ELK routed it, with its labels where ELK kept room for them. */
+/** A flow drawn where ELK routed it, with what goes through written on the line. */
 export function RoutedEdge({ id, data, selected }: EdgeProps<RoutedFlowEdge>) {
   if (!data || data.points.length < 2) return null;
-  const { points, labelAt, look, flowText, steps, activeStep, onStep } = data;
-  const color = selected ? "var(--u-ink)" : STROKE[look];
+  const { points, labelAt, text } = data;
   return (
     <>
       <BaseEdge
         id={id}
         path={roundedPath(points)}
-        markerEnd={`url(#arrow-${look})`}
-        style={{ stroke: color, strokeWidth: look === "lit" ? 1.8 : 1.2 }}
+        markerEnd="url(#arrow-flow)"
+        style={{ stroke: selected ? "var(--u-ink)" : "var(--u-faint)", strokeWidth: 1.3 }}
         interactionWidth={14}
       />
-      <EdgeLabelRenderer>
-        {steps.map((mark, index) => {
-          const at = labelAt[index];
-          if (!at) return null;
-          return (
-            <button
-              key={mark.number}
-              type="button"
-              className={`nodrag nopan absolute flex items-center gap-1.5 rounded-full border bg-bg py-0.5 pr-2.5 pl-0.5 text-[12px] whitespace-nowrap text-ink ${
-                mark.number === activeStep ? "border-lamp shadow-[0_0_0_3px_var(--u-lamp-soft)]" : "border-line"
-              }`}
-              style={{ transform: `translate(${at.x}px, ${at.y}px)`, pointerEvents: "all" }}
-              onClick={(event) => {
-                event.stopPropagation(); // the step, not the arrow under it (labels are portals inside the edge)
-                onStep(mark.number);
-              }}
-            >
-              <span className="step-number" data-on={mark.number === activeStep}>
-                {mark.number}
-              </span>
-              {mark.label}
-            </button>
-          );
-        })}
-        {flowText && labelAt[0] && (
+      {labelAt && (
+        <EdgeLabelRenderer>
           <span
-            className="absolute rounded bg-bg px-1 text-[11px] whitespace-nowrap text-muted"
-            style={{ transform: `translate(${labelAt[0].x}px, ${labelAt[0].y}px)` }}
+            className="absolute rounded bg-bg px-1 text-[12px] whitespace-nowrap text-muted"
+            style={{ transform: `translate(${labelAt.x}px, ${labelAt.y}px)` }}
           >
-            {flowText}
+            {text}
           </span>
-        )}
-      </EdgeLabelRenderer>
+        </EdgeLabelRenderer>
+      )}
     </>
   );
 }
 
-/** The arrow heads, one per look (SVG markers cannot take their colour from the line). */
-export function ArrowMarkers() {
+/** The arrow head (SVG markers cannot take their colour from the line). */
+export function ArrowMarker() {
   return (
     <svg className="absolute size-0" aria-hidden="true">
       <defs>
-        {(Object.keys(STROKE) as EdgeLook[]).map((look) => (
-          <marker key={look} id={`arrow-${look}`} viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto">
-            <path d="M0 0 8 4 0 8z" style={{ fill: STROKE[look] }} />
-          </marker>
-        ))}
+        <marker id="arrow-flow" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto">
+          <path d="M0 0 8 4 0 8z" style={{ fill: "var(--u-faint)" }} />
+        </marker>
       </defs>
     </svg>
   );
