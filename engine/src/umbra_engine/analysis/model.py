@@ -14,6 +14,8 @@ BLOCK_TYPES = (
 )  # fmt: skip
 SECTIONS = ("blocs", "flux", "composants", "parcours")
 MAX_ACTION = 60  # a label on the diagram, not a sentence
+MAX_SHORT = 90  # a block's "en bref": a few words under its name
+MAX_SIMPLE = 400
 
 
 class ModelFormatError(ValueError):
@@ -38,6 +40,7 @@ def checked_model(
     if not isinstance(raw.get("resume"), str):
         raise ModelFormatError("missing resume")
     model = {
+        "pitch": str(raw.get("pitch", "")),
         "resume": raw["resume"],
         "blocs": [
             b for b in (_block(item, line_counts, directories) for item in _list(raw.get("blocs"))) if b
@@ -79,8 +82,9 @@ def updated_model(model: dict, raw_patch: dict, line_counts: dict[str, int], dir
     }
     merged["modules"] |= patch["modules"]
     merged["dossiers"] = model.get("dossiers", {}) | patch["dossiers"]
-    if isinstance(raw_patch.get("resume"), str):
-        merged["resume"] = raw_patch["resume"]
+    for text in ("resume", "pitch"):
+        if isinstance(raw_patch.get(text), str):
+            merged[text] = raw_patch[text]
     # New flows may join blocks that were not returned again: check them against every block.
     new_flows = _flows(raw_patch.get("flux"), {b["id"] for b in merged["blocs"]})
     replaced = {(f["de"], f["vers"]) for f in new_flows}
@@ -124,6 +128,7 @@ def _block(item: object, line_counts: dict[str, int], directories: set[str]) -> 
         "nom": item["nom"],
         "type": item.get("type") if item.get("type") in BLOCK_TYPES else "library",
         "role": str(item.get("role", "")),
+        "en_bref": str(item.get("en_bref", ""))[:MAX_SHORT],
         "techno": str(item.get("techno", "")),
         "code": code,
         "indices": str(item.get("indices", "")),
@@ -165,6 +170,7 @@ def _journey(item: object, line_counts: dict[str, int], block_ids: set[str]) -> 
         {
             "texte": str(s.get("texte", "")),
             "action": str(s.get("action", ""))[:MAX_ACTION],
+            "simple": str(s.get("simple", ""))[:MAX_SIMPLE],
             "composant": str(s.get("composant", "")),
             "touche": [b for b in _texts(s.get("touche")) if b in block_ids],
             "conditions": _texts(s.get("conditions")),

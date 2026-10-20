@@ -32,3 +32,16 @@ def test_a_missing_or_overlong_action_never_breaks_the_model():
     old, long = model_with(STEP, {**STEP, "action": "x" * 500})["parcours"][0]["etapes"]
     assert old["action"] == ""  # a model studied before the label existed
     assert len(long["action"]) == MAX_ACTION
+
+
+def test_plain_texts_for_readers_who_do_not_code_are_kept():
+    raw = {
+        "resume": "r",
+        "pitch": "Umbra montre comment marche un logiciel.",
+        "blocs": [{"id": "spool", "nom": "File", "en_bref": "Garde les événements", "type": "queue"}],
+        "parcours": [{"id": "j", "nom": "J", "etapes": [{**STEP, "simple": "Claude note ce qu'il a fait."}]}],
+    }
+    model = checked_model(raw, {"hook.py": 10}, set())
+    assert model["pitch"] == "Umbra montre comment marche un logiciel."
+    assert model["blocs"][0]["en_bref"] == "Garde les événements"
+    assert model["parcours"][0]["etapes"][0]["simple"] == "Claude note ce qu'il a fait."
