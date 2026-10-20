@@ -60,7 +60,8 @@ def main() -> None:
     if os.environ.get("UMBRA_CHILD"):  # a session Umbra itself started: nothing to report
         return
     try:
-        event = event_from(json.load(sys.stdin))
+        # Claude Code writes UTF-8; sys.stdin would decode it in the locale encoding (cp1252 on Windows)
+        event = event_from(json.loads(sys.stdin.buffer.read().decode("utf-8")))
         if event is not None:
             spool(Path(os.environ.get("UMBRA_HOME") or Path.home() / ".umbra"), event)
     except Exception:  # noqa: BLE001 — a reporting hook must never disturb Claude
