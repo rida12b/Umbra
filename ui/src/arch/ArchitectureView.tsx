@@ -7,8 +7,9 @@ import { ArchCanvas } from "./ArchCanvas";
 import { BlockDetails, FlowDetails, Overview } from "./ArchPanels";
 import { BLOCK_LABEL } from "./BlockNode";
 import { JourneyPanel } from "./JourneyPanel";
-import { journeyPath } from "./journeyPath";
 import { ModelPending } from "./ModelStatus";
+import { journeySequence } from "./sequence";
+import { SequenceView } from "./SequenceView";
 
 interface Props {
   project: Project;
@@ -17,7 +18,7 @@ interface Props {
   narrow: boolean;
 }
 
-/** The Project's landing view: its architecture; a chosen journey lit on it, step by step. */
+/** The Project's landing view: its architecture, or a chosen journey drawn as a sequence, step by step. */
 export function ArchitectureView({ project, route, theme, narrow }: Props) {
   const state = useModel();
   const model = state?.model ?? null;
@@ -27,12 +28,9 @@ export function ArchitectureView({ project, route, theme, narrow }: Props) {
   const flow = picked?.on === here ? picked.flow : null;
   const journey = model?.parcours.find((j) => j.id === route.journey) ?? null;
   const activeStep = journey && journey.etapes.length > 0 ? Math.min(route.step ?? 1, journey.etapes.length) : null;
-  const path = useMemo(() => (model && journey ? journeyPath(model, journey) : null), [model, journey]);
-  // A journey shows its own blocks only (large enough to read); the overview, every block with a flow.
-  const shown = useMemo(() => {
-    if (path) return path.blocks;
-    return new Set(model?.flux.flatMap((flow) => [flow.de, flow.vers]) ?? []);
-  }, [model, path]);
+  const sequence = useMemo(() => (model && journey ? journeySequence(model, journey) : null), [model, journey]);
+  // The overview draws every block that has a flow; the others are listed under the map.
+  const shown = useMemo(() => new Set(model?.flux.flatMap((flow) => [flow.de, flow.vers]) ?? []), [model]);
 
   const go = useCallback(
     (change: Partial<Route>) =>
@@ -87,29 +85,25 @@ export function ArchitectureView({ project, route, theme, narrow }: Props) {
 
   return (
     <div className="grid h-full min-h-0 grid-cols-[1fr_minmax(360px,440px)]">
-      <section className="map-surface relative min-h-0" aria-label="Carte de l'architecture">
-        <ArchCanvas
-          model={model}
-          theme={theme}
-          path={path}
-          shown={shown}
-          pathKey={`${journey?.id ?? ""}|${state?.created_at ?? ""}`}
-          activeStep={activeStep}
-          pickedBlock={block?.id ?? null}
-          onPickBlock={onPickBlock}
-          onPickFlow={(index) => {
-            const found = model.flux[index];
-            setFlow(found ? { flow: found, on: here } : null);
-          }}
-          onStep={onStep}
-        />
-        <MapLegend
-          activeStep={journey ? activeStep : null}
-          unplaced={path?.unplaced ?? []}
-          offMap={model.blocs.filter((item) => !shown.has(item.id))}
-          journeyShown={journey !== null}
-          onPick={onPickBlock}
-        />
+      <section className={`relative min-h-0 ${sequence ? "" : "map-surface"}`} aria-label="Carte de l'architecture">
+        {sequence ? (
+          <SequenceView sequence={sequence} activeStep={activeStep} onStep={onStep} onPickBlock={onPickBlock} />
+        ) : (
+          <>
+            <ArchCanvas
+              model={model}
+              theme={theme}
+              shown={shown}
+              pickedBlock={block?.id ?? null}
+              onPickBlock={onPickBlock}
+              onPickFlow={(index) => {
+                const found = model.flux[index];
+                setFlow(found ? { flow: found, on: here } : null);
+              }}
+            />
+            <MapLegend offMap={model.blocs.filter((item) => !shown.has(item.id))} onPick={onPickBlock} />
+          </>
+        )}
       </section>
       <aside
         key={flow ? "flow" : (block?.id ?? journey?.id ?? "overview")} // another subject starts at the top
@@ -122,25 +116,14 @@ export function ArchitectureView({ project, route, theme, narrow }: Props) {
   );
 }
 
-/** What the map shows and what it leaves out, in one line at its foot. */
-function MapLegend({ activeStep, unplaced, offMap, journeyShown, onPick }: {
-  activeStep: number | null; unplaced: number[]; offMap: ArchBlock[]; journeyShown: boolean; onPick: (id: string) => void;
-}) {
+/** How to use the map, and the blocks it leaves out (no flow), in one line at its foot. */
+function MapLegend({ offMap, onPick }: { offMap: ArchBlock[]; onPick: (id: string) => void }) {
   return (
     <div className="pointer-events-none absolute right-3 bottom-3 left-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-[12px] text-faint">
       <span className="pointer-events-auto rounded-md border border-line-soft bg-bg/90 px-2.5 py-1.5">
-        {journeyShown ? (
-          <span className="flex items-center gap-1.5">
-            {activeStep !== null && <span className="step-number">{activeStep}</span>} Étape du parcours, détaillée à droite.
-            {offMap.length === 1 && " 1 bloc hors de ce parcours n'est pas montré."}
-            {offMap.length > 1 && ` ${offMap.length} blocs hors de ce parcours ne sont pas montrés.`}
-            {unplaced.length > 0 && ` Hors schéma : étape${unplaced.length > 1 ? "s" : ""} ${unplaced.join(", ")}.`}
-          </span>
-        ) : (
-          "Choisissez un parcours à gauche pour le suivre sur la carte. Cliquez un bloc pour son détail."
-        )}
+        Choisissez un parcours à gauche pour le suivre étape par étape. Cliquez un bloc pour son détail.
       </span>
-      {!journeyShown && offMap.length > 0 && (
+      {offMap.length > 0 && (
         <span className="pointer-events-auto rounded-md border border-line-soft bg-bg/90 px-2.5 py-1.5">
           Sans flux :{" "}
           {offMap.map((item, index) => (

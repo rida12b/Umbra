@@ -10,8 +10,16 @@ import { ModelStatusLine } from "./ModelStatus";
 export function Overview({ model, onJourney }: { model: ProjectModel; onJourney: (id: string) => void }) {
   return (
     <div className="px-6 pt-5 pb-10">
-      <h1 className="text-[19px] font-semibold tracking-[-0.01em]">Ce que fait ce projet</h1>
-      <p className="mt-2.5 text-[14px] leading-relaxed text-muted">{model.resume}</p>
+      <h1 className="text-[20px] font-semibold tracking-[-0.01em]">Ce que fait ce projet</h1>
+      {model.pitch && <p className="mt-2.5 text-[16px] leading-relaxed text-ink">{model.pitch}</p>}
+      {model.pitch ? (
+        <details className="mt-3 text-[14px]">
+          <summary className="cursor-pointer text-muted hover:text-ink">En détail</summary>
+          <p className="mt-2 leading-relaxed text-muted">{model.resume}</p>
+        </details>
+      ) : (
+        <p className="mt-2.5 text-[14px] leading-relaxed text-muted">{model.resume}</p>
+      )}
       {model.parcours.length > 0 && (
         <>
           <SectionTitle>Suivre un parcours sur la carte</SectionTitle>

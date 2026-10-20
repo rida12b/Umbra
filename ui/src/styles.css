@@ -12,13 +12,14 @@
   --u-bg: #f6f7f9;
   --u-panel: #ffffff;
   --u-raised: #eceef2;
-  --u-line: #d9dde3;
-  --u-line-soft: #e7eaee;
-  --u-ink: #1c2027;
-  --u-muted: #555c67;
-  --u-faint: #858c97;
+  --u-line: #c9ced6;
+  --u-line-soft: #dde1e6;
+  --u-ink: #161a20;
+  --u-muted: #464d58;
+  --u-faint: #646c78; /* 4.9:1 on the background: small text stays readable */
   --u-lamp: #f0b44c;
-  --u-lamp-ink: #9a5f05; /* the accent as text or line on a light surface */
+  --u-lamp-ink: #8a5300; /* the accent as text on a light surface */
+  --u-lamp-line: #b8770a; /* the lit journey's arrows: 3.4:1 on white */
   --u-lamp-soft: rgba(240, 180, 76, 0.18);
   --u-on-lamp: #1b1e24;
   --u-ok: #2f7d4a;
@@ -35,10 +36,11 @@
   --u-line: #343a45;
   --u-line-soft: #2a2f38;
   --u-ink: #e7e4dd;
-  --u-muted: #a6a6a1;
-  --u-faint: #737882;
+  --u-muted: #b3b2ac;
+  --u-faint: #8b909a;
   --u-lamp: #f0b44c;
   --u-lamp-ink: #f0b44c;
+  --u-lamp-line: #f0b44c;
   --u-lamp-soft: rgba(240, 180, 76, 0.14);
   --u-on-lamp: #1b1e24;
   --u-ok: #7fb98a;
@@ -61,6 +63,7 @@
   --color-faint: var(--u-faint);
   --color-lamp: var(--u-lamp);
   --color-lamp-ink: var(--u-lamp-ink);
+  --color-lamp-line: var(--u-lamp-line);
   --color-lamp-soft: var(--u-lamp-soft);
   --color-on-lamp: var(--u-on-lamp);
   --color-ok: var(--u-ok);

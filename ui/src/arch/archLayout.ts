@@ -71,7 +71,7 @@ export async function placeArchitecture(boxes: LayoutBox[], arrows: LayoutArrow[
   for (const edge of result.edges ?? []) {
     const points = (edge.sections ?? []).flatMap((s) => [s.startPoint, ...(s.bendPoints ?? []), s.endPoint]);
     const labels = (edge.labels ?? []).map((label) => ({ x: label.x ?? 0, y: label.y ?? 0 }));
-    placed.arrows.set(edge.id, { points, labels });
+    placed.arrows.set(edge.id, { points, labels }); // ELK keeps labels clear of blocks and of each other
   }
   return placed;
 }

@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useState } from "react";
-import { readSessionHeader } from "./api";
+import { readSessionHeader, signedOut } from "./api";
 
 // What the engine reports while it watches the Project: files that just changed, cards rewritten.
 export interface Live {
@@ -59,6 +59,10 @@ export function useLiveEvents(projectId: string | null): Live {
             credentials: "omit",
             signal: controller.signal,
           });
+          if (response.status === 401) {
+            signedOut(); // the engine restarted: retrying can never succeed, the page asks for a new link
+            return;
+          }
           if (!response.ok || !response.body) throw new Error(String(response.status));
           // (Re)connected: read everything again once, in case something changed while away.
           setLive((previous) => ({ ...previous, connected: true, revision: previous.revision + 1 }));
