@@ -35,6 +35,7 @@ function flowText(text: string): string {
 }
 
 const READABLE_ZOOM = 0.95;
+const LEGEND_ROOM = 70;
 
 /** Where the active step is written: the middle of its label on an arrow, or of its block. */
 function stepCentre(layout: Placed, path: JourneyPath | null, step: number | null) {
@@ -85,6 +86,7 @@ export function ArchCanvas(props: Props) {
 
   useEffect(() => {
     let current = true;
+    setFailed(false);
     const arrows: LayoutArrow[] = flows(model, shown).map(({ flow, key }) => {
       const steps = path?.onEdges.get(key);
       const labels = path
@@ -179,7 +181,8 @@ export function ArchCanvas(props: Props) {
         onPaneClick={() => onPickBlock(null)}
         nodesDraggable={false}
         nodesConnectable={false}
-        onInit={(flow) => flow.fitBounds({ x: 0, y: 0, ...placed.layout.size }, { padding: 0.03 })}
+        // Room under the drawing for the legend, which sits over the bottom of the map.
+        onInit={(flow) => flow.fitBounds({ x: 0, y: 0, width: placed.layout.size.width, height: placed.layout.size.height + LEGEND_ROOM }, { padding: 0.03 })}
         minZoom={0.15}
         maxZoom={1.6}
       >

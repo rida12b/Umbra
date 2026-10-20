@@ -36,9 +36,15 @@ export function parseRoute(hash: string): Route {
     node: !node || node === OLD_JOURNEYS_VIEW ? ARCHITECTURE_VIEW : node,
     expand: params.get("expand") === "1",
     journey: params.get("journey"),
-    step: params.get("step") ? Number(params.get("step")) : null,
+    step: positive(params.get("step")),
     select: params.get("select"),
   };
+}
+
+/** `step=3` → 3; anything else (`abc`, `0`, `-2`) → no step. */
+function positive(text: string | null): number | null {
+  const value = Number(text);
+  return text && Number.isInteger(value) && value > 0 ? value : null;
 }
 
 /** A mistyped or truncated link (`%E0`) must not blank the page. */

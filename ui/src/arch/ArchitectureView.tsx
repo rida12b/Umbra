@@ -1,7 +1,7 @@
 import { useCallback, useMemo, useState } from "react";
 import type { ArchBlock, ArchFlow, Project } from "../api";
 import { useModel } from "../model";
-import { ARCHITECTURE_VIEW, navigate, type Route } from "../route";
+import { ARCHITECTURE_VIEW, navigate, routeHash, type Route } from "../route";
 import type { Theme } from "../theme";
 import { ArchCanvas } from "./ArchCanvas";
 import { BlockDetails, FlowDetails, Overview } from "./ArchPanels";
@@ -21,9 +21,12 @@ interface Props {
 export function ArchitectureView({ project, route, theme, narrow }: Props) {
   const state = useModel();
   const model = state?.model ?? null;
-  const [flow, setFlow] = useState<ArchFlow | null>(null);
+  // A picked flow belongs to the page it was picked on: any navigation (journey, Back) drops it.
+  const [picked, setFlow] = useState<{ flow: ArchFlow; on: string } | null>(null);
+  const here = routeHash(route);
+  const flow = picked?.on === here ? picked.flow : null;
   const journey = model?.parcours.find((j) => j.id === route.journey) ?? null;
-  const activeStep = journey ? Math.min(route.step ?? 1, journey.etapes.length) : null;
+  const activeStep = journey && journey.etapes.length > 0 ? Math.min(route.step ?? 1, journey.etapes.length) : null;
   const path = useMemo(() => (model && journey ? journeyPath(model, journey) : null), [model, journey]);
   // A journey shows its own blocks only (large enough to read); the overview, every block with a flow.
   const shown = useMemo(() => {
@@ -94,11 +97,15 @@ export function ArchitectureView({ project, route, theme, narrow }: Props) {
           activeStep={activeStep}
           pickedBlock={block?.id ?? null}
           onPickBlock={onPickBlock}
-          onPickFlow={(index) => setFlow(model.flux[index] ?? null)}
+          onPickFlow={(index) => {
+            const found = model.flux[index];
+            setFlow(found ? { flow: found, on: here } : null);
+          }}
           onStep={onStep}
         />
         <MapLegend
           activeStep={journey ? activeStep : null}
+          unplaced={path?.unplaced ?? []}
           offMap={model.blocs.filter((item) => !shown.has(item.id))}
           journeyShown={journey !== null}
           onPick={onPickBlock}
@@ -116,24 +123,25 @@ export function ArchitectureView({ project, route, theme, narrow }: Props) {
 }
 
 /** What the map shows and what it leaves out, in one line at its foot. */
-function MapLegend({ activeStep, offMap, journeyShown, onPick }: {
-  activeStep: number | null; offMap: ArchBlock[]; journeyShown: boolean; onPick: (id: string) => void;
+function MapLegend({ activeStep, unplaced, offMap, journeyShown, onPick }: {
+  activeStep: number | null; unplaced: number[]; offMap: ArchBlock[]; journeyShown: boolean; onPick: (id: string) => void;
 }) {
   return (
-    <div className="absolute right-3 bottom-3 left-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-[12px] text-faint">
-      <span className="rounded-md border border-line-soft bg-bg/90 px-2.5 py-1.5">
+    <div className="pointer-events-none absolute right-3 bottom-3 left-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-[12px] text-faint">
+      <span className="pointer-events-auto rounded-md border border-line-soft bg-bg/90 px-2.5 py-1.5">
         {journeyShown ? (
           <span className="flex items-center gap-1.5">
-            <span className="step-number">{activeStep}</span> Étape du parcours, détaillée à droite.
+            {activeStep !== null && <span className="step-number">{activeStep}</span>} Étape du parcours, détaillée à droite.
             {offMap.length === 1 && " 1 bloc hors de ce parcours n'est pas montré."}
             {offMap.length > 1 && ` ${offMap.length} blocs hors de ce parcours ne sont pas montrés.`}
+            {unplaced.length > 0 && ` Hors schéma : étape${unplaced.length > 1 ? "s" : ""} ${unplaced.join(", ")}.`}
           </span>
         ) : (
           "Choisissez un parcours à gauche pour le suivre sur la carte. Cliquez un bloc pour son détail."
         )}
       </span>
       {!journeyShown && offMap.length > 0 && (
-        <span className="rounded-md border border-line-soft bg-bg/90 px-2.5 py-1.5">
+        <span className="pointer-events-auto rounded-md border border-line-soft bg-bg/90 px-2.5 py-1.5">
           Sans flux :{" "}
           {offMap.map((item, index) => (
             <span key={item.id}>

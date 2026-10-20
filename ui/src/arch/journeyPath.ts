@@ -19,6 +19,7 @@ export interface JourneyPath {
   onEdges: Map<string, StepMark[]>;
   inBlocks: Map<string, StepMark[]>;
   extraEdges: { key: string; source: string; target: string }[];
+  unplaced: number[]; // steps the model ties to no block of the map
 }
 
 const FALLBACK_WORDS = 5;
@@ -38,7 +39,7 @@ export function journeyPath(model: ProjectModel, journey: Journey): JourneyPath 
     flowKey.set(`${flow.de}>${flow.vers}`, `f${index}`);
     if (!flowKey.has(`${flow.vers}>${flow.de}`)) flowKey.set(`${flow.vers}>${flow.de}`, `f${index}`);
   });
-  const path: JourneyPath = { blocks: new Set(), edges: new Set(), onEdges: new Map(), inBlocks: new Map(), extraEdges: [] };
+  const path: JourneyPath = { blocks: new Set(), edges: new Set(), onEdges: new Map(), inBlocks: new Map(), extraEdges: [], unplaced: [] };
   const add = <K>(map: Map<K, StepMark[]>, key: K, mark: StepMark) => map.set(key, [...(map.get(key) ?? []), mark]);
 
   const arrow = (from: string, to: string): string => {
@@ -65,8 +66,9 @@ export function journeyPath(model: ProjectModel, journey: Journey): JourneyPath 
       add(path.onEdges, key, mark);
       others.forEach((id) => path.edges.add(arrow(here, id)));
     } else {
-      const inside = here ?? first;
+      const inside = here ?? first ?? previous; // no known block: it goes on where the last step was
       if (inside) add(path.inBlocks, inside, mark);
+      else path.unplaced.push(mark.number);
     }
     // The hand-over between two steps in different blocks is lit too, when the model has that flow.
     if (here && previous && previous !== here) {

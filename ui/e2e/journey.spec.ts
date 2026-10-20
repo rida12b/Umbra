@@ -45,8 +45,10 @@ test("a journey lit on the map, its steps linked both ways with the timeline", a
 
 test("old journey links open the journey on the architecture", async ({ page }) => {
   const project = await signIn(page);
-  await page.goto(`/#/p/${project}?node=parcours%3A&journey=order`);
+  await page.goto(`/#/p/${project}?node=parcours%3A&journey=order&step=abc`);
   await expect(page.getByRole("heading", { name: "Passer une commande" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Étape 1" })).toHaveAttribute("aria-current", "step"); // a bad step is step 1
+  await expect(page.getByText("NaN")).toHaveCount(0);
 });
 
 test("code map down to a function, back up with the breadcrumbs", async ({ page, isMobile }) => {
