@@ -45,6 +45,11 @@ Rules:
 - Every step and every exposed thing cites "fichier" (a path relative to this folder) and "lignes"
   [start, end] that you actually read. If you did not read it, do not cite it; say "probablement".
 - Name concrete things: routes, functions, tables, collections, models, environment settings.
+- Two kinds of text. "texte" (and roles of components, modules, folders) is for a developer: name the
+  code. The diagram texts, "pitch", the block "nom" and "en_bref", the step "action" and "simple",
+  are for a reader who does NOT code: everyday French words, no names of functions, files, classes,
+  commands or internal terms (say "les faits tirés du code", not "les Claims"; "le moteur", not
+  "le démon"). Put technologies (SQLite, FastAPI...) in "techno", not in the name.
 - Prefer depth on the main journeys over listing everything. Stop exploring when the model is clear.
 
 Answer with ONLY one JSON object (no text before or after):
@@ -52,8 +57,10 @@ Answer with ONLY one JSON object (no text before or after):
 """
 
 SCHEMA = """{
+  "pitch": "one sentence for a reader who does not code: what the product does, for whom",
   "resume": "3-4 sentences: what the product does for whom, how it is built, how a request flows",
-  "blocs": [{"id": "short-id", "nom": "...", "type": "user|frontend|backend|worker|database|storage|
+  "blocs": [{"id": "short-id", "nom": "plain name", "en_bref": "at most 8 plain words: what it is for",
+             "type": "user|frontend|backend|worker|database|storage|
              queue|external|ml_model|device|cli|library|docs|tests|infra", "role": "one sentence",
              "techno": "...", "code": ["folders or files"], "indices": "what shows it"}],
   "flux": [{"de": "bloc id", "vers": "bloc id", "quoi": "what goes through"}],
@@ -62,8 +69,10 @@ SCHEMA = """{
                   "expose": [{"quoi": "route, function or event", "fichier": "...", "lignes": [a, b]}],
                   "utilise": ["other composant ids or bloc ids"], "fichiers": ["paths"]}],
   "parcours": [{"id": "short-id", "nom": "what the user or system does", "declencheur": "...",
-                "etapes": [{"texte": "what happens", "action": "2 to 5 words, verb first, the label
-                            on the diagram (e.g. 'Écrit un fichier .json')", "composant": "composant id",
+                "etapes": [{"texte": "what happens, for a developer",
+                            "simple": "the same in one plain sentence, for a reader who does not code",
+                            "action": "2 to 5 plain words, verb first, the label on the diagram
+                            (e.g. 'Note la demande')", "composant": "composant id",
                             "touche": ["bloc ids this step reaches: user, database, model, outside service"],
                             "conditions": ["what must hold for this step to happen; empty if always"],
                             "manuel": false, "fichier": "...", "lignes": [a, b]}],
@@ -80,12 +89,13 @@ in UMBRA_MODEL.json and UMBRA_INDEX.md is up to date. These files were added, ch
 {changed}
 Open the changed files and what depends on them (use Grep), then update the model. Same rules as
 before: cite files and lines you read, French, plain sentences; a journey you return is whole, in
-real order, with each step's action label, conditions and manual flag, and the journey's other
-branches. Line numbers in untouched entries may have moved: return the entries whose citations you
-know moved.
+real order, with each step's simple sentence, action label, conditions and manual flag, and the
+journey's other branches. Line numbers in untouched entries may have moved: return the entries whose
+citations you know moved.
 
 Answer with ONLY one JSON object containing just what changed, with the same shapes as the model:
-{{"resume": "only if it changed", "blocs": [...], "flux": [...], "composants": [...], "parcours": [...],
+{{"pitch": "only if it changed", "resume": "only if it changed",
+  "blocs": [...], "flux": [...], "composants": [...], "parcours": [...],
   "modules": {{"path": "role"}}, "dossiers": {{"path": "role"}}, "supprime": {{"blocs": [ids],
   "composants": [ids], "parcours": [ids], "modules": [paths]}}, "incertitudes": [...]}}
 Entries you return replace the entries with the same id (or path). Leave out everything unchanged."""
