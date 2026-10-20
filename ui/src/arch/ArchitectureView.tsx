@@ -7,6 +7,7 @@ import { ArchCanvas } from "./ArchCanvas";
 import { BlockDetails, FlowDetails, Overview } from "./ArchPanels";
 import { BLOCK_LABEL } from "./BlockNode";
 import { JourneyPanel } from "./JourneyPanel";
+import { StateMessage } from "../ui";
 import { ModelPending } from "./ModelStatus";
 import { journeySequence } from "./sequence";
 import { SequenceView } from "./SequenceView";
@@ -86,7 +87,9 @@ export function ArchitectureView({ project, route, theme, narrow }: Props) {
   return (
     <div className="grid h-full min-h-0 grid-cols-[1fr_minmax(360px,440px)]">
       <section className={`relative min-h-0 ${sequence ? "" : "map-surface"}`} aria-label="Carte de l'architecture">
-        {sequence ? (
+        {sequence && sequence.rows.length === 0 ? (
+          <StateMessage title="Ce parcours n'a pas d'étape">Claude n'a décrit aucune étape pour lui. Choisissez un autre parcours.</StateMessage>
+        ) : sequence ? (
           <SequenceView sequence={sequence} activeStep={activeStep} onStep={onStep} onPickBlock={onPickBlock} />
         ) : (
           <>

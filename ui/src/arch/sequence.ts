@@ -45,6 +45,7 @@ export function journeySequence(model: ProjectModel, journey: Journey): Sequence
     // A person who acts (a command, a click) starts the arrow; otherwise the block at work does.
     if (to && step.manuel && blocks.get(to)?.type === "user") [from, to] = [to, from];
     if (!from) [from, to] = [to, null];
+    if (to === from) to = null; // it stays inside one block: a marker, not an arrow onto itself
     meet(from);
     meet(to);
     if (here) previous = here;

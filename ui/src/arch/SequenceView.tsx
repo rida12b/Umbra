@@ -104,7 +104,7 @@ export function SequenceView({ sequence, activeStep, onStep, onPickBlock }: Prop
                 aria-label={`Étape ${row.number} : ${row.label}`}
                 aria-current={on ? "step" : undefined}
                 onClick={() => onStep(row.number)}
-                className={`absolute left-0 rounded-md ${on ? "bg-lamp-soft" : "hover:bg-raised/60"}`}
+                className={`absolute left-0 scroll-mt-[124px] scroll-mb-4 rounded-md ${on ? "bg-lamp-soft" : "hover:bg-raised/60"}`} // clear of the sticky header
                 style={{ top: y + 2, height: ROW - 4, width }}
               >
                 <span
