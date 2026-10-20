@@ -2,10 +2,10 @@ name: Engine
 
 on:
   pull_request:
-    paths: ["engine/**", "ui/**", ".github/workflows/engine.yml"]
+    paths: ["engine/**", "ui/**", "plugin/**", ".github/workflows/engine.yml"]
   push:
     branches: [main]
-    paths: ["engine/**", "ui/**", ".github/workflows/engine.yml"]
+    paths: ["engine/**", "ui/**", "plugin/**", ".github/workflows/engine.yml"]
 
 jobs:
   test:

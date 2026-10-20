@@ -1,7 +1,8 @@
 {
   "name": "umbra",
-  "version": "0.1.0",
   "description": "Reports what Claude Code changes (prompt, edited files, final message) to the local Umbra engine, so its map shows who changed what and why.",
-  "author": { "name": "rida12b" },
+  "author": {
+    "name": "rida12b"
+  },
   "license": "MIT"
 }
