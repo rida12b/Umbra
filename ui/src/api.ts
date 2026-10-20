@@ -154,6 +154,7 @@ export interface Component {
 
 export interface JourneyStep extends Cited {
   texte: string;
+  action?: string; // 2-5 words for the diagram (models studied before v1.3 have none)
   composant: string;
   touche: string[]; // blocks this step reaches: the user, a database, a model, an outside service
   conditions?: string[]; // what must hold for the step to happen at all

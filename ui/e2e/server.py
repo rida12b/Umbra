@@ -50,7 +50,7 @@ MODEL = {
     "parcours": [
         {"id": "order", "nom": "Passer une commande", "declencheur": "Le client clique sur Commander.",
          "etapes": [
-             {"texte": "Le site envoie la commande.", "composant": "web", "touche": ["api"],
+             {"texte": "Le site envoie la commande.", "action": "Envoie POST /orders", "composant": "web", "touche": ["api"],
               "fichier": "web/src/app.ts", "lignes": [1, 3]},
              {"texte": "L'API valide puis enregistre.", "composant": "orders", "touche": ["db"],
               "fichier": "api/app/orders.py", "lignes": [8, 10]},

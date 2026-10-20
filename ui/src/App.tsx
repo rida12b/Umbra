@@ -3,10 +3,12 @@ import { ApiError, api, whenSignedOut, type Project } from "./api";
 import { LiveContext, useLiveEvents } from "./live";
 import { ProjectPage } from "./ProjectPage";
 import { takeLoginCode, useRoute } from "./route";
+import { TopBar } from "./shell/TopBar";
 import { useTheme } from "./theme";
+import { Command, StateMessage } from "./ui";
 
 type Projects = { list: Project[] } | { error: ApiError } | null;
-const NARROW = "(max-width: 720px)";
+const NARROW = "(max-width: 860px)";
 
 // Done once per page load, before any API call: a login code works only once.
 const sessionReady: Promise<void> = (() => {
@@ -30,6 +32,7 @@ export function App() {
   const route = useRoute();
   const narrow = useNarrow();
   const [projects, setProjects] = useState<Projects>(null);
+  const [searching, setSearching] = useState(false);
 
   useEffect(() => {
     whenSignedOut(() => setProjects({ error: new ApiError(401, "signed out") }));
@@ -44,70 +47,72 @@ export function App() {
   const live = useLiveEvents(project?.id ?? null);
 
   return (
-    <div className="app">
-      <header className="topbar">
-        <a className="brand" href="#/">
-          Umbra
-        </a>
-        {project && <span className="topbar-project">{project.name}</span>}
-        <button className="theme-toggle" onClick={toggleTheme} aria-label={`Switch to ${theme === "dark" ? "light" : "dark"} theme`}>
-          {theme === "dark" ? "Light" : "Dark"}
-        </button>
-      </header>
-      <LiveContext.Provider value={live}>
-      <main className="main">
-        {projects === null && <div className="state">Connecting to the local engine…</div>}
+    <LiveContext.Provider value={live}>
+      <div className="flex h-full flex-col">
+        <TopBar project={project} theme={theme} onToggleTheme={toggleTheme} onSearch={() => setSearching(true)} />
+        {projects === null && <StateMessage>Connexion au moteur local…</StateMessage>}
         {projects && "error" in projects && <ConnectionProblem error={projects.error} />}
         {projects && "list" in projects && !route.projectId && <ProjectList projects={projects.list} />}
         {projects && "list" in projects && route.projectId && !project && (
-          <div className="state">
-            <p>Unknown Project: {route.projectId}</p>
-            <a href="#/">All Projects</a>
-          </div>
+          <StateMessage title="Projet inconnu">
+            <p className="font-mono text-[13px]">{route.projectId}</p>
+            <a className="mt-3 inline-block text-ink underline underline-offset-[3px]" href="#/">
+              Voir tous les projets
+            </a>
+          </StateMessage>
         )}
-        {project && <ProjectPage key={project.id} project={project} route={route} theme={theme} narrow={narrow} />}
-      </main>
-      </LiveContext.Provider>
-    </div>
+        {project && (
+          <ProjectPage
+            key={project.id}
+            project={project}
+            route={route}
+            theme={theme}
+            narrow={narrow}
+            searching={searching}
+            onSearching={setSearching}
+          />
+        )}
+      </div>
+    </LiveContext.Provider>
   );
 }
 
 function ConnectionProblem({ error }: { error: ApiError }) {
   if (error.needsLogin)
     return (
-      <div className="state">
-        <h1>Sign in from your terminal</h1>
-        <p>This page needs a one-time link from the engine. In a terminal, run:</p>
-        <pre className="command">umbra-engine open</pre>
-        <p className="muted">The link works once and expires after 2 minutes. Your API token never goes in a URL.</p>
-      </div>
+      <StateMessage title="Connectez-vous depuis votre terminal">
+        <p>Cette page a besoin d'un lien à usage unique donné par le moteur. Dans un terminal :</p>
+        <Command>umbra-engine open</Command>
+        <p className="text-[13px] text-faint">Le lien marche une fois et expire après 2 minutes. Votre jeton d'API ne passe jamais dans une adresse.</p>
+      </StateMessage>
     );
   return (
-    <div className="state error-text">
-      <p>{error.message}</p>
-    </div>
+    <StateMessage title="Le moteur ne répond pas">
+      <p className="text-danger">{error.message}</p>
+      <p className="mt-2">Lancez-le avec :</p>
+      <Command>umbra-engine serve</Command>
+    </StateMessage>
   );
 }
 
 function ProjectList({ projects }: { projects: Project[] }) {
   if (projects.length === 0)
     return (
-      <div className="state">
-        <h1>No Project yet</h1>
-        <p>Register and index a folder from a terminal:</p>
-        <pre className="command">umbra-engine index C:\path\to\your\project</pre>
-        <p className="muted">Then reload this page.</p>
-      </div>
+      <StateMessage title="Aucun projet pour l'instant">
+        <p>Enregistrez et indexez un dossier depuis un terminal :</p>
+        <Command>umbra-engine add C:\chemin\vers\le\projet{"\n"}umbra-engine index C:\chemin\vers\le\projet</Command>
+        <p className="text-[13px] text-faint">Puis rechargez cette page.</p>
+      </StateMessage>
     );
   return (
-    <section className="projects">
-      <h1>Projects</h1>
-      <ul>
+    <section className="mx-auto w-full max-w-3xl px-4 py-10">
+      <h1 className="mb-4 text-[19px] font-semibold tracking-[-0.01em]">Projets</h1>
+      <ul className="divide-y divide-line-soft border-y border-line-soft">
         {projects.map((project) => (
           <li key={project.id}>
-            <a href={`#/p/${encodeURIComponent(project.id)}`}>
-              <span className="project-name">{project.name}</span>
-              <span className="project-root">{project.root}</span>
+            <a href={`#/p/${encodeURIComponent(project.id)}`} className="block px-1 py-3 hover:bg-raised">
+              <span className="block font-medium text-ink">{project.name}</span>
+              <span className="block truncate font-mono text-[12px] text-faint">{project.root}</span>
             </a>
           </li>
         ))}

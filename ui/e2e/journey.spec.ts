@@ -19,23 +19,34 @@ async function signIn(page: Page): Promise<string> {
   const minted = await page.request.post("/v1/ui/login-codes", { headers: { Authorization: `Bearer ${secret}` } });
   const { code } = (await minted.json()) as { code: string };
   await page.goto(`/#login=${code}`);
-  await expect(page.getByRole("heading", { name: "Projects" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Projets" })).toBeVisible();
   expect(page.url()).not.toContain(code); // the code leaves the address bar at once
   return project;
 }
 
-test("architecture, journey, and the whole path lit on the diagram", async ({ page }) => {
+test("a journey lit on the map, its steps linked both ways with the timeline", async ({ page, isMobile }) => {
   const project = await signIn(page);
   await page.goto(`/#/p/${project}`);
-  await expect(page.getByText("Une boutique de test")).toBeVisible();
-  await page.getByRole("button", { name: /Passer une commande/ }).click();
+  await expect(page.getByText("Une boutique de test").first()).toBeVisible();
+  if (isMobile) await page.getByLabel("Suivre un parcours").selectOption("order");
+  else await page.getByRole("region", { name: "Parcours" }).getByRole("button", { name: /Passer une commande/ }).click();
   await expect(page.getByRole("heading", { name: "Passer une commande" })).toBeVisible();
-  await expect(page.locator(".timeline .step")).toHaveCount(2);
-  await expect(page.getByText("→ Base PostgreSQL")).toBeVisible();
-  await page.getByRole("button", { name: "api/app/orders.py:8–10" }).click();
-  await expect(page.locator(".line.cited").first()).toContainText("def create_order");
-  await page.getByRole("button", { name: /Voir ce parcours sur le schéma/ }).click();
-  await expect(page).toHaveURL(/journey=order/);
+  await expect(page.getByRole("button", { name: /^Étape \d/ })).toHaveCount(2);
+  // Step 1 is active: its cited code is open.
+  await expect(page.locator('[data-cited="true"]').first()).toContainText("submit");
+  if (isMobile) return; // phones get the timeline without the map
+  const map = page.getByRole("region", { name: "Carte de l'architecture" });
+  await expect(map.locator(".react-flow__node")).toHaveCount(3); // the journey's blocks only: no "Client"
+  await expect(map.getByRole("button", { name: /Envoie POST \/orders/ })).toBeVisible(); // the short action
+  await map.getByRole("button", { name: /L'API valide puis/ }).click(); // a step without action: its first words
+  await expect(page).toHaveURL(/journey=order&step=2/);
+  await expect(page.locator('[data-cited="true"]').first()).toContainText("def create_order");
+});
+
+test("old journey links open the journey on the architecture", async ({ page }) => {
+  const project = await signIn(page);
+  await page.goto(`/#/p/${project}?node=parcours%3A&journey=order`);
+  await expect(page.getByRole("heading", { name: "Passer une commande" })).toBeVisible();
 });
 
 test("code map down to a function, back up with the breadcrumbs", async ({ page, isMobile }) => {
@@ -49,16 +60,18 @@ test("code map down to a function, back up with the breadcrumbs", async ({ page,
   await expect(fn).toBeVisible();
   await expect(page.locator(".react-flow__edge.link-hypothesis")).toHaveCount(1); // create_order calls validate
   await fn.click();
-  await expect(page.locator(".panel")).toContainText("create_order");
-  await page.getByRole("navigation", { name: "Zoom levels" }).getByRole("link", { name: "shop" }).click();
+  await expect(page.getByLabel("Explication et preuves")).toContainText("create_order");
+  await page.getByRole("navigation", { name: "Niveaux" }).getByRole("link", { name: "shop" }).click();
   await expect(page.locator('.react-flow__node[data-id="service:api"]')).toBeVisible();
 });
 
 test("search jumps to a function and selects it", async ({ page }) => {
   const project = await signIn(page);
   await page.goto(`/#/p/${project}?node=app%3A`);
-  await page.getByLabel("Chercher dans le projet").fill("validate");
-  await page.getByRole("listbox").getByRole("button", { name: /validate/ }).first().click();
+  await expect(page.getByRole("navigation", { name: "Vues" })).toBeVisible(); // the shortcut exists once the page is up
+  await page.keyboard.press("Control+k");
+  await page.getByRole("combobox", { name: "Chercher dans le projet" }).fill("validate");
+  await page.getByRole("option", { name: /validate/ }).first().click();
   await expect(page).toHaveURL(/select=api%2Fapp%2Forders\.py%3A%3Avalidate/);
-  await expect(page.locator(".panel, .element-row.selected").first()).toContainText("validate");
+  await expect(page.getByLabel("Explication et preuves")).toContainText("validate");
 });

@@ -1,246 +1,150 @@
-import { Background, Controls, MarkerType, ReactFlow, type Edge } from "@xyflow/react";
-import { useEffect, useMemo, useState } from "react";
-import type { ArchBlock, ArchFlow, Project, ProjectModel } from "../api";
-import { changedUnder, useLive } from "../live";
-import { layoutBoxes } from "../map/layout";
+import { useCallback, useMemo, useState } from "react";
+import type { ArchBlock, ArchFlow, Project } from "../api";
 import { useModel } from "../model";
-import { JOURNEYS_VIEW, navigate } from "../route";
+import { ARCHITECTURE_VIEW, navigate, type Route } from "../route";
 import type { Theme } from "../theme";
-import { BLOCK_LABEL, BlockIcon, BlockNode, type BlockFlowNode } from "./BlockNode";
-import { CitedCode } from "./CitedCode";
-import { ModelPending, ModelStatusLine } from "./ModelStatus";
-
-const BLOCK_SIZE = { width: 260, height: 132 };
-const nodeTypes = { block: BlockNode };
-type Picked = { block: ArchBlock } | { flow: ArchFlow } | null;
+import { ArchCanvas } from "./ArchCanvas";
+import { BlockDetails, FlowDetails, Overview } from "./ArchPanels";
+import { BLOCK_LABEL } from "./BlockNode";
+import { JourneyPanel } from "./JourneyPanel";
+import { journeyPath } from "./journeyPath";
+import { ModelPending } from "./ModelStatus";
 
 interface Props {
   project: Project;
+  route: Route;
   theme: Theme;
   narrow: boolean;
-  /** Blocks and flows of one journey to light up (from the journeys view). */
-  highlight?: { blocks: Set<string>; flows: Set<string> } | null;
 }
 
-/** The Project's landing view: its architecture, from the model Claude Code wrote after studying it. */
-export function ArchitectureView({ project, theme, narrow, highlight = null }: Props) {
+/** The Project's landing view: its architecture; a chosen journey lit on it, step by step. */
+export function ArchitectureView({ project, route, theme, narrow }: Props) {
   const state = useModel();
-  const [picked, setPicked] = useState<Picked>(null);
   const model = state?.model ?? null;
-  if (!model) return <ModelPending state={state} />;
+  const [flow, setFlow] = useState<ArchFlow | null>(null);
+  const journey = model?.parcours.find((j) => j.id === route.journey) ?? null;
+  const activeStep = journey ? Math.min(route.step ?? 1, journey.etapes.length) : null;
+  const path = useMemo(() => (model && journey ? journeyPath(model, journey) : null), [model, journey]);
+  // A journey shows its own blocks only (large enough to read); the overview, every block with a flow.
+  const shown = useMemo(() => {
+    if (path) return path.blocks;
+    return new Set(model?.flux.flatMap((flow) => [flow.de, flow.vers]) ?? []);
+  }, [model, path]);
 
-  const names = new Map(model.blocs.map((block) => [block.id, block.nom]));
-  // The model may have been updated since the click: show the block as it is now (or the overview).
-  const pickedBlock = picked && "block" in picked ? model.blocs.find((b) => b.id === picked.block.id) : undefined;
-  return (
-    <div className="map-body">
-      {narrow ? (
-        <BlockList model={model} onPick={setPicked} />
-      ) : (
-        <ArchitectureCanvas model={model} theme={theme} picked={picked} onPick={setPicked} highlight={highlight} />
-      )}
-      <aside className="panel" aria-label="Architecture">
-        {pickedBlock ? (
-          <BlockDetails block={pickedBlock} model={model} project={project} onBack={() => setPicked(null)} />
-        ) : picked && "flow" in picked ? (
-          <>
-            <button className="link-button back" onClick={() => setPicked(null)}>← Vue d'ensemble</button>
-            <p className="panel-kind">Flux</p>
-            <h2 className="panel-title">
-              {names.get(picked.flow.de)} → {names.get(picked.flow.vers)}
-            </h2>
-            <p>{picked.flow.quoi}</p>
-          </>
-        ) : (
-          <Overview model={model} project={project} />
+  const go = useCallback(
+    (change: Partial<Route>) =>
+      navigate({ ...route, projectId: project.id, node: ARCHITECTURE_VIEW, expand: false, ...change }),
+    [route, project.id],
+  );
+  const onStep = useCallback((step: number) => {
+    setFlow(null);
+    go({ step, select: null });
+  }, [go]);
+  const onPickBlock = useCallback((id: string | null) => {
+    setFlow(null);
+    go({ select: id });
+  }, [go]);
+
+  if (!model) return <ModelPending state={state} />;
+  const block = route.select ? model.blocs.find((b) => b.id === route.select) : undefined;
+  const back = () => {
+    setFlow(null);
+    go({ select: null });
+  };
+
+  const panel = flow ? (
+    <FlowDetails flow={flow} model={model} onBack={back} />
+  ) : block ? (
+    <BlockDetails block={block} model={model} project={project} onBack={back} />
+  ) : journey ? (
+    <JourneyPanel projectId={project.id} journey={journey} activeStep={activeStep} onStep={onStep} />
+  ) : (
+    <Overview model={model} onJourney={(id) => go({ journey: id, step: 1, select: null })} />
+  );
+
+  if (narrow)
+    return (
+      <div className="h-full min-w-0 overflow-y-auto">
+        {panel}
+        {!journey && !block && !flow && (
+          <ul className="border-t border-line-soft px-6 py-4">
+            {model.blocs.map((item) => (
+              <li key={item.id} className="border-b border-line-soft py-2.5">
+                <button type="button" className="text-left" onClick={() => onPickBlock(item.id)}>
+                  <span className="block text-[12px] text-faint">{BLOCK_LABEL[item.type]}</span>
+                  <span className="block text-[14px] font-medium">{item.nom}</span>
+                  <span className="block text-[13px] text-muted">{item.role}</span>
+                </button>
+              </li>
+            ))}
+          </ul>
         )}
+      </div>
+    );
+
+  return (
+    <div className="grid h-full min-h-0 grid-cols-[1fr_minmax(360px,440px)]">
+      <section className="map-surface relative min-h-0" aria-label="Carte de l'architecture">
+        <ArchCanvas
+          model={model}
+          theme={theme}
+          path={path}
+          shown={shown}
+          pathKey={`${journey?.id ?? ""}|${state?.created_at ?? ""}`}
+          activeStep={activeStep}
+          pickedBlock={block?.id ?? null}
+          onPickBlock={onPickBlock}
+          onPickFlow={(index) => setFlow(model.flux[index] ?? null)}
+          onStep={onStep}
+        />
+        <MapLegend
+          activeStep={journey ? activeStep : null}
+          offMap={model.blocs.filter((item) => !shown.has(item.id))}
+          journeyShown={journey !== null}
+          onPick={onPickBlock}
+        />
+      </section>
+      <aside
+        key={flow ? "flow" : (block?.id ?? journey?.id ?? "overview")} // another subject starts at the top
+        className="min-h-0 overflow-y-auto border-l border-line-soft"
+        aria-label="Détail"
+      >
+        {panel}
       </aside>
     </div>
   );
 }
 
-function Overview({ model, project }: { model: ProjectModel; project: Project }) {
-  return (
-    <>
-      <p className="panel-kind">Architecture · {project.name}</p>
-      <p className="card-role">{model.resume}</p>
-      <h3 className="card-title">Ce que fait le système, de bout en bout</h3>
-      <ul className="journey-links">
-        {model.parcours.map((journey) => (
-          <li key={journey.id}>
-            <button
-              className="link-button"
-              onClick={() => navigate({ projectId: project.id, node: JOURNEYS_VIEW, expand: false, journey: journey.id })}
-            >
-              {journey.nom} →
-            </button>
-            <span className="muted"> {journey.etapes.length} étapes</span>
-          </li>
-        ))}
-      </ul>
-      {model.incertitudes.length > 0 && (
-        <>
-          <h3 className="card-title">Ce qu'on ne peut pas savoir d'ici</h3>
-          <ul className="card-list muted">
-            {model.incertitudes.map((item, index) => (
-              <li key={index}>{item}</li>
-            ))}
-          </ul>
-        </>
-      )}
-      <ModelStatusLine />
-      <p className="muted hint">Cliquez un bloc pour ses composants et son code, un flux pour ce qui y passe.</p>
-    </>
-  );
-}
-
-function ArchitectureCanvas({ model, theme, picked, onPick, highlight }: {
-  model: ProjectModel; theme: Theme; picked: Picked; onPick: (p: Picked) => void;
-  highlight: Props["highlight"];
+/** What the map shows and what it leaves out, in one line at its foot. */
+function MapLegend({ activeStep, offMap, journeyShown, onPick }: {
+  activeStep: number | null; offMap: ArchBlock[]; journeyShown: boolean; onPick: (id: string) => void;
 }) {
-  const [nodes, setNodes] = useState<BlockFlowNode[] | null>(null);
-  const live = useLive();
-  useEffect(() => {
-    let current = true;
-    const links = model.flux.map((flow) => [flow.de, flow.vers] as [string, string]);
-    layoutBoxes(model.blocs.map((block) => block.id), links, BLOCK_SIZE, false)
-      .then((positions) => {
-        if (!current) return;
-        setNodes(
-          model.blocs.map((block) => ({
-            id: block.id,
-            type: "block",
-            position: positions.get(block.id) ?? { x: 0, y: 0 },
-            data: { block },
-          })),
-        );
-      })
-      .catch(() => current && setNodes([]));
-    return () => {
-      current = false;
-    };
-  }, [model]);
-
-  const pickedId = picked && "block" in picked ? picked.block.id : null;
-  const edges: Edge[] = useMemo(
-    () =>
-      model.flux.map((flow, index) => {
-        const active =
-          (pickedId !== null && (flow.de === pickedId || flow.vers === pickedId)) ||
-          (highlight?.flows.has(`${flow.de}>${flow.vers}`) ?? false);
-        return {
-          id: `f${index}`,
-          source: flow.de,
-          target: flow.vers,
-          label: flow.quoi.length > 42 ? `${flow.quoi.slice(0, 40)}…` : flow.quoi,
-          className: `flow${active ? " flow-active" : ""}`,
-          markerEnd: { type: MarkerType.ArrowClosed, width: 16, height: 16 },
-        };
-      }),
-    [model.flux, pickedId, highlight],
-  );
-
-  if (nodes === null) return <div className="state">Mise en place du schéma…</div>;
   return (
-    <ReactFlow
-      nodes={nodes.map((node) => ({
-        ...node,
-        selected: node.id === pickedId,
-        className: highlight && !highlight.blocks.has(node.id) ? "dimmed" : undefined,
-        data: { ...node.data, changed: node.data.block.code.some((code) => changedUnder(live, code.chemin)) },
-      }))}
-      edges={edges}
-      nodeTypes={nodeTypes}
-      colorMode={theme}
-      onNodeClick={(_, node) => onPick({ block: node.data.block })}
-      onEdgeClick={(_, edge) => {
-        const flow = model.flux[Number(edge.id.slice(1))];
-        if (flow) onPick({ flow });
-      }}
-      onPaneClick={() => onPick(null)}
-      nodesDraggable={false}
-      nodesConnectable={false}
-      fitView
-      fitViewOptions={{ padding: 0.12, maxZoom: 1.1 }}
-      minZoom={0.1}
-    >
-      <Background gap={24} size={1} />
-      <Controls showInteractive={false} />
-    </ReactFlow>
-  );
-}
-
-function BlockList({ model, onPick }: { model: ProjectModel; onPick: (p: Picked) => void }) {
-  return (
-    <ul className="element-list">
-      {model.blocs.map((block) => (
-        <li key={block.id}>
-          <button className={`element-row arch-row tone-${block.type}`} onClick={() => onPick({ block })}>
-            <span className="arch-head">
-              <BlockIcon type={block.type} />
-              <span>
-                <span className="arch-kind">{BLOCK_LABEL[block.type]}</span>
-                <span className="arch-name">{block.nom}</span>
-              </span>
-            </span>
-            <span className="element-role">{block.role}</span>
-          </button>
-        </li>
-      ))}
-    </ul>
-  );
-}
-
-function BlockDetails({ block, model, project, onBack }: {
-  block: ArchBlock; model: ProjectModel; project: Project; onBack: () => void;
-}) {
-  const components = model.composants.filter((component) => component.bloc === block.id);
-  return (
-    <>
-      <button className="link-button back" onClick={onBack}>← Vue d'ensemble</button>
-      <p className="panel-kind">{BLOCK_LABEL[block.type]}</p>
-      <h2 className="panel-title">{block.nom}</h2>
-      <p className="card-role">{block.role}</p>
-      {block.techno && <p className="muted">{block.techno}</p>}
-      {components.length > 0 && <h3 className="card-title">Ses composants</h3>}
-      {components.map((component) => (
-        <section key={component.id} className="component">
-          <p className="component-name">{component.nom}</p>
-          <p>{component.role}</p>
-          {component.expose.length > 0 && (
-            <ul className="card-list">
-              {component.expose.map((item, index) => (
-                <li key={index}>
-                  {item.quoi} <CitedCode projectId={project.id} cited={item} />
-                </li>
-              ))}
-            </ul>
-          )}
-        </section>
-      ))}
-      <h3 className="card-title">Son code</h3>
-      {block.code.length === 0 ? (
-        <p className="muted">Pas de code dans ce projet : c'est un élément extérieur (personne, service, base).</p>
-      ) : (
-        <ul className="card-list">
-          {block.code.map((code) => (
-            <li key={code.chemin}>
-              <button
-                className="link-button code-link"
-                onClick={() => navigate({ projectId: project.id, node: code.element, expand: false })}
-              >
-                {code.chemin} →
+    <div className="absolute right-3 bottom-3 left-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-[12px] text-faint">
+      <span className="rounded-md border border-line-soft bg-bg/90 px-2.5 py-1.5">
+        {journeyShown ? (
+          <span className="flex items-center gap-1.5">
+            <span className="step-number">{activeStep}</span> Étape du parcours, détaillée à droite.
+            {offMap.length === 1 && " 1 bloc hors de ce parcours n'est pas montré."}
+            {offMap.length > 1 && ` ${offMap.length} blocs hors de ce parcours ne sont pas montrés.`}
+          </span>
+        ) : (
+          "Choisissez un parcours à gauche pour le suivre sur la carte. Cliquez un bloc pour son détail."
+        )}
+      </span>
+      {!journeyShown && offMap.length > 0 && (
+        <span className="rounded-md border border-line-soft bg-bg/90 px-2.5 py-1.5">
+          Sans flux :{" "}
+          {offMap.map((item, index) => (
+            <span key={item.id}>
+              {index > 0 && ", "}
+              <button type="button" className="text-muted underline decoration-line underline-offset-[3px] hover:text-ink" onClick={() => onPick(item.id)}>
+                {item.nom}
               </button>
-            </li>
+            </span>
           ))}
-        </ul>
+        </span>
       )}
-      {block.indices && (
-        <>
-          <h3 className="card-title">Pourquoi on le pense</h3>
-          <p className="muted">{block.indices}</p>
-        </>
-      )}
-    </>
+    </div>
   );
 }

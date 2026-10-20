@@ -8,14 +8,14 @@ export interface Route {
   projectId: string | null;
   node: string;
   expand: boolean;
-  journey?: string | null; // on the journeys view: which one, and which step
+  journey?: string | null; // on the architecture: the journey lit on the map, and its active step
   step?: number | null;
   select?: string | null; // on a map view: the element to select (from a search)
 }
 
 export const APPLICATION = "app:";
 export const ARCHITECTURE_VIEW = "arch:"; // a Project opens on its architecture
-export const JOURNEYS_VIEW = "parcours:";
+const OLD_JOURNEYS_VIEW = "parcours:"; // journeys now live on the architecture: old links still open
 export const ACTIVITY_VIEW = "activite:";
 const LOGIN = "#login=";
 
@@ -30,9 +30,10 @@ export function parseRoute(hash: string): Route {
   const [path = "", query = ""] = hash.replace(/^#/, "").split("?", 2);
   const match = /^\/p\/([^/]+)$/.exec(path);
   const params = new URLSearchParams(query);
+  const node = params.get("node");
   return {
     projectId: match?.[1] ? safeDecode(match[1]) : null,
-    node: params.get("node") ?? ARCHITECTURE_VIEW,
+    node: !node || node === OLD_JOURNEYS_VIEW ? ARCHITECTURE_VIEW : node,
     expand: params.get("expand") === "1",
     journey: params.get("journey"),
     step: params.get("step") ? Number(params.get("step")) : null,
