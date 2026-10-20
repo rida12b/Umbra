@@ -20,9 +20,8 @@ def hook(home: Path, payload: dict, **env: str) -> None:
     environment = {**os.environ, "UMBRA_HOME": str(home), **env}
     if "UMBRA_CHILD" not in env:  # the test runner may itself run inside a Umbra-started session
         environment.pop("UMBRA_CHILD", None)
-    subprocess.run(
-        [sys.executable, str(HOOK)], input=json.dumps(payload), text=True, env=environment, check=True
-    )
+    raw = json.dumps(payload, ensure_ascii=False).encode("utf-8")  # as Claude Code sends it
+    subprocess.run([sys.executable, str(HOOK)], input=raw, env=environment, check=True)
 
 
 def wait_for(condition, timeout: float = 15.0):
@@ -44,7 +43,7 @@ def test_a_claude_turn_appears_with_its_prompt_files_and_final_message(settings,
         project = client.post("/v1/projects", json={"path": str(root)}, headers=auth).json()["id"]
         client.post(f"/v1/projects/{project}/index", headers=auth)
         common = {"session_id": "s1", "prompt_id": "p1", "cwd": str(root)}
-        hook(settings.home, {**common, "hook_event_name": "UserPromptSubmit", "prompt": "Make x two"})
+        hook(settings.home, {**common, "hook_event_name": "UserPromptSubmit", "prompt": "Passe x à « deux »"})
         hook(settings.home, {**common, "hook_event_name": "PostToolUse", "tool_name": "Edit",
                              "tool_input": {"file_path": str(root / "app" / "a.py")}})  # fmt: skip
         hook(settings.home, {**common, "hook_event_name": "Stop", "last_assistant_message": "x is now 2."})
@@ -54,7 +53,11 @@ def test_a_claude_turn_appears_with_its_prompt_files_and_final_message(settings,
             return turns if turns and turns[0]["message"] else None
 
         [turn] = wait_for(activity)
-        assert (turn["prompt"], turn["files"], turn["message"]) == ("Make x two", ["app/a.py"], "x is now 2.")
+        assert (turn["prompt"], turn["files"], turn["message"]) == (
+            "Passe x à « deux »",
+            ["app/a.py"],
+            "x is now 2.",
+        )
 
 
 def test_sessions_started_by_umbra_report_nothing(settings, make_repo):
