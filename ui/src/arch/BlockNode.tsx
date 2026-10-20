@@ -1,11 +1,28 @@
 import { Handle, Position, type Node, type NodeProps } from "@xyflow/react";
 import type { ArchBlock, BlockType } from "../api";
+import type { StepMark } from "./journeyPath";
 
-export type BlockData = { block: ArchBlock; changed?: boolean };
+export type BlockLook = "plain" | "lit" | "dim";
+export type BlockData = {
+  block: ArchBlock;
+  look: BlockLook;
+  inside: StepMark[]; // journey steps that happen inside this block
+  activeStep: number | null;
+  changed: boolean;
+  onStep: (number: number) => void;
+};
 export type BlockFlowNode = Node<BlockData, "block">;
 
+export const BLOCK_WIDTH = 232;
+const BASE_HEIGHT = 112; // kind, a name on two lines at most, a role on two lines at most
+const STEP_ROW = 30;
+
+export function blockHeight(inside: number): number {
+  return BASE_HEIGHT + (inside > 0 ? 10 + inside * STEP_ROW : 0);
+}
+
 export const BLOCK_LABEL: Record<BlockType, string> = {
-  user: "Utilisateur",
+  user: "Personne",
   frontend: "Interface",
   backend: "Serveur",
   worker: "Tâche de fond",
@@ -22,51 +39,51 @@ export const BLOCK_LABEL: Record<BlockType, string> = {
   infra: "Infrastructure",
 };
 
-// One simple pictogram per kind of block (24×24, stroke only), so the role reads before the text.
-const ICON: Record<BlockType, string> = {
-  user: "M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm-7 8a7 7 0 0 1 14 0",
-  frontend: "M3 5h18v12H3zM8 21h8M12 17v4",
-  backend: "M4 4h16v6H4zM4 14h16v6H4zM8 7h.01M8 17h.01",
-  worker: "M12 3v3M12 18v3M3 12h3M18 12h3M6 6l2 2M16 16l2 2M6 18l2-2M16 8l2-2M12 9a3 3 0 1 0 0 6 3 3 0 0 0 0-6",
-  database: "M4 6c0-1.7 3.6-3 8-3s8 1.3 8 3-3.6 3-8 3-8-1.3-8-3Zm0 0v12c0 1.7 3.6 3 8 3s8-1.3 8-3V6M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3",
-  storage: "M3 7h18v13H3zM3 7l3-4h12l3 4",
-  queue: "M3 6h4v12H3zM10 6h4v12h-4zM17 6h4v12h-4z",
-  external: "M7 18a5 5 0 0 1 0-10 6 6 0 0 1 11 2 4 4 0 0 1 0 8z",
-  ml_model: "M9 3h6v4H9zM5 9h14v12H5zM9 13h.01M15 13h.01M9 17h6",
-  device: "M7 3h10v18H7zM11 18h2",
-  cli: "M4 5h16v14H4zM7 9l3 3-3 3M12 15h5",
-  library: "M5 4h5v16H5zM12 4h5v16h-5zM10 8h2M10 16h2",
-  docs: "M6 3h9l3 3v15H6zM9 9h6M9 13h6M9 17h4",
-  tests: "M9 3v6l-5 9a2 2 0 0 0 2 3h12a2 2 0 0 0 2-3l-5-9V3M8 3h8",
-  infra: "M12 3l8 4.5v9L12 21l-8-4.5v-9z",
+const LOOK = {
+  plain: "border-line bg-panel",
+  lit: "border-lamp-ink/55 bg-panel",
+  dim: "border-line-soft bg-panel opacity-35",
 };
 
-export function BlockIcon({ type }: { type: BlockType }) {
-  return (
-    <svg className={`block-icon tone-${type}`} viewBox="0 0 24 24" aria-hidden="true">
-      <path d={ICON[type]} fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  );
-}
-
 export function BlockNode({ data, selected }: NodeProps<BlockFlowNode>) {
-  const { block, changed } = data;
+  const { block, look, inside, activeStep, changed, onStep } = data;
+  const height = blockHeight(inside.length);
   return (
-    <div className={`arch-block tone-${block.type}${selected ? " selected" : ""}${changed ? " changed" : ""}`}>
-      <Handle type="target" position={Position.Left} />
-      <div className="arch-head">
-        <BlockIcon type={block.type} />
-        <div>
-          <div className="arch-kind">{BLOCK_LABEL[block.type]}</div>
-          <div className="arch-name">
-            {changed && <span className="changed-dot" title="Code modifié à l'instant" />}
-            {block.nom}
-          </div>
-        </div>
-      </div>
-      <div className="arch-role">{block.role}</div>
-      {block.techno && <div className="arch-techno">{block.techno}</div>}
-      <Handle type="source" position={Position.Right} />
+    <div
+      className={`flex flex-col rounded-lg border px-3 py-2.5 transition-opacity ${LOOK[look]} ${
+        selected ? "ring-2 ring-ink/70" : ""
+      }`}
+      style={{ width: BLOCK_WIDTH, height }}
+      title={block.role}
+    >
+      <Handle type="target" position={Position.Top} />
+      <span className="flex items-center gap-1.5 text-[11.5px] text-faint">
+        {changed && <span className="size-1.5 rounded-full bg-ok" title="Code modifié à l'instant" />}
+        {BLOCK_LABEL[block.type]}
+      </span>
+      <span className="line-clamp-2 text-[13.5px] leading-snug font-semibold text-ink">{block.nom}</span>
+      <span className="mt-0.5 line-clamp-2 text-[12px] leading-snug text-muted">{block.role}</span>
+      {inside.length > 0 && (
+        <span className="mt-auto flex flex-col gap-1 border-t border-line-soft pt-2">
+          {inside.map((mark) => (
+            <button
+              key={mark.number}
+              type="button"
+              className="nodrag flex items-center gap-2 text-left text-[12px] text-ink"
+              onClick={(event) => {
+                event.stopPropagation();
+                onStep(mark.number);
+              }}
+            >
+              <span className="step-number" data-on={mark.number === activeStep}>
+                {mark.number}
+              </span>
+              <span className="truncate">{mark.label}</span>
+            </button>
+          ))}
+        </span>
+      )}
+      <Handle type="source" position={Position.Bottom} />
     </div>
   );
 }

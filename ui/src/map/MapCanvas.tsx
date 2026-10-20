@@ -1,5 +1,4 @@
 import {
-  Background,
   Controls,
   MarkerType,
   ReactFlow,
@@ -13,6 +12,7 @@ import type { Theme } from "../theme";
 import { ElementNode, type ElementFlowNode } from "./ElementNode";
 import { layout } from "./layout";
 import { changedUnder, useLive } from "../live";
+import { StateMessage } from "../ui";
 
 export type Selection = { type: "node"; node: MapNode } | { type: "edge"; edge: MapEdge } | null;
 
@@ -110,8 +110,8 @@ export function MapCanvas({ view, roles, theme, vertical, selection, onSelect, o
     if (found) onSelect({ type: "edge", edge: found });
   };
 
-  if (failed) return <div className="state error-text">The layout failed for this view.</div>;
-  if (nodes === null) return <div className="state">Placing elements…</div>;
+  if (failed) return <StateMessage title="Cette vue n'a pas pu être placée.">Essayez un autre niveau du code.</StateMessage>;
+  if (nodes === null) return <StateMessage>Mise en place des éléments…</StateMessage>;
   return (
     <ReactFlow
       key={view.parent.key}
@@ -130,8 +130,7 @@ export function MapCanvas({ view, roles, theme, vertical, selection, onSelect, o
       fitViewOptions={{ padding: 0.15, maxZoom: 1.1 }}
       minZoom={0.1}
     >
-      <Background gap={24} size={1} />
-      <Controls showInteractive={false} />
+      <Controls showInteractive={false} position="top-right" />
     </ReactFlow>
   );
 }

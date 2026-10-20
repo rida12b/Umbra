@@ -1,13 +1,15 @@
+import { X } from "lucide-react";
 import type { MapEdge, MapNode, MapStatus } from "../api";
 import { KIND_LABEL, STATUS_LABEL, childrenLabel } from "../map/ElementNode";
 import type { Selection } from "../map/MapCanvas";
-import { EvidenceItem } from "./EvidenceItem";
+import { Button } from "../ui";
 import { ElementUnderstanding } from "./ElementUnderstanding";
+import { EvidenceItem } from "./EvidenceItem";
 
 const STATUS_MEANING: Record<MapStatus, string> = {
-  fact: "Read directly from the code: each part is backed by the cited lines.",
-  hypothesis: "Inferred, not proven: Umbra matched names or paths but could not confirm the target.",
-  declaration: "What configuration declares. It is not proof that this runs, or runs this way.",
+  fact: "Lu directement dans le code : chaque partie s'appuie sur les lignes citées.",
+  hypothesis: "Déduit, pas prouvé : Umbra a rapproché des noms ou des chemins sans pouvoir confirmer la cible.",
+  declaration: "Ce que la configuration déclare. Ce n'est pas la preuve que cela tourne, ni de cette façon.",
 };
 const MODULE_PREVIEW_LINES = 30;
 
@@ -21,26 +23,27 @@ interface Props {
   onClose: () => void;
 }
 
-export function DetailsPanel(props: Props) {
-  const { projectId, selection, level, labelOf, onOpen, onClose } = props;
+export function DetailsPanel({ projectId, selection, level, labelOf, onOpen, onClose }: Props) {
   return (
-    <aside className="panel" aria-label="Explanation and evidence">
-      <button className="panel-close" onClick={onClose} aria-label="Close panel">
-        ×
-      </button>
+    <div className="relative px-6 pt-5 pb-10">
+      {selection !== null && (
+        <button type="button" className="absolute top-4 right-4 rounded p-1 text-faint hover:bg-raised hover:text-ink" onClick={onClose} aria-label="Fermer le détail">
+          <X size={16} />
+        </button>
+      )}
       {selection === null ? (
         <>
-          <p className="panel-kind">Vous êtes ici · {KIND_LABEL[level.kind]}</p>
-          <h2 className="panel-title">{level.label}</h2>
+          <p className="text-[12px] text-faint">Vous êtes ici : {KIND_LABEL[level.kind].toLowerCase()}</p>
+          <h1 className="text-[19px] font-semibold tracking-[-0.01em]">{level.label}</h1>
           <ElementUnderstanding key={level.key} projectId={projectId} node={level} />
-          <p className="muted hint">Cliquez un bloc pour son rôle, double-cliquez pour entrer dedans.</p>
+          <p className="mt-6 text-[12.5px] text-faint">Cliquez un bloc pour son rôle, double-cliquez pour entrer dedans.</p>
         </>
       ) : selection.type === "node" ? (
         <NodeDetails key={selection.node.key} projectId={projectId} node={selection.node} onOpen={onOpen} />
       ) : (
         <EdgeDetails projectId={projectId} edge={selection.edge} labelOf={labelOf} />
       )}
-    </aside>
+    </div>
   );
 }
 
@@ -49,27 +52,27 @@ function NodeDetails({ projectId, node, onOpen }: { projectId: string; node: Map
   const location = node.path && node.lines ? `${node.path}:${node.lines[0]}–${node.lines[1]}` : node.path;
   return (
     <>
-      <p className="panel-kind">{KIND_LABEL[node.kind]}</p>
-      <h2 className="panel-title">{node.label}</h2>
+      <p className="text-[12px] text-faint">{KIND_LABEL[node.kind]}</p>
+      <h1 className="pr-8 text-[19px] font-semibold tracking-[-0.01em] break-words">{node.label}</h1>
+      {location && <p className="mt-1 font-mono text-[12px] break-all text-faint">{location}</p>}
       {node.children > 0 && (
-        <button className="primary" onClick={() => onOpen(node)}>
-          Entrer — {childrenLabel(node)}
-        </button>
+        <Button variant="primary" className="mt-3" onClick={() => onOpen(node)}>
+          Entrer : {childrenLabel(node)}
+        </Button>
       )}
       <ElementUnderstanding projectId={projectId} node={node} />
-      <details className="technical">
-        <summary>Détails techniques et preuves</summary>
-        <p className="status-line">
-          <span className={`badge badge-${node.status}`}>{STATUS_LABEL[node.status]}</span>{" "}
+      <details className="mt-6 border-t border-line-soft pt-3 text-[13px]">
+        <summary className="cursor-pointer text-muted hover:text-ink">Détails techniques et preuves</summary>
+        <p className="mt-2 text-muted">
+          <span className="mr-1.5 rounded border border-line px-1.5 py-px">{STATUS_LABEL[node.status]}</span>
           {STATUS_MEANING[node.status]}
         </p>
-        {location && <p className="panel-path">{location}</p>}
         {details.length > 0 && (
-          <dl className="details">
+          <dl className="mt-2 space-y-1">
             {details.map(([name, values]) => (
-              <div key={name}>
-                <dt>{name}</dt>
-                <dd>{values.map((value) => (value === "" ? "(Project root)" : value)).join(", ")}</dd>
+              <div key={name} className="grid grid-cols-[110px_1fr] gap-2">
+                <dt className="text-faint">{name}</dt>
+                <dd className="break-words">{values.map((value) => (value === "" ? "(racine du projet)" : value)).join(", ")}</dd>
               </div>
             ))}
           </dl>
@@ -88,17 +91,17 @@ function NodeDetails({ projectId, node, onOpen }: { projectId: string; node: Map
 function EdgeDetails({ projectId, edge, labelOf }: { projectId: string; edge: MapEdge; labelOf: (k: string) => string }) {
   return (
     <>
-      <p className="panel-kind">Lien</p>
-      <h2 className="panel-title">
+      <p className="text-[12px] text-faint">Lien</p>
+      <h1 className="pr-8 text-[19px] font-semibold tracking-[-0.01em] break-words">
         {labelOf(edge.source)} → {labelOf(edge.target)}
-      </h2>
-      <p className="status-line">
-        <span className={`badge badge-${edge.status}`}>{STATUS_LABEL[edge.status]}</span>{" "}
+      </h1>
+      <p className="mt-2 text-[13px] text-muted">
+        <span className="mr-1.5 rounded border border-line px-1.5 py-px">{STATUS_LABEL[edge.status]}</span>
         {STATUS_MEANING[edge.status]}
       </p>
-      <p>
-        <code>{edge.relation}</code>, {edge.count} {edge.count > 1 ? "Claims" : "Claim"}
-        {edge.count > edge.evidence.length ? ` (showing ${edge.evidence.length})` : ""}
+      <p className="mt-2 text-[13px]">
+        <code className="font-mono">{edge.relation}</code>, {edge.count} preuve{edge.count > 1 ? "s" : ""}
+        {edge.count > edge.evidence.length ? ` (${edge.evidence.length} montrées)` : ""}
       </p>
       {edge.evidence.map((key) => (
         <EvidenceItem key={key} projectId={projectId} source={{ claim: key }} />

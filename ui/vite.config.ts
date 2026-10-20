@@ -1,10 +1,11 @@
+import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
 import { defineConfig } from "vite";
 
 // The engine serves the built app from its own package, on the same origin as the API.
 // In development, `npm run dev` proxies the API to a running `umbra-engine serve`.
 export default defineConfig({
-  plugins: [react()],
+  plugins: [react(), tailwindcss()],
   build: {
     outDir: "../engine/src/umbra_engine/web",
     emptyOutDir: true,

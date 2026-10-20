@@ -1,6 +1,7 @@
 import type { MapNode } from "../api";
 import { journeysThrough, roleOf, useModel } from "../model";
-import { JOURNEYS_VIEW, navigate } from "../route";
+import { ARCHITECTURE_VIEW, navigate } from "../route";
+import { Button, SectionTitle } from "../ui";
 import { ExplanationCard } from "./ExplanationCard";
 import { useExplanation } from "./useExplanation";
 
@@ -18,23 +19,28 @@ export function ElementUnderstanding({ projectId, node }: { projectId: string; n
   const deepState = card?.state;
 
   return (
-    <section className="understanding">
-      {role ? <p className="card-role">{role}</p> : model ? null : <p className="writing">Claude Code étudie le projet…</p>}
+    <section>
+      {role ? (
+        <p className="mt-2.5 text-[14px] leading-relaxed text-muted">{role}</p>
+      ) : (
+        !model && <p className="mt-2.5 text-[13px] text-faint">Claude Code étudie le projet…</p>
+      )}
       {through.length > 0 && (
         <>
-          <h3 className="card-title">Intervient dans</h3>
-          <ul className="journey-links">
+          <SectionTitle>Intervient dans</SectionTitle>
+          <ul className="space-y-1">
             {through.map(({ journey, steps }) => (
-              <li key={journey.id}>
-                <button
-                  className="link-button"
-                  onClick={() =>
-                    navigate({ projectId, node: JOURNEYS_VIEW, expand: false, journey: journey.id, step: steps[0] })
-                  }
+              <li key={journey.id} className="text-[13px]">
+                <Button
+                  variant="link"
+                  onClick={() => navigate({ projectId, node: ARCHITECTURE_VIEW, expand: false, journey: journey.id, step: steps[0] })}
                 >
                   {journey.nom}
-                </button>
-                <span className="muted"> — étape{steps.length > 1 ? "s" : ""} {steps.join(", ")}</span>
+                </Button>
+                <span className="text-faint">
+                  {" "}
+                  — étape{steps.length > 1 ? "s" : ""} {steps.join(", ")}
+                </span>
               </li>
             ))}
           </ul>
@@ -44,13 +50,15 @@ export function ElementUnderstanding({ projectId, node }: { projectId: string; n
         <ExplanationCard projectId={projectId} explanation={card} defaultFile={node.path} />
       ) : (
         node.kind !== "application" && (
-          <button className="deepen" onClick={request}>
+          <Button className="mt-5" onClick={request}>
             Approfondir avec Claude : entrées, sorties, étapes
-          </button>
+          </Button>
         )
       )}
       {deepState === "stale" && card?.card && (
-        <button className="link-button" onClick={request}>Le code a changé : réécrire cette fiche</button>
+        <Button variant="link" className="mt-2 text-[13px]" onClick={request}>
+          Le code a changé : réécrire cette fiche
+        </Button>
       )}
     </section>
   );
