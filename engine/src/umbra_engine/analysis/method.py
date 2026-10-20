@@ -26,6 +26,9 @@ Work in this order, and do not skip steps:
    b. CONDITIONS: for each step, what must hold for it to happen at all: environment variables and
       feature flags, deployment mode (cloud / self-hosted), configuration, authentication or role,
       the presence of an outside service. A step that only runs in some setups must say so.
+      Check how the platform really runs a condition, not how it reads: an `if:` in GitHub Actions
+      without a status function also needs every earlier step to succeed; a shell script without
+      `set -e` goes on after a failed command; a default value can switch a feature off.
    c. NOTHING ESSENTIAL SKIPPED: include every step without which the result does not happen,
       including manual actions a person must do (run a command, apply a file, click), and steps that
       repeat per item (e.g. one search per sub-question). List the alternative paths the code has
@@ -59,7 +62,8 @@ SCHEMA = """{
                   "expose": [{"quoi": "route, function or event", "fichier": "...", "lignes": [a, b]}],
                   "utilise": ["other composant ids or bloc ids"], "fichiers": ["paths"]}],
   "parcours": [{"id": "short-id", "nom": "what the user or system does", "declencheur": "...",
-                "etapes": [{"texte": "what happens", "composant": "composant id",
+                "etapes": [{"texte": "what happens", "action": "2 to 5 words, verb first, the label
+                            on the diagram (e.g. 'Écrit un fichier .json')", "composant": "composant id",
                             "touche": ["bloc ids this step reaches: user, database, model, outside service"],
                             "conditions": ["what must hold for this step to happen; empty if always"],
                             "manuel": false, "fichier": "...", "lignes": [a, b]}],
@@ -76,8 +80,9 @@ in UMBRA_MODEL.json and UMBRA_INDEX.md is up to date. These files were added, ch
 {changed}
 Open the changed files and what depends on them (use Grep), then update the model. Same rules as
 before: cite files and lines you read, French, plain sentences; a journey you return is whole, in
-real order, with each step's conditions and manual flag and the journey's other branches. Line numbers
-in untouched entries may have moved: return the entries whose citations you know moved.
+real order, with each step's action label, conditions and manual flag, and the journey's other
+branches. Line numbers in untouched entries may have moved: return the entries whose citations you
+know moved.
 
 Answer with ONLY one JSON object containing just what changed, with the same shapes as the model:
 {{"resume": "only if it changed", "blocs": [...], "flux": [...], "composants": [...], "parcours": [...],

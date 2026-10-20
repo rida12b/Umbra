@@ -13,6 +13,7 @@ BLOCK_TYPES = (
     "ml_model", "device", "cli", "library", "docs", "tests", "infra",
 )  # fmt: skip
 SECTIONS = ("blocs", "flux", "composants", "parcours")
+MAX_ACTION = 60  # a label on the diagram, not a sentence
 
 
 class ModelFormatError(ValueError):
@@ -163,6 +164,7 @@ def _journey(item: object, line_counts: dict[str, int], block_ids: set[str]) -> 
     steps = [
         {
             "texte": str(s.get("texte", "")),
+            "action": str(s.get("action", ""))[:MAX_ACTION],
             "composant": str(s.get("composant", "")),
             "touche": [b for b in _texts(s.get("touche")) if b in block_ids],
             "conditions": _texts(s.get("conditions")),
