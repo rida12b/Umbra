@@ -46,7 +46,8 @@ Rules:
   [start, end] that you actually read. If you did not read it, do not cite it; say "probablement".
 - Name concrete things: routes, functions, tables, collections, models, environment settings.
 - Two kinds of text. "texte" (and roles of components, modules, folders) is for a developer: name the
-  code. The diagram texts, "pitch", the block "nom" and "en_bref", the step "action" and "simple",
+  code. The reader texts, "pitch", the block "nom" and "en_bref", the flow "verbe", the journey
+  "depart" and "fin", the step "action" and "simple",
   are for a reader who does NOT code: everyday French words, no names of functions, files, classes,
   commands or internal terms (say "les faits tirés du code", not "les Claims"; "le moteur", not
   "le démon"). Put technologies (SQLite, FastAPI...) in "techno", not in the name.
@@ -62,13 +63,17 @@ SCHEMA = """{
   "blocs": [{"id": "short-id", "nom": "plain name", "en_bref": "at most 8 plain words: what it is for",
              "type": "user|frontend|backend|worker|database|storage|
              queue|external|ml_model|device|cli|library|docs|tests|infra", "role": "one sentence",
+             "importance": "coeur (what the product is about) | secondaire (supporting: tests, docs,
+             CI, tooling) | ancien (legacy, being replaced)",
              "techno": "...", "code": ["folders or files"], "indices": "what shows it"}],
-  "flux": [{"de": "bloc id", "vers": "bloc id", "quoi": "what goes through"}],
+  "flux": [{"de": "bloc id", "vers": "bloc id", "quoi": "what goes through",
+            "verbe": "1 to 4 plain words read as 'de VERBE vers' (e.g. 'envoie les demandes à')"}],
   "composants": [{"id": "short-id", "nom": "...", "bloc": "bloc id", "role": "one sentence",
                   "responsabilites": ["..."],
                   "expose": [{"quoi": "route, function or event", "fichier": "...", "lignes": [a, b]}],
                   "utilise": ["other composant ids or bloc ids"], "fichiers": ["paths"]}],
   "parcours": [{"id": "short-id", "nom": "what the user or system does", "declencheur": "...",
+                "depart": "the trigger in one plain sentence", "fin": "the result in one plain sentence",
                 "etapes": [{"texte": "what happens, for a developer",
                             "simple": "the same in one plain sentence, for a reader who does not code",
                             "action": "2 to 5 plain words, verb first, the label on the diagram

@@ -19,7 +19,7 @@ from umbra_engine.project_store import FileEntry
 from umbra_engine.projection.graph import ProjectGraph
 
 MODEL_KEY = "model:"
-MODEL_PRODUCER = "claude-code-study@1.4"  # another version studies the Project again from scratch
+MODEL_PRODUCER = "claude-code-study@1.5"  # another version studies the Project again from scratch
 MODEL_FILE = "UMBRA_MODEL.json"
 MAX_LISTED_CHANGES = 200
 
