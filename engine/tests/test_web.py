@@ -66,3 +66,14 @@ def test_the_built_app_is_served_and_its_absence_is_explained(settings, tmp_path
     client = TestClient(create_app(settings), base_url="http://127.0.0.1")
     assert "<title>Umbra</title>" in client.get("/").text
     assert client.get("/v1/health").json()["status"] == "ok"  # the mount at `/` does not shadow the API
+
+
+def test_a_new_build_is_never_hidden_by_the_browser_cache(settings, tmp_path, monkeypatch):
+    built = tmp_path / "built"
+    (built / "assets").mkdir(parents=True)
+    (built / "index.html").write_text('<script type="module" src="/assets/index-abc.js"></script>')
+    (built / "assets" / "index-abc.js").write_text("export {}")
+    monkeypatch.setattr(web, "WEB_ROOT", built)
+    client = TestClient(create_app(settings), base_url="http://127.0.0.1")
+    assert client.get("/").headers["cache-control"] == "no-cache"  # the page is checked on every load
+    assert "immutable" in client.get("/assets/index-abc.js").headers["cache-control"]  # hashed names

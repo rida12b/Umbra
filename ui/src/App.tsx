@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { ApiError, api, whenSignedOut, type Project } from "./api";
 import { LiveContext, useLiveEvents } from "./live";
+import { useNewVersion } from "./newVersion";
 import { ProjectPage } from "./ProjectPage";
 import { takeLoginCode, useRoute } from "./route";
 import { TopBar } from "./shell/TopBar";
@@ -33,6 +34,7 @@ export function App() {
   const narrow = useNarrow();
   const [projects, setProjects] = useState<Projects>(null);
   const [searching, setSearching] = useState(false);
+  const outdated = useNewVersion();
 
   useEffect(() => {
     whenSignedOut(() => setProjects({ error: new ApiError(401, "signed out") }));
@@ -49,6 +51,14 @@ export function App() {
   return (
     <LiveContext.Provider value={live}>
       <div className="flex h-full flex-col">
+        {outdated && (
+          <div role="status" className="flex items-center justify-center gap-3 bg-lamp px-4 py-2 text-[14px] font-medium text-on-lamp">
+            Une nouvelle version d'Umbra est prête.
+            <button type="button" className="rounded-md bg-on-lamp px-3 py-1 text-lamp" onClick={() => window.location.reload()}>
+              Recharger
+            </button>
+          </div>
+        )}
         <TopBar project={project} theme={theme} onToggleTheme={toggleTheme} onSearch={() => setSearching(true)} />
         {projects === null && <StateMessage>Connexion au moteur local…</StateMessage>}
         {projects && "error" in projects && <ConnectionProblem error={projects.error} />}
