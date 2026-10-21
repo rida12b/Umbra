@@ -16,6 +16,8 @@ SECTIONS = ("blocs", "flux", "composants", "parcours")
 MAX_ACTION = 60  # a label on the diagram, not a sentence
 MAX_SHORT = 90  # a block's "en bref": a few words under its name
 MAX_SIMPLE = 400
+MAX_VERB = 50
+IMPORTANCE = ("coeur", "secondaire", "ancien")
 
 
 class ModelFormatError(ValueError):
@@ -129,6 +131,7 @@ def _block(item: object, line_counts: dict[str, int], directories: set[str]) -> 
         "type": item.get("type") if item.get("type") in BLOCK_TYPES else "library",
         "role": str(item.get("role", "")),
         "en_bref": str(item.get("en_bref", ""))[:MAX_SHORT],
+        "importance": item.get("importance") if item.get("importance") in IMPORTANCE else "coeur",
         "techno": str(item.get("techno", "")),
         "code": code,
         "indices": str(item.get("indices", "")),
@@ -184,6 +187,8 @@ def _journey(item: object, line_counts: dict[str, int], block_ids: set[str]) -> 
         "id": item["id"],
         "nom": item["nom"],
         "declencheur": str(item.get("declencheur", "")),
+        "depart": str(item.get("depart", ""))[:MAX_SIMPLE],
+        "fin": str(item.get("fin", ""))[:MAX_SIMPLE],
         "etapes": steps,
         "resultat": str(item.get("resultat", "")),
         "branches": [
@@ -196,7 +201,12 @@ def _journey(item: object, line_counts: dict[str, int], block_ids: set[str]) -> 
 
 def _flows(value: object, block_ids: set[str]) -> list[dict]:
     return [
-        {"de": f["de"], "vers": f["vers"], "quoi": str(f.get("quoi", ""))}
+        {
+            "de": f["de"],
+            "vers": f["vers"],
+            "quoi": str(f.get("quoi", "")),
+            "verbe": str(f.get("verbe", ""))[:MAX_VERB],
+        }
         for f in _list(value)
         if isinstance(f, dict)
         and f.get("de") in block_ids

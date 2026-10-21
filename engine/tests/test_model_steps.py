@@ -45,3 +45,20 @@ def test_plain_texts_for_readers_who_do_not_code_are_kept():
     assert model["pitch"] == "Umbra montre comment marche un logiciel."
     assert model["blocs"][0]["en_bref"] == "Garde les événements"
     assert model["parcours"][0]["etapes"][0]["simple"] == "Claude note ce qu'il a fait."
+
+
+def test_reader_texts_of_v15_are_kept_and_old_models_get_safe_defaults():
+    raw = {
+        "resume": "r",
+        "blocs": [
+            {"id": "a", "nom": "A", "type": "backend", "importance": "ancien"},
+            {"id": "b", "nom": "B", "type": "database", "importance": "n'importe quoi"},
+        ],
+        "flux": [{"de": "a", "vers": "b", "quoi": "q", "verbe": "range dans"}],
+        "parcours": [{"id": "j", "nom": "J", "depart": "On clique.", "fin": "Rangé.", "etapes": [STEP]}],
+    }
+    model = checked_model(raw, {"hook.py": 10}, set())
+    # an unknown importance counts as core: a block is shown rather than hidden by mistake
+    assert [b["importance"] for b in model["blocs"]] == ["ancien", "coeur"]
+    assert model["flux"][0]["verbe"] == "range dans"
+    assert (model["parcours"][0]["depart"], model["parcours"][0]["fin"]) == ("On clique.", "Rangé.")
