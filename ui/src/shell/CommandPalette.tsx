@@ -74,7 +74,7 @@ export function CommandPalette({ projectId, model, open, onOpenChange }: Props) 
       <Command.Input
         value={query}
         onValueChange={setQuery}
-        placeholder="Un parcours, un bloc, un fichier, une fonction…"
+        placeholder="Une histoire, une pièce, un fichier, une fonction…"
         className="w-full border-b border-line-soft bg-transparent px-4 py-3.5 text-[15px] text-ink outline-none placeholder:text-faint"
       />
       <Command.List className="max-h-[min(420px,60vh)] overflow-y-auto p-2">
@@ -82,7 +82,7 @@ export function CommandPalette({ projectId, model, open, onOpenChange }: Props) 
           {wanted.length < 2 ? "Tapez au moins deux lettres pour chercher dans le code." : "Rien trouvé sous ce nom."}
         </Command.Empty>
         {journeys.length > 0 && (
-          <Command.Group heading="Parcours" className={group}>
+          <Command.Group heading="Histoires" className={group}>
             {journeys.map((journey) => (
               <Command.Item
                 key={journey.id}
@@ -97,7 +97,7 @@ export function CommandPalette({ projectId, model, open, onOpenChange }: Props) 
           </Command.Group>
         )}
         {blocks.length > 0 && (
-          <Command.Group heading="Blocs de l'architecture" className={group}>
+          <Command.Group heading="Pièces du projet" className={group}>
             {blocks.map((block) => (
               <Command.Item
                 key={block.id}

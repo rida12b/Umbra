@@ -30,7 +30,7 @@ export interface Placed {
 const elk = new ELK();
 
 /**
- * Layered layout, top to bottom (the map area is taller than wide): what is used sits below what uses it. ELK also routes the arrows at right
+ * Layered layout, left to right (pages are wider than tall): what is used sits right of what uses it. ELK also routes the arrows at right
  * angles and keeps room for their labels, so step labels never sit on a block.
  */
 export async function placeArchitecture(boxes: LayoutBox[], arrows: LayoutArrow[]): Promise<Placed> {
@@ -38,7 +38,7 @@ export async function placeArchitecture(boxes: LayoutBox[], arrows: LayoutArrow[
     id: "root",
     layoutOptions: {
       "elk.algorithm": "layered",
-      "elk.direction": "DOWN",
+      "elk.direction": "RIGHT",
       "elk.edgeRouting": "ORTHOGONAL",
       "elk.edgeLabels.inline": "false",
       "elk.spacing.nodeNode": "36",

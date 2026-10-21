@@ -4,7 +4,8 @@ import { roundedPath, type Point } from "./archLayout";
 export type RoutedData = {
   points: Point[];
   labelAt: Point | null;
-  text: string; // what goes through, shortened
+  text: string; // what one block does to the other, shortened
+  full: string; // the whole description, on hover
 };
 export type RoutedFlowEdge = Edge<RoutedData, "routed">;
 
@@ -13,21 +14,22 @@ export const FLOW_LABEL_HEIGHT = 20;
 /** A flow drawn where ELK routed it, with what goes through written on the line. */
 export function RoutedEdge({ id, data, selected }: EdgeProps<RoutedFlowEdge>) {
   if (!data || data.points.length < 2) return null;
-  const { points, labelAt, text } = data;
+  const { points, labelAt, text, full } = data;
   return (
     <>
       <BaseEdge
         id={id}
         path={roundedPath(points)}
         markerEnd="url(#arrow-flow)"
-        style={{ stroke: selected ? "var(--u-ink)" : "var(--u-faint)", strokeWidth: 1.3 }}
+        style={{ stroke: selected ? "var(--u-ink)" : "var(--u-faint)", strokeWidth: 1.4 }}
         interactionWidth={14}
       />
       {labelAt && (
         <EdgeLabelRenderer>
           <span
-            className="absolute rounded bg-bg px-1 text-[12px] whitespace-nowrap text-muted"
-            style={{ transform: `translate(${labelAt.x}px, ${labelAt.y}px)` }}
+            className="absolute rounded bg-bg px-1.5 text-[13px] whitespace-nowrap text-muted"
+            style={{ transform: `translate(${labelAt.x}px, ${labelAt.y}px)`, pointerEvents: "all" }}
+            title={full}
           >
             {text}
           </span>

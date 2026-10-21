@@ -1,10 +1,11 @@
 import type { Project, ProjectModel } from "../api";
-import { ACTIVITY_VIEW, APPLICATION, ARCHITECTURE_VIEW, navigate, type Route } from "../route";
+import { ACTIVITY_VIEW, APPLICATION, ARCHITECTURE_VIEW, MAP_VIEW, navigate, type Route } from "../route";
 
-export type View = typeof ARCHITECTURE_VIEW | typeof APPLICATION | typeof ACTIVITY_VIEW;
+export type View = typeof ARCHITECTURE_VIEW | typeof MAP_VIEW | typeof APPLICATION | typeof ACTIVITY_VIEW;
 
 const VIEWS: { node: View; label: string }[] = [
-  { node: ARCHITECTURE_VIEW, label: "Architecture" },
+  { node: ARCHITECTURE_VIEW, label: "Accueil du projet" },
+  { node: MAP_VIEW, label: "Toutes les pièces" },
   { node: APPLICATION, label: "Code" },
   { node: ACTIVITY_VIEW, label: "Activité de Claude" },
 ];
@@ -27,7 +28,7 @@ export function Sidebar({ project, route, view, model, narrow }: Props) {
   if (narrow)
     return (
       <nav className="flex flex-col gap-2 border-b border-line-soft px-4 py-2.5" aria-label="Vues">
-        <div className="flex gap-1 overflow-x-auto">
+        <div className="flex gap-1 overflow-x-auto [scrollbar-width:none]">
           {VIEWS.map((item) => (
             <button
               key={item.node}
@@ -42,12 +43,12 @@ export function Sidebar({ project, route, view, model, narrow }: Props) {
         </div>
         {model && model.parcours.length > 0 && (
           <select
-            aria-label="Suivre un parcours"
+            aria-label="Lire une histoire"
             className="w-full min-w-0 truncate rounded-md border border-line bg-panel px-2 py-1.5 text-[13px] text-ink"
             value={chosen ?? ""}
             onChange={(event) => (event.target.value ? openJourney(event.target.value) : openView(ARCHITECTURE_VIEW))}
           >
-            <option value="">Vue d'ensemble (aucun parcours)</option>
+            <option value="">Accueil du projet</option>
             {model.parcours.map((journey) => (
               <option key={journey.id} value={journey.id}>
                 {journey.nom}
@@ -77,7 +78,7 @@ export function Sidebar({ project, route, view, model, narrow }: Props) {
       {model && model.parcours.length > 0 && (
         <section aria-labelledby="journeys-title">
           <h2 id="journeys-title" className="px-2.5 pb-1.5 text-[12px] font-medium text-faint">
-            Parcours
+            Comment ça marche
           </h2>
           <ul className="flex flex-col gap-0.5">
             {model.parcours.map((journey) => {
