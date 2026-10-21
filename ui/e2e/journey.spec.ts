@@ -24,35 +24,53 @@ async function signIn(page: Page): Promise<string> {
   return project;
 }
 
-test("a journey as a sequence: blocks across, steps in order, linked with the step list", async ({ page, isMobile }) => {
+test("home: what the project does, then its stories; a story lights the parts of each step", async ({ page, isMobile }) => {
   const project = await signIn(page);
   await page.goto(`/#/p/${project}`);
+  await expect(page.getByRole("heading", { name: "Ce que fait ce projet" })).toBeVisible();
   await expect(page.getByText("Une boutique de test").first()).toBeVisible();
-  if (isMobile) await page.getByLabel("Suivre un parcours").selectOption("order");
-  else await page.getByRole("region", { name: "Parcours" }).getByRole("button", { name: /Passer une commande/ }).click();
+  await page.getByRole("button", { name: /Passer une commande.*Lire l'histoire/ }).click();
   await expect(page.getByRole("heading", { name: "Passer une commande" })).toBeVisible();
-  await expect(page.getByRole("button", { name: /^Étape \d$/ })).toHaveCount(2);
-  // Plain words first; the code only on demand.
-  await page.getByRole("button", { name: "Détail technique et code" }).click();
-  await page.getByRole("button", { name: "web/src/app.ts:1–3" }).click();
-  await expect(page.locator('[data-cited="true"]').first()).toContainText("submit");
-  if (isMobile) return; // phones get the step list without the diagram
-  const map = page.getByRole("region", { name: "Carte de l'architecture" });
-  await expect(map.getByRole("button", { name: /Envoie POST \/orders/ })).toBeVisible(); // the short action
-  await expect(map.getByRole("button", { name: /Base PostgreSQL/ })).toBeVisible(); // a block the journey reaches
-  await expect(map.getByRole("button", { name: /^Client/ })).toHaveCount(0); // a block it does not
-  await map.getByRole("button", { name: /^Étape 2 :/ }).click();
+  await expect(page.getByRole("button", { name: /^Étape \d :/ })).toHaveCount(2);
+  await expect(page.getByRole("button", { name: /^Étape 1 : Envoie POST \/orders/ })).toHaveAttribute("aria-current", "step");
+  const cast = page.getByLabel("Qui intervient");
+  if (!isMobile) {
+    await expect(cast.getByText("Étape 1 :")).toBeVisible();
+    await expect(cast.getByRole("button", { name: /Site web/ })).toBeVisible();
+  }
+  await page.getByRole("button", { name: /^Étape 2 :/ }).click();
   await expect(page).toHaveURL(/journey=order&step=2/);
-  await page.getByRole("button", { name: "Détail technique et code" }).click();
+  // Plain words first; the code only on demand.
+  await page.getByRole("button", { name: "Détails pour développeur" }).click();
   await page.getByRole("button", { name: "api/app/orders.py:8–10" }).click();
   await expect(page.locator('[data-cited="true"]').first()).toContainText("def create_order");
 });
 
-test("old journey links open the journey on the architecture", async ({ page }) => {
+test("a part: what it is for, the stories it takes part in, who it works with", async ({ page }) => {
+  const project = await signIn(page);
+  await page.goto(`/#/p/${project}?select=api`);
+  await expect(page.getByRole("heading", { name: "API commandes" })).toBeVisible();
+  await expect(page.getByRole("main").getByRole("button", { name: /Passer une commande/ })).toBeVisible();
+  await expect(page.getByText("Avec qui cette pièce travaille")).toBeVisible();
+  await page.getByRole("button", { name: "Accueil du projet" }).first().click();
+  await expect(page.getByRole("heading", { name: "Ce que fait ce projet" })).toBeVisible();
+});
+
+test("every part on one map, at a readable size", async ({ page, isMobile }) => {
+  test.skip(isMobile, "the map is a desktop view");
+  const project = await signIn(page);
+  await page.goto(`/#/p/${project}?node=carte%3A`);
+  await expect(page.getByRole("heading", { name: "Toutes les pièces" })).toBeVisible();
+  await expect(page.locator(".react-flow__node")).toHaveCount(4);
+  await page.locator('.react-flow__node[data-id="db"]').click();
+  await expect(page.getByRole("heading", { name: "Base PostgreSQL" })).toBeVisible();
+});
+
+test("old journey links open the story", async ({ page }) => {
   const project = await signIn(page);
   await page.goto(`/#/p/${project}?node=parcours%3A&journey=order&step=abc`);
   await expect(page.getByRole("heading", { name: "Passer une commande" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Étape 1", exact: true })).toHaveAttribute("aria-current", "step"); // a bad step is step 1
+  await expect(page.getByRole("button", { name: /^Étape 1 :/ })).toHaveAttribute("aria-current", "step"); // a bad step is step 1
   await expect(page.getByText("NaN")).toHaveCount(0);
 });
 

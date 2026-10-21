@@ -124,6 +124,7 @@ export interface ArchBlock {
   type: BlockType;
   role: string;
   en_bref?: string; // a few plain words for the diagram (models studied before v1.4 have none)
+  importance?: "coeur" | "secondaire" | "ancien"; // v1.5: the home shows the core only
   techno: string;
   code: { chemin: string; element: string }[];
   indices: string;
@@ -133,6 +134,7 @@ export interface ArchFlow {
   de: string;
   vers: string;
   quoi: string;
+  verbe?: string; // v1.5: read as « de VERBE vers »
 }
 
 /** A place in the code the model cites; `verifie` = Umbra found the file and those lines. */
@@ -172,6 +174,8 @@ export interface Journey {
   id: string;
   nom: string;
   declencheur: string;
+  depart?: string; // v1.5: the trigger in plain words
+  fin?: string; // v1.5: the result in plain words
   etapes: JourneyStep[];
   resultat: string;
   branches?: Branch[];

@@ -17,6 +17,7 @@ export const APPLICATION = "app:";
 export const ARCHITECTURE_VIEW = "arch:"; // a Project opens on its architecture
 const OLD_JOURNEYS_VIEW = "parcours:"; // journeys now live on the architecture: old links still open
 export const ACTIVITY_VIEW = "activite:";
+export const MAP_VIEW = "carte:"; // every part of the architecture
 const LOGIN = "#login=";
 
 export function takeLoginCode(): string | null {

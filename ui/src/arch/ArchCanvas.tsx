@@ -1,107 +1,116 @@
-import { Controls, ReactFlow } from "@xyflow/react";
+import { Controls, ReactFlow, type ReactFlowInstance } from "@xyflow/react";
 import { useEffect, useMemo, useState } from "react";
-import type { ProjectModel } from "../api";
+import type { ArchBlock, ProjectModel } from "../api";
 import { changedUnder, useLive } from "../live";
 import type { Theme } from "../theme";
 import { StateMessage } from "../ui";
 import { placeArchitecture, textWidth, type LayoutArrow, type Placed } from "./archLayout";
 import { BLOCK_HEIGHT, BLOCK_WIDTH, BlockNode, type BlockFlowNode } from "./BlockNode";
 import { ArrowMarker, FLOW_LABEL_HEIGHT, RoutedEdge, type RoutedFlowEdge } from "./RoutedEdge";
+import { flowWords } from "./story";
 
 const nodeTypes = { block: BlockNode };
 const edgeTypes = { routed: RoutedEdge };
-const FLOW_TEXT_MAX = 34;
-const LEGEND_ROOM = 70; // the legend sits over the bottom of the map
+const LABEL_MAX = 36;
+const READABLE_ZOOM = 0.65; // below this the text of a block is too small: scroll instead of shrinking
 
 interface Props {
   model: ProjectModel;
   theme: Theme;
-  shown: Set<string>; // the blocks drawn: every block that has a flow
-  pickedBlock: string | null;
-  onPickBlock: (id: string | null) => void;
-  onPickFlow: (index: number) => void;
+  blocks: ArchBlock[]; // the blocks drawn, with the flows between them
+  onPickBlock: (id: string) => void;
 }
 
-function flowText(text: string): string {
-  return text.length > FLOW_TEXT_MAX ? `${text.slice(0, FLOW_TEXT_MAX - 1)}…` : text;
+function label(flow: { verbe?: string; quoi: string }): string {
+  const words = flowWords(flow);
+  return words.length > LABEL_MAX ? `${words.slice(0, LABEL_MAX - 1)}…` : words;
 }
 
-/** The model's flows between two drawn blocks, with their stable keys (`f<index>` in the model). */
-function flows(model: ProjectModel, shown: Set<string>) {
-  return model.flux
-    .map((flow, index) => ({ flow, key: `f${index}` }))
-    .filter(({ flow }) => shown.has(flow.de) && shown.has(flow.vers));
+/** Fit the whole drawing, but never below a readable size: then show its top and let the person scroll. */
+function frame(flow: ReactFlowInstance<BlockFlowNode, RoutedFlowEdge>, size: { width: number; height: number }) {
+  void flow.fitBounds({ x: 0, y: 0, ...size }, { padding: 0.04 }).then(() => {
+    if (flow.getZoom() < READABLE_ZOOM) void flow.setViewport({ x: 24, y: 24, zoom: READABLE_ZOOM });
+  });
 }
 
-/** The architecture overview: the blocks and the flows between them, from the model. */
-export function ArchCanvas({ model, theme, shown, pickedBlock, onPickBlock, onPickFlow }: Props) {
+/** Blocks and the flows between them, each arrow labelled with what one block does to the other. */
+export function ArchCanvas({ model, theme, blocks, onPickBlock }: Props) {
   const [placed, setPlaced] = useState<Placed | null>(null);
   const [failed, setFailed] = useState(false);
   const live = useLive();
+  const shown = useMemo(() => new Set(blocks.map((b) => b.id)), [blocks]);
+  const flows = useMemo(
+    () =>
+      model.flux
+        .map((flow, index) => ({ flow, key: `f${index}` }))
+        .filter(({ flow }) => shown.has(flow.de) && shown.has(flow.vers)),
+    [model.flux, shown],
+  );
 
   useEffect(() => {
     let current = true;
     setFailed(false);
-    const arrows: LayoutArrow[] = flows(model, shown).map(({ flow, key }) => ({
+    const arrows: LayoutArrow[] = flows.map(({ flow, key }) => ({
       key,
       source: flow.de,
       target: flow.vers,
-      labels: [{ width: textWidth(flowText(flow.quoi), 6.6) + 10, height: FLOW_LABEL_HEIGHT }],
+      labels: [{ width: textWidth(label(flow), 7.8) + 14, height: FLOW_LABEL_HEIGHT }],
     }));
-    const boxes = model.blocs
-      .filter((block) => shown.has(block.id))
-      .map((block) => ({ id: block.id, width: BLOCK_WIDTH, height: BLOCK_HEIGHT }));
-    placeArchitecture(boxes, arrows)
+    placeArchitecture(
+      blocks.map((block) => ({ id: block.id, width: BLOCK_WIDTH, height: BLOCK_HEIGHT })),
+      arrows,
+    )
       .then((layout) => current && setPlaced(layout))
       .catch(() => current && setFailed(true));
     return () => {
       current = false;
     };
-  }, [model, shown]);
+  }, [blocks, flows]);
 
   const nodes: BlockFlowNode[] = useMemo(() => {
     if (!placed) return [];
-    return model.blocs.flatMap((block) => {
+    return blocks.flatMap((block) => {
       const position = placed.boxes.get(block.id);
       if (!position) return [];
       const changed = block.code.some((code) => changedUnder(live, code.chemin));
-      return [{ id: block.id, type: "block" as const, position, selected: block.id === pickedBlock, data: { block, changed } }];
+      return [{ id: block.id, type: "block" as const, position, focusable: false, data: { block, changed, onPick: onPickBlock } }];
     });
-  }, [placed, model.blocs, pickedBlock, live]);
+  }, [placed, blocks, live, onPickBlock]);
 
   const edges: RoutedFlowEdge[] = useMemo(() => {
     if (!placed) return [];
-    return flows(model, shown).flatMap(({ flow, key }) => {
+    return flows.flatMap(({ flow, key }) => {
       const route = placed.arrows.get(key);
       if (!route) return [];
-      const data = { points: route.points, labelAt: route.labels[0] ?? null, text: flowText(flow.quoi) };
+      const data = { points: route.points, labelAt: route.labels[0] ?? null, text: label(flow), full: flow.quoi };
       return [{ id: key, type: "routed" as const, source: flow.de, target: flow.vers, data }];
     });
-  }, [placed, model, shown]);
+  }, [placed, flows]);
 
-  if (failed) return <StateMessage title="Le schéma n'a pas pu être placé.">Les autres vues restent utilisables.</StateMessage>;
+  if (failed) return <StateMessage title="Le schéma n'a pas pu être placé.">Le reste de la page reste utilisable.</StateMessage>;
   if (!placed) return <StateMessage>Mise en place du schéma…</StateMessage>;
   return (
     <>
       <ArrowMarker />
       <ReactFlow
+        key={`${placed.size.width}x${placed.size.height}`} // a new drawing (live update) is framed again
         nodes={nodes}
         edges={edges}
         nodeTypes={nodeTypes}
         edgeTypes={edgeTypes}
         colorMode={theme}
         onNodeClick={(_, node) => onPickBlock(node.id)}
-        onEdgeClick={(_, edge) => onPickFlow(Number(edge.id.slice(1)))}
-        onPaneClick={() => onPickBlock(null)}
         nodesDraggable={false}
         nodesConnectable={false}
-        onInit={(flow) =>
-          flow.fitBounds({ x: 0, y: 0, width: placed.size.width, height: placed.size.height + LEGEND_ROOM }, { padding: 0.03 })
-        }
-        minZoom={0.15}
-        maxZoom={1.6}
+        elementsSelectable={false}
+        onInit={(flow) => frame(flow, placed.size)}
+        minZoom={0.3}
+        maxZoom={1.5}
+        preventScrolling={false} // the page scrolls over the diagram; zoom with the buttons or ctrl + wheel
+        zoomOnScroll={false}
+        panOnScroll={false}
       >
-        <Controls showInteractive={false} position="top-right" fitViewOptions={{ padding: 0.03 }} />
+        <Controls showInteractive={false} position="top-right" fitViewOptions={{ padding: 0.04 }} />
       </ReactFlow>
     </>
   );
