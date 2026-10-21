@@ -67,17 +67,19 @@ export function JourneyPage({ projectId, model, journey, activeStep, narrow, onS
         </ol>
 
         {(journey.branches ?? []).length > 0 && (
-          <section className="mt-10">
-            <h2 className="text-[18px] font-semibold">Si les choses se passent autrement</h2>
+          <details className="mt-10">
+            <summary className="cursor-pointer text-[18px] font-semibold">
+              Si les choses se passent autrement ({(journey.branches ?? []).length})
+            </summary>
             <ul className="mt-3 flex flex-col gap-2.5">
               {(journey.branches ?? []).map((branch, index) => (
                 <li key={index} className="text-[16px] leading-relaxed text-muted">
-                  <span className="font-medium text-ink">Si {branch.quand} : </span>
+                  <span className="font-medium text-ink">Si {lowerFirst(branch.quand)} : </span>
                   {branch.alors}
                 </li>
               ))}
             </ul>
-          </section>
+          </details>
         )}
       </article>
       {!narrow && (
@@ -211,4 +213,10 @@ function CastPanel({ model, cast, actors, number, narrow, onBlock }: {
       </p>
     </div>
   );
+}
+
+/** « Si une page… », not « Si Une page… »; an acronym (« API indisponible ») keeps its capitals. */
+function lowerFirst(text: string): string {
+  const [first = "", second = ""] = text;
+  return second === second.toUpperCase() && second !== second.toLowerCase() ? text : first.toLowerCase() + text.slice(1);
 }

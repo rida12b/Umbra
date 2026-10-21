@@ -15,8 +15,9 @@ export function stepActors(model: ProjectModel, step: JourneyStep): ArchBlock[] 
   const owner = model.composants.find((c) => c.id === step.composant)?.bloc ?? step.composant;
   let here = blocks.get(owner) ?? null;
   let reached = step.touche.map((id) => blocks.get(id)).find((b) => b && b !== here) ?? null;
-  // A person who acts (a command, a click) comes first: « Utilisateur agit sur Commande du moteur ».
-  if (reached?.type === "user" && step.manuel) [here, reached] = [reached, here];
+  // A step done by hand is done by the part it reaches (a person, whatever type Claude gave it):
+  // « Personne qui lance le service → Serveur de réception », not the other way round.
+  if (reached && step.manuel) [here, reached] = [reached, here];
   return [here, reached].filter((b): b is ArchBlock => b !== null);
 }
 
