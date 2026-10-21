@@ -51,7 +51,7 @@ test("a part: what it is for, the stories it takes part in, who it works with", 
   await page.goto(`/#/p/${project}?select=api`);
   await expect(page.getByRole("heading", { name: "API commandes" })).toBeVisible();
   await expect(page.getByRole("main").getByRole("button", { name: /Passer une commande/ })).toBeVisible();
-  await expect(page.getByText("Avec qui elle travaille")).toBeVisible();
+  await expect(page.getByText("Avec qui cette pièce travaille")).toBeVisible();
   await page.getByRole("button", { name: "Accueil du projet" }).first().click();
   await expect(page.getByRole("heading", { name: "Ce que fait ce projet" })).toBeVisible();
 });

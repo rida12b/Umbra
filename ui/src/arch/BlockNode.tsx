@@ -1,7 +1,7 @@
 import { Handle, Position, type Node, type NodeProps } from "@xyflow/react";
 import type { ArchBlock, BlockType } from "../api";
 
-export type BlockData = { block: ArchBlock; changed: boolean };
+export type BlockData = { block: ArchBlock; changed: boolean; onPick: (id: string) => void };
 export type BlockFlowNode = Node<BlockData, "block">;
 
 export const BLOCK_WIDTH = 240;
@@ -26,11 +26,20 @@ export const BLOCK_LABEL: Record<BlockType, string> = {
 };
 
 export function BlockNode({ data }: NodeProps<BlockFlowNode>) {
-  const { block, changed } = data;
+  const { block, changed, onPick } = data;
   const old = block.importance === "ancien";
   return (
+    // Clicks go through React Flow (onNodeClick); Tab then Enter opens the part from the keyboard too.
     <div
-      className={`flex flex-col rounded-lg border bg-panel px-3 py-2.5 hover:border-lamp-line ${old ? "border-dashed border-line opacity-60" : "border-line"}`}
+      role="button"
+      tabIndex={0}
+      aria-label={`${block.nom} : ${block.en_bref || block.role}`}
+      onKeyDown={(event) => {
+        if (event.key !== "Enter" && event.key !== " ") return;
+        event.preventDefault();
+        onPick(block.id);
+      }}
+      className={`flex flex-col rounded-lg border-2 bg-panel px-3 py-2.5 text-left hover:border-lamp-line ${old ? "border-dashed border-faint opacity-70" : "border-line"}`}
       style={{ width: BLOCK_WIDTH, height: BLOCK_HEIGHT }}
       title={block.role}
     >

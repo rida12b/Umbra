@@ -43,7 +43,7 @@ export async function placeArchitecture(boxes: LayoutBox[], arrows: LayoutArrow[
       "elk.edgeLabels.inline": "false",
       "elk.spacing.nodeNode": "36",
       "elk.spacing.edgeLabel": "4",
-      "elk.spacing.edgeEdge": "14",
+      "elk.spacing.edgeEdge": "22",
       "elk.layered.spacing.nodeNodeBetweenLayers": "72",
       "elk.layered.spacing.edgeNodeBetweenLayers": "20",
       "elk.layered.nodePlacement.strategy": "BRANDES_KOEPF",

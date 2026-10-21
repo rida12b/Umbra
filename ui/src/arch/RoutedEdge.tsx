@@ -9,7 +9,7 @@ export type RoutedData = {
 };
 export type RoutedFlowEdge = Edge<RoutedData, "routed">;
 
-export const FLOW_LABEL_HEIGHT = 20;
+export const FLOW_LABEL_HEIGHT = 22;
 
 /** A flow drawn where ELK routed it, with what goes through written on the line. */
 export function RoutedEdge({ id, data, selected }: EdgeProps<RoutedFlowEdge>) {
@@ -27,7 +27,7 @@ export function RoutedEdge({ id, data, selected }: EdgeProps<RoutedFlowEdge>) {
       {labelAt && (
         <EdgeLabelRenderer>
           <span
-            className="absolute rounded bg-bg px-1.5 text-[13px] whitespace-nowrap text-muted"
+            className="absolute rounded border border-line-soft bg-bg px-1.5 text-[14px] whitespace-nowrap text-ink"
             style={{ transform: `translate(${labelAt.x}px, ${labelAt.y}px)`, pointerEvents: "all" }}
             title={full}
           >

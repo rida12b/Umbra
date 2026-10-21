@@ -38,6 +38,15 @@ export function ArchitectureView({ project, route, theme, narrow }: Props) {
   const block = route.select ? model.blocs.find((b) => b.id === route.select) : undefined;
   const journey = journeyId ? model.parcours.find((j) => j.id === journeyId) : undefined;
 
+  if ((route.select && !block) || (journeyId && !journey))
+    return (
+      <StateMessage title={route.select ? "Cette pièce n'existe plus" : "Cette histoire n'existe plus"}>
+        <p>Le projet a changé depuis ce lien.</p>
+        <button type="button" className="mt-3 text-ink underline underline-offset-[3px]" onClick={() => go({})}>
+          Revenir à l'accueil du projet
+        </button>
+      </StateMessage>
+    );
   if (block)
     return (
       <BlockPage

@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import type { ProjectModel } from "../api";
 import type { Theme } from "../theme";
 import { ArchCanvas } from "./ArchCanvas";
@@ -10,9 +11,10 @@ interface Props {
 
 /** Every part of the project and how they work together, at a readable size (scroll to see the rest). */
 export function MapPage({ model, theme, onBlock }: Props) {
-  const linked = new Set(model.flux.flatMap((flow) => [flow.de, flow.vers]));
-  const drawn = model.blocs.filter((block) => linked.has(block.id));
-  const apart = model.blocs.filter((block) => !linked.has(block.id));
+  const [drawn, apart] = useMemo(() => {
+    const linked = new Set(model.flux.flatMap((flow) => [flow.de, flow.vers]));
+    return [model.blocs.filter((block) => linked.has(block.id)), model.blocs.filter((block) => !linked.has(block.id))];
+  }, [model]);
   return (
     <div className="flex h-full flex-col">
       <header className="flex flex-wrap items-baseline gap-x-6 gap-y-1 border-b border-line-soft px-6 py-3">

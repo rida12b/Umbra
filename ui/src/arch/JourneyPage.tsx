@@ -32,7 +32,9 @@ export function JourneyPage({ projectId, model, journey, activeStep, narrow, onS
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
-      if (event.target instanceof HTMLElement && event.target.closest("input, textarea, [cmdk-root]")) return;
+      if (event.altKey || event.ctrlKey || event.metaKey) return;
+      const typing = "input, textarea, select, [contenteditable], [role=listbox], [cmdk-root]";
+      if (event.target instanceof HTMLElement && event.target.closest(typing)) return;
       if (event.key === "ArrowDown" && activeStep < journey.etapes.length) onStep(activeStep + 1);
       else if (event.key === "ArrowUp" && activeStep > 1) onStep(activeStep - 1);
       else return;
@@ -43,7 +45,7 @@ export function JourneyPage({ projectId, model, journey, activeStep, narrow, onS
   }, [activeStep, journey.etapes.length, onStep]);
 
   const castPanel = (
-    <CastPanel cast={cast} actors={actors} step={step ? { number: activeStep, actors } : null} narrow={narrow} onBlock={onBlock} />
+    <CastPanel model={model} cast={cast} actors={actors} number={activeStep} narrow={narrow} onBlock={onBlock} />
   );
 
   return (
@@ -54,7 +56,7 @@ export function JourneyPage({ projectId, model, journey, activeStep, narrow, onS
           <Bookend title="Ça commence quand">{journey.depart || journey.declencheur}</Bookend>
           <Bookend title="À la fin">{journey.fin || journey.resultat}</Bookend>
         </div>
-        {narrow && <div className="mt-6">{castPanel}</div>}
+        {narrow && <div className="sticky top-0 z-10 -mx-6 mt-6 bg-bg px-6 py-2">{castPanel}</div>}
 
         <ol className="mt-8 flex flex-col gap-1" aria-label="Les étapes">
           {journey.etapes.map((item, index) => (
@@ -122,7 +124,7 @@ function Step({ projectId, step, number, on, onStep }: {
           <span className="flex flex-wrap items-center gap-2 text-[20px] leading-snug font-semibold">
             {stepLabel(step)}
             {step.manuel && (
-              <span className="rounded-full bg-ok px-2.5 py-0.5 text-[12px] font-semibold text-bg">Tu le fais toi-même</span>
+              <span className="rounded-full bg-ok px-2.5 py-0.5 text-[12px] font-semibold text-bg">À faire vous-même</span>
             )}
           </span>
           <span className="mt-1 block text-[17px] leading-relaxed text-muted">{step.simple || step.texte}</span>
@@ -160,26 +162,32 @@ function Step({ projectId, step, number, on, onStep }: {
   );
 }
 
-function CastPanel({ cast, actors, step, narrow, onBlock }: {
-  cast: ArchBlock[]; actors: ArchBlock[]; step: { number: number; actors: ArchBlock[] } | null; narrow: boolean;
+function CastPanel({ model, cast, actors, number, narrow, onBlock }: {
+  model: ProjectModel; cast: ArchBlock[]; actors: ArchBlock[]; number: number; narrow: boolean;
   onBlock: (id: string) => void;
 }) {
+  const [doer, target] = actors;
+  // « Moteur local lit et surveille Dossier du projet étudié »: the verb of the flow between them, if any.
+  const flow = doer && target ? model.flux.find((f) => f.de === doer.id && f.vers === target.id) : undefined;
+  const line = (
+    <p className="flex min-h-12 flex-wrap items-center gap-x-1.5 text-[15px] leading-snug">
+      <span className="text-muted">Étape {number} :</span>
+      <b>{doer?.nom ?? "aucune pièce précise"}</b>
+      {target &&
+        (flow?.verbe ? (
+          <span className="text-muted">{flow.verbe}</span>
+        ) : (
+          <ArrowRight size={15} className="text-lamp-ink" aria-label="agit sur" />
+        ))}
+      {target && <b>{target.nom}</b>}
+    </p>
+  );
+  if (narrow) return <div className="rounded-xl bg-raised px-4 py-3">{line}</div>;
   return (
     <div>
       <h2 className="text-[14px] font-semibold text-faint">Qui intervient</h2>
-      {step && (
-        <p className="mt-2 flex min-h-12 flex-wrap items-center gap-1.5 text-[15px] leading-snug">
-          <span className="text-muted">Étape {step.number} :</span>
-          <b>{step.actors[0]?.nom ?? "—"}</b>
-          {step.actors[1] && (
-            <>
-              <ArrowRight size={15} className="text-lamp-ink" aria-label="agit sur" />
-              <b>{step.actors[1].nom}</b>
-            </>
-          )}
-        </p>
-      )}
-      <ul className={`mt-3 ${narrow ? "flex flex-wrap gap-2" : "flex flex-col gap-2"}`}>
+      <div className="mt-2">{line}</div>
+      <ul className="mt-3 flex flex-col gap-2">
         {cast.map((block) => {
           const lit = actors.includes(block);
           return (
@@ -189,15 +197,18 @@ function CastPanel({ cast, actors, step, narrow, onBlock }: {
                 onClick={() => onBlock(block.id)}
                 className={`w-full rounded-xl border px-4 py-3 text-left ${
                   lit ? "border-lamp-line bg-panel" : "border-line-soft opacity-50 hover:opacity-80"
-                } ${narrow ? "py-2" : ""}`}
+                }`}
               >
                 <span className="block text-[15px] font-semibold">{block.nom}</span>
-                {!narrow && <span className="block text-[13.5px] leading-snug text-muted">{block.en_bref || block.role}</span>}
+                <span className="block text-[13.5px] leading-snug text-muted">{block.en_bref || block.role}</span>
               </button>
             </li>
           );
         })}
       </ul>
+      <p className="mt-3 text-[13px] leading-snug text-faint">
+        Encadrées : les pièces de cette étape. Grisées : les autres pièces de l'histoire.
+      </p>
     </div>
   );
 }

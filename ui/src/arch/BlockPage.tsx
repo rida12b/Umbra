@@ -38,7 +38,7 @@ export function BlockPage({ project, model, block, onBack, onJourney, onBlock }:
 
         {stories.length > 0 && (
           <section className="mt-10">
-            <h2 className="text-[20px] font-semibold">Les histoires où elle joue</h2>
+            <h2 className="text-[20px] font-semibold">Les histoires où cette pièce intervient</h2>
             <ul className="mt-3 flex flex-col gap-2">
               {stories.map(({ journey, steps }) => (
                 <li key={journey.id}>
@@ -60,10 +60,10 @@ export function BlockPage({ project, model, block, onBack, onJourney, onBlock }:
 
         {outgoing.length + incoming.length > 0 && (
           <section className="mt-10">
-            <h2 className="text-[20px] font-semibold">Avec qui elle travaille</h2>
+            <h2 className="text-[20px] font-semibold">Avec qui cette pièce travaille</h2>
             <ul className="mt-3 flex flex-col gap-2 text-[16px] leading-relaxed">
-              {[...outgoing, ...incoming].map((flow) => (
-                <li key={`${flow.de}>${flow.vers}`}>
+              {[...outgoing, ...incoming.filter((flow) => flow.de !== block.id)].map((flow, index) => (
+                <li key={index}>
                   <FlowSentence
                     from={flow.de === block.id ? <b>{block.nom}</b> : <PartLink name={name(flow.de)} onClick={() => onBlock(flow.de)} />}
                     to={flow.vers === block.id ? <b>{block.nom}</b> : <PartLink name={name(flow.vers)} onClick={() => onBlock(flow.vers)} />}

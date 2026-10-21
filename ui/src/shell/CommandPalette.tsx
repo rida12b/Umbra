@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { api, type ProjectModel, type SearchHit } from "../api";
 import { KIND_LABEL } from "../map/ElementNode";
 import { ARCHITECTURE_VIEW, navigate } from "../route";
+import { steps } from "../ui";
 
 const WAIT_MS = 200;
 const MAX_LOCAL = 6;
@@ -91,7 +92,7 @@ export function CommandPalette({ projectId, model, open, onOpenChange }: Props) 
                 onSelect={() => go({ projectId, node: ARCHITECTURE_VIEW, expand: false, journey: journey.id, step: 1 })}
               >
                 <span className="flex-1 truncate">{journey.nom}</span>
-                <span className="text-[12px] text-faint">{journey.etapes.length} étapes</span>
+                <span className="text-[12px] text-faint">{steps(journey.etapes.length)}</span>
               </Command.Item>
             ))}
           </Command.Group>

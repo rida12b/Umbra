@@ -54,7 +54,7 @@ export function ArchCanvas({ model, theme, blocks, onPickBlock }: Props) {
       key,
       source: flow.de,
       target: flow.vers,
-      labels: [{ width: textWidth(label(flow), 7.2) + 12, height: FLOW_LABEL_HEIGHT }],
+      labels: [{ width: textWidth(label(flow), 7.8) + 14, height: FLOW_LABEL_HEIGHT }],
     }));
     placeArchitecture(
       blocks.map((block) => ({ id: block.id, width: BLOCK_WIDTH, height: BLOCK_HEIGHT })),
@@ -73,9 +73,9 @@ export function ArchCanvas({ model, theme, blocks, onPickBlock }: Props) {
       const position = placed.boxes.get(block.id);
       if (!position) return [];
       const changed = block.code.some((code) => changedUnder(live, code.chemin));
-      return [{ id: block.id, type: "block" as const, position, data: { block, changed } }];
+      return [{ id: block.id, type: "block" as const, position, focusable: false, data: { block, changed, onPick: onPickBlock } }];
     });
-  }, [placed, blocks, live]);
+  }, [placed, blocks, live, onPickBlock]);
 
   const edges: RoutedFlowEdge[] = useMemo(() => {
     if (!placed) return [];
@@ -93,6 +93,7 @@ export function ArchCanvas({ model, theme, blocks, onPickBlock }: Props) {
     <>
       <ArrowMarker />
       <ReactFlow
+        key={`${placed.size.width}x${placed.size.height}`} // a new drawing (live update) is framed again
         nodes={nodes}
         edges={edges}
         nodeTypes={nodeTypes}

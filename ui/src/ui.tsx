@@ -1,5 +1,10 @@
 import type { ButtonHTMLAttributes, ReactNode } from "react";
 
+/** « 1 étape », « 8 étapes ». */
+export function steps(count: number): string {
+  return `${count} étape${count === 1 ? "" : "s"}`;
+}
+
 // The few building blocks every view shares, so a heading or a button looks the same everywhere.
 
 export function SectionTitle({ children }: { children: ReactNode }) {

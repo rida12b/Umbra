@@ -1,9 +1,11 @@
 import { ArrowRight } from "lucide-react";
+import { useMemo } from "react";
 import type { Project, ProjectModel } from "../api";
 import { MAP_VIEW, navigate } from "../route";
 import type { Theme } from "../theme";
 import { ArchCanvas } from "./ArchCanvas";
 import { BLOCK_LABEL } from "./BlockNode";
+import { steps } from "../ui";
 import { ModelStatusLine } from "./ModelStatus";
 
 const MAX_CORE = 7; // C4 context level: a handful of parts, read at a glance
@@ -19,8 +21,10 @@ interface Props {
 
 /** What the project does, its main parts at a readable size, then the stories of how it works. */
 export function HomePage({ project, model, theme, narrow, onJourney, onBlock }: Props) {
-  const linked = new Set(model.flux.flatMap((flow) => [flow.de, flow.vers]));
-  const core = model.blocs.filter((b) => (b.importance ?? "coeur") === "coeur" && linked.has(b.id)).slice(0, MAX_CORE);
+  const core = useMemo(() => {
+    const linked = new Set(model.flux.flatMap((flow) => [flow.de, flow.vers]));
+    return model.blocs.filter((b) => (b.importance ?? "coeur") === "coeur" && linked.has(b.id)).slice(0, MAX_CORE);
+  }, [model]);
   const others = model.blocs.length - core.length;
 
   return (
@@ -29,6 +33,17 @@ export function HomePage({ project, model, theme, narrow, onJourney, onBlock }: 
         <p className="text-[14px] font-medium text-faint">{project.name}</p>
         <h1 className="mt-1 text-[28px] leading-tight font-semibold tracking-[-0.01em]">Ce que fait ce projet</h1>
         <p className="mt-4 max-w-[68ch] text-[19px] leading-relaxed text-ink">{model.pitch || model.resume}</p>
+        <p className="mt-3 text-[14px] text-faint">
+          Décrit par Claude Code à partir du code, chaque étape avec son code à l'appui.
+          {model.incertitudes.length > 0 && (
+            <>
+              {" "}
+              <a href="#unverified" className="text-muted underline decoration-line underline-offset-[3px] hover:text-ink">
+                {model.incertitudes.length} point{model.incertitudes.length > 1 ? "s" : ""} non vérifié{model.incertitudes.length > 1 ? "s" : ""}
+              </a>
+            </>
+          )}
+        </p>
 
         <section className="mt-12" aria-labelledby="journeys-heading">
           <h2 id="journeys-heading" className="text-[20px] font-semibold">Comment ça marche</h2>
@@ -50,7 +65,7 @@ export function HomePage({ project, model, theme, narrow, onJourney, onBlock }: 
                     </span>
                   )}
                   <span className="mt-auto pt-3 text-[13px] text-faint group-hover:text-ink">
-                    Lire l'histoire en {journey.etapes.length} étapes
+                    Lire l'histoire en {steps(journey.etapes.length)}
                   </span>
                 </button>
               </li>
@@ -81,25 +96,25 @@ export function HomePage({ project, model, theme, narrow, onJourney, onBlock }: 
                 <ArchCanvas model={model} theme={theme} blocks={core} onPickBlock={onBlock} />
               </div>
             )}
-            {others > 0 && (
-              <button
-                type="button"
-                className="mt-3 text-[15px] text-ink underline decoration-line underline-offset-[3px] hover:decoration-ink"
-                onClick={() => navigate({ projectId: project.id, node: MAP_VIEW, expand: false })}
-              >
-                Voir toutes les pièces ({model.blocs.length})
-              </button>
-            )}
           </section>
         )}
 
+        {others > 0 && (
+          <button
+            type="button"
+            className="mt-3 text-[15px] text-ink underline decoration-line underline-offset-[3px] hover:decoration-ink"
+            onClick={() => navigate({ projectId: project.id, node: MAP_VIEW, expand: false })}
+          >
+            Voir toutes les pièces ({model.blocs.length})
+          </button>
+        )}
         <section className="mt-14 max-w-[70ch] space-y-3 text-[15px]">
           <details>
             <summary className="cursor-pointer text-muted hover:text-ink">Le projet en détail</summary>
             <p className="mt-2 max-w-[70ch] leading-relaxed text-muted">{model.resume}</p>
           </details>
           {model.incertitudes.length > 0 && (
-            <details>
+            <details id="unverified">
               <summary className="cursor-pointer text-muted hover:text-ink">Ce que Claude n'a pas pu vérifier</summary>
               <ul className="mt-2 max-w-[70ch] list-disc space-y-1.5 pl-5 text-[14px] text-muted">
                 {model.incertitudes.map((item, index) => (

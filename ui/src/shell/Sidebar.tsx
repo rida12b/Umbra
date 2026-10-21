@@ -1,13 +1,14 @@
 import type { Project, ProjectModel } from "../api";
 import { ACTIVITY_VIEW, APPLICATION, ARCHITECTURE_VIEW, MAP_VIEW, navigate, type Route } from "../route";
+import { steps } from "../ui";
 
 export type View = typeof ARCHITECTURE_VIEW | typeof MAP_VIEW | typeof APPLICATION | typeof ACTIVITY_VIEW;
 
-const VIEWS: { node: View; label: string }[] = [
-  { node: ARCHITECTURE_VIEW, label: "Accueil du projet" },
-  { node: MAP_VIEW, label: "Toutes les pièces" },
-  { node: APPLICATION, label: "Code" },
-  { node: ACTIVITY_VIEW, label: "Activité de Claude" },
+const VIEWS: { node: View; label: string; short: string }[] = [
+  { node: ARCHITECTURE_VIEW, label: "Accueil du projet", short: "Accueil" },
+  { node: MAP_VIEW, label: "Toutes les pièces", short: "Pièces" },
+  { node: APPLICATION, label: "Code", short: "Code" },
+  { node: ACTIVITY_VIEW, label: "Activité de Claude", short: "Activité" },
 ];
 
 interface Props {
@@ -24,6 +25,8 @@ export function Sidebar({ project, route, view, model, narrow }: Props) {
   const openJourney = (journey: string) =>
     navigate({ projectId: project.id, node: ARCHITECTURE_VIEW, expand: false, journey, step: 1 });
   const chosen = view === ARCHITECTURE_VIEW ? route.journey : null;
+  // « Accueil » is the current page only on the home itself, not on a story or a part.
+  const current = (node: View) => view === node && (node !== ARCHITECTURE_VIEW || (!route.journey && !route.select));
 
   if (narrow)
     return (
@@ -33,11 +36,11 @@ export function Sidebar({ project, route, view, model, narrow }: Props) {
             <button
               key={item.node}
               type="button"
-              aria-current={view === item.node ? "page" : undefined}
+              aria-current={current(item.node) ? "page" : undefined}
               className={`shrink-0 rounded-md px-2.5 py-1 text-[13px] ${view === item.node ? "bg-raised text-ink" : "text-muted"}`}
               onClick={() => openView(item.node)}
             >
-              {item.label}
+              {item.short}
             </button>
           ))}
         </div>
@@ -66,7 +69,7 @@ export function Sidebar({ project, route, view, model, narrow }: Props) {
           <button
             key={item.node}
             type="button"
-            aria-current={view === item.node ? "page" : undefined}
+            aria-current={current(item.node) ? "page" : undefined}
             className={`rounded-md px-2.5 py-1.5 text-left ${view === item.node ? "bg-raised text-ink" : "text-muted hover:text-ink"}`}
             onClick={() => openView(item.node)}
           >
@@ -96,7 +99,7 @@ export function Sidebar({ project, route, view, model, narrow }: Props) {
                   >
                     {journey.nom}
                     <span className="mt-0.5 block text-[12px] text-faint">
-                      {journey.etapes.length} étapes{manual > 0 ? `, dont ${manual} à faire soi-même` : ""}
+                      {steps(journey.etapes.length)}{manual > 0 ? `, dont ${manual} à faire vous-même` : ""}
                     </span>
                   </button>
                 </li>
