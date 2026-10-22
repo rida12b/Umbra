@@ -10,6 +10,7 @@ export interface LayoutBox {
   id: string;
   width: number;
   height: number;
+  column?: number; // boxes of a lower column always sit left of higher ones (the map's zones)
 }
 
 /** An arrow and the labels written on it (sizes are estimates of the rendered text). */
@@ -50,8 +51,12 @@ export async function placeArchitecture(boxes: LayoutBox[], arrows: LayoutArrow[
       "elk.separateConnectedComponents": "true",
       "elk.spacing.componentComponent": "48",
       "elk.aspectRatio": "1.5",
+      "elk.partitioning.activate": String(boxes.some((box) => box.column !== undefined)),
     },
-    children: boxes.map((box) => ({ ...box })),
+    children: boxes.map(({ column, ...box }) => ({
+      ...box,
+      layoutOptions: column === undefined ? undefined : { "elk.partitioning.partition": String(column) },
+    })),
     edges: arrows.map(
       (arrow): ElkExtendedEdge => ({
         id: arrow.key,
