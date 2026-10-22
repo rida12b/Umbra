@@ -45,6 +45,7 @@ export function placeRows(boxes: RowBox[], arrows: RowArrow[], size: { width: nu
       zoneOfRow.push(zone);
     }
   }
+  if (rows.length === 0) return { size: { width: ROW_TITLE_WIDTH, height: 0 }, boxes: new Map(), arrows: new Map(), labels: new Map(), rows: [] };
   const rowOf = new Map(rows.flatMap((row, r) => row.map((id) => [id, r] as const)));
   const links = arrows.filter((a) => rowOf.has(a.source) && rowOf.has(a.target) && a.source !== a.target);
 
@@ -55,7 +56,7 @@ export function placeRows(boxes: RowBox[], arrows: RowArrow[], size: { width: nu
   const neighbours = (id: string, rowIndex: number) =>
     links.flatMap((a) => (a.source === id ? [a.target] : a.target === id ? [a.source] : [])).filter((o) => rowOf.get(o) === rowIndex);
   const sweep = (from: number, to: number, step: number) => {
-    for (let r = from; r !== to; r += step) {
+    for (let r = from; r >= 0 && r < rows.length && r !== to; r += step) {
       const row = rows[r];
       if (!row) continue;
       const weight = (id: string) => {

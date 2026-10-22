@@ -186,6 +186,7 @@ export function buildLevel(model: ProjectModel, key: LevelKey, projectName: stri
       room = MAX_BOXES - new Set(others.map(zoneOf)).size;
     }
     const shown = key === "around" ? others : main;
+    if (key === "around" && shown.length === 0) return null; // everything fits on the main map now
     const groups: Box[] =
       key === "parts"
         ? ZONES.flatMap((zone) => {
