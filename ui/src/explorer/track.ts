@@ -4,10 +4,11 @@ import { zoneOf, type Level, type Target } from "./levels";
 
 /** Where one step of a journey shows on the current level. */
 export interface StepOnMap {
-  boxes: string[]; // the boxes lit: one (it happens inside) or two (from → to)
+  boxes: string[]; // the boxes lit: where it happens, what it acts on, and anything else it reaches
   link: string | null; // the arrow it runs along, if the level has one between those boxes
   elsewhere: { id: string; title: string } | null; // the step happens inside this box: « entrer pour la voir »
   words: string; // the step's short action, on its arrow
+  arrow: boolean; // false: the step works on what came in (a check, a reply being built), no data moves yet
 }
 
 /**
@@ -29,19 +30,25 @@ export function trackJourney(model: ProjectModel, journey: Journey, level: Level
     boxOf("system") ??
     groupOf(blockId);
 
-  return journey.etapes.map((step) => {
+  const last = journey.etapes.length - 1;
+  const zoneOfBlock = new Map(model.blocs.map((b) => [b.id, zoneOf(b)]));
+  return journey.etapes.map((step, index) => {
     const [doer, target] = stepActors(model, step);
     // The step's component belongs to one of the two (the target when the step is done by hand).
     const componentOf = (blockId: string | undefined) => (componentBlock.get(step.composant) === blockId ? step.composant : null);
     const from = doer ? atThisLevel(doer.id, componentOf(doer.id)) : null;
     const to = target ? atThisLevel(target.id, componentOf(target.id)) : null;
-    const boxes = [...new Set([from, to].filter((id): id is string => id !== null))];
+    const also = step.touche.filter((id) => id !== doer?.id && id !== target?.id).map((id) => atThisLevel(id, null));
+    const boxes = [...new Set([from, to, ...also].filter((id): id is string => id !== null))];
+    // Mid-path, a step that « reaches » the person who asked is working on their request (checking
+    // it, reading their history): the answer only travels back to them at the end.
+    const arrow = !(target && zoneOfBlock.get(target.id) === "utilise" && !step.manuel && index < last);
     const link =
-      from && to && from !== to
+      arrow && from && to && from !== to
         ? (level.links.find((l) => l.from === from && l.to === to)?.id ?? null) // an answer going back gets its own arrow
         : null;
     const single = boxes.length === 1 ? level.boxes.find((b) => b.id === boxes[0]) : undefined;
     const elsewhere = single && single.inside > 0 ? { id: single.id, title: single.title } : null;
-    return { boxes, link, elsewhere, words: stepLabel(step) };
+    return { boxes, link, elsewhere, words: stepLabel(step), arrow };
   });
 }

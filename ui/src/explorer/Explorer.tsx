@@ -76,12 +76,13 @@ export function Explorer({ project, route, theme, narrow }: Props) {
     };
   }, [track, stepNumber]);
 
-  // Esc goes back up: first out of the selection, then one level up.
+  // Esc goes back up: first out of the selection, then out of the path being played, then one level up.
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       if (event.key !== "Escape" || !model) return;
       if (event.target instanceof HTMLElement && event.target.closest("input, textarea, [cmdk-root]")) return;
       if (route.select) select(null);
+      else if (route.journey) stop();
       else if (levelKey) {
         const above = trail(model, levelKey).at(-2);
         if (above) openLevel(above.key);
@@ -89,7 +90,7 @@ export function Explorer({ project, route, theme, narrow }: Props) {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [model, route.select, levelKey, select, openLevel]);
+  }, [model, route.select, route.journey, levelKey, select, stop, openLevel]);
 
   if (!model) return <ModelPending state={state} />;
   const crumbs = levelKey ? trail(model, levelKey) : [...trail(model, "parts"), ...(codeView?.breadcrumbs.map((c) => ({ key: c.key, title: c.label, code: true })) ?? [])];
@@ -177,7 +178,9 @@ export function Explorer({ project, route, theme, narrow }: Props) {
             </span>
           );
         })}
-        {levelKey && !narrow && <span className="ml-auto text-[13px] text-faint">Échap : remonter d'un niveau</span>}
+        {levelKey && !narrow && (
+          <span className="ml-auto text-[13px] text-faint">{journey ? "Échap : arrêter le chemin" : "Échap : remonter d'un niveau"}</span>
+        )}
       </nav>
       <div className="min-h-0 flex-1">{body}</div>
       {journey && (

@@ -24,7 +24,7 @@ export type BoxFlowNode = Node<BoxData, "box">;
 export function BoxNode({ data }: NodeProps<BoxFlowNode>) {
   const { box, look, selected, vertical, onSelect, onEnter } = data;
   const tone =
-    look === "lit" ? "border-lamp-line" : look === "dim" || box.faded ? "border-line-soft opacity-40" : "border-line";
+    look === "lit" ? "border-lamp-line" : look === "dim" ? "border-line-soft opacity-40" : box.faded ? "border-line opacity-70" : "border-line";
   return (
     // Two separate controls (select, enter): a button inside a button is neither announced nor usable by keyboard.
     <div

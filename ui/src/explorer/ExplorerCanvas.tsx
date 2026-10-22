@@ -24,6 +24,7 @@ const edgeTypes = { arrow: ArrowEdge };
 const READABLE_ZOOM = 0.75; // below this, the boxes' words are too small to read
 const LARGEST_FIT = 1.1; // a small level is not blown up past this
 const MARGIN = 24;
+const CONTROLS = 48;
 const FEW_LINKS = 8; // up to this many arrows, their words show all the time
 
 export interface Play {
@@ -50,14 +51,14 @@ type AnyNode = BoxFlowNode | ZoneFlowNode;
 function frame(flow: ReactFlowInstance<AnyNode, ArrowFlowEdge>, size: { width: number; height: number }, screen: HTMLElement | null): boolean {
   const width = screen?.clientWidth ?? 1000;
   const height = screen?.clientHeight ?? 700;
-  const across = (width - 2 * MARGIN) / Math.max(size.width, 1);
+  const across = (width - 2 * MARGIN - CONTROLS) / Math.max(size.width, 1); // the zoom buttons sit top right
   const whole = Math.min(LARGEST_FIT, across, (height - 2 * MARGIN) / Math.max(size.height, 1));
   if (whole >= READABLE_ZOOM) {
-    void flow.setViewport({ x: (width - size.width * whole) / 2, y: (height - size.height * whole) / 2, zoom: whole });
+    void flow.setViewport({ x: (width - CONTROLS - size.width * whole) / 2, y: (height - size.height * whole) / 2, zoom: whole });
     return false;
   }
   const zoom = Math.max(READABLE_ZOOM, Math.min(LARGEST_FIT, across));
-  void flow.setViewport({ x: Math.max(MARGIN, (width - size.width * zoom) / 2), y: MARGIN, zoom });
+  void flow.setViewport({ x: Math.max(MARGIN, (width - CONTROLS - size.width * zoom) / 2), y: MARGIN, zoom });
   return size.height * zoom + MARGIN > height; // the bottom of the map is out of sight
 }
 
@@ -67,7 +68,7 @@ export function ExplorerCanvas({ level, theme, selected, play, onSelect, onEnter
   const [failed, setFailed] = useState(false);
   const [hovered, setHovered] = useState<string | null>(null);
   const screen = useRef<HTMLDivElement>(null);
-  const [below, setBelow] = useState(false); // part of the map is under the screen: say so until the reader moves
+  const [below, setBelow] = useState(false); // part of the map is under the screen: say so
   const flowRef = useRef<ReactFlowInstance<AnyNode, ArrowFlowEdge> | null>(null);
   const [framed, setFramed] = useState(0); // counts framings: the step is followed after the first one
   // A live refresh rebuilds the level; only a change of its boxes or arrows is laid out again.
@@ -98,7 +99,6 @@ export function ExplorerCanvas({ level, theme, selected, play, onSelect, onEnter
     const seen = top * zoom + y >= 0 && bottom * zoom + y <= el.clientHeight && left * zoom + x >= 0 && right * zoom + x <= el.clientWidth;
     if (seen) return;
     void flow.setCenter((left + right) / 2, (top + bottom) / 2, { zoom, duration: 400 });
-    setBelow(false); // the reader is no longer at the top of the map
   }, [stepBoxes, placed, framed]);
 
   useEffect(() => {
@@ -174,7 +174,7 @@ export function ExplorerCanvas({ level, theme, selected, play, onSelect, onEnter
     // A played step between two boxes the level has no arrow for: drawn for the time of the step.
     const step = play?.step;
     const [from, to] = step?.boxes ?? [];
-    if (step && !step.link && from && to)
+    if (step?.arrow && !step.link && from && to)
       arrows.push({ id: "step", type: "arrow", source: from, target: to, data: { points: null, label: step.words, labelAt: null, look: "lit", moving: true } });
     return arrows;
   }, [placed, level, hovered, selected, play]);
@@ -204,7 +204,7 @@ export function ExplorerCanvas({ level, theme, selected, play, onSelect, onEnter
           setBelow(frame(flow, placed.size, screen.current));
           setFramed((n) => n + 1);
         }}
-        onMoveStart={(event) => event && setBelow(false)} // null: our own framing, not the reader
+        onMoveEnd={(_, view) => setBelow(placed.size.height * view.zoom + view.y > (screen.current?.clientHeight ?? 0) + 8)}
         minZoom={0.25}
         maxZoom={1.6}
         zoomOnScroll={false}

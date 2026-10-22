@@ -201,7 +201,11 @@ function StepInfo({ projectId, journey, number, onStep }: {
                   {index + 1}
                 </span>
                 {stepLabel(step)}
-                {step.manuel && <span className="ml-auto shrink-0 text-[12px] font-normal text-ok">fait à la main</span>}
+                {step.manuel && (
+                  <span className="ml-auto shrink-0 text-[12px] font-normal text-ok" title="Fait par une personne (un clic, une commande), pas par le programme">
+                    par une personne
+                  </span>
+                )}
               </button>
             </li>
           );
@@ -213,10 +217,9 @@ function StepInfo({ projectId, journey, number, onStep }: {
           <p className="mt-1 text-[15px] leading-relaxed">{journey.fin || journey.resultat}</p>
         </section>
       )}
-      {current.fichier && <Files title={`Pour changer l'étape ${number}`} paths={[current.fichier]} />}
       {(journey.branches ?? []).length > 0 && (
         <section className="mt-6">
-          <h3 className="text-[15px] font-semibold">Quand ça ne se passe pas comme prévu</h3>
+          <h3 className="text-[15px] font-semibold">Quand ça ne se passe pas comme prévu (sur tout le chemin)</h3>
           <ul className="mt-2 space-y-2.5">
             {(journey.branches ?? []).map((branch, index) => (
               <li key={index} className="rounded-lg border border-line-soft px-3.5 py-2.5 text-[14.5px] leading-relaxed">
@@ -227,6 +230,7 @@ function StepInfo({ projectId, journey, number, onStep }: {
           </ul>
         </section>
       )}
+      {current.fichier && <Files title={`Pour changer l'étape ${number}`} paths={[current.fichier]} />}
       <details className="mt-6 border-t border-line-soft pt-3 text-[14px]">
         <summary className="cursor-pointer text-muted hover:text-ink">Détails pour développeur (étape {number})</summary>
         <div className="mt-3 space-y-2 text-muted">
