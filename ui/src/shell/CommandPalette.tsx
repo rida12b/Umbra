@@ -2,6 +2,7 @@ import { Command } from "cmdk";
 import { useEffect, useState } from "react";
 import { api, type ProjectModel, type SearchHit } from "../api";
 import { KIND_LABEL } from "../map/ElementNode";
+import { levelNode } from "../explorer/Explorer";
 import { ARCHITECTURE_VIEW, navigate } from "../route";
 import { steps } from "../ui";
 
@@ -51,8 +52,17 @@ export function CommandPalette({ projectId, model, open, onOpenChange }: Props) 
 
   const wanted = plain(query.trim());
   const matches = (text: string) => wanted === "" || plain(text).includes(wanted);
-  const journeys = (model?.parcours ?? []).filter((j) => matches(j.nom)).slice(0, MAX_LOCAL);
-  const blocks = (model?.blocs ?? []).filter((b) => matches(`${b.nom} ${b.role}`)).slice(0, MAX_LOCAL);
+  // A path is found by its name, by the words of its steps (opened at that step) or of its other cases.
+  const journeys = (model?.parcours ?? [])
+    .flatMap((journey) => {
+      const step = journey.etapes.findIndex((s) => matches(`${s.action ?? ""} ${s.simple ?? ""} ${s.texte}`));
+      const other = (journey.branches ?? []).some((b) => matches(`${b.quand} ${b.alors}`));
+      if (matches(journey.nom)) return [{ journey, step: 1, why: "" }];
+      if (step >= 0) return [{ journey, step: step + 1, why: `étape ${step + 1}` }];
+      return other ? [{ journey, step: 1, why: "cas particulier" }] : [];
+    })
+    .slice(0, MAX_LOCAL);
+  const blocks = (model?.blocs ?? []).filter((b) => matches(`${b.nom} ${b.en_bref ?? ""} ${b.role}`)).slice(0, MAX_LOCAL);
 
   const go = (target: Parameters<typeof navigate>[0]) => {
     onOpenChange(false);
@@ -75,7 +85,7 @@ export function CommandPalette({ projectId, model, open, onOpenChange }: Props) 
       <Command.Input
         value={query}
         onValueChange={setQuery}
-        placeholder="Une histoire, une pièce, un fichier, une fonction…"
+        placeholder="Un chemin, une pièce, un fichier, un mot (« erreur », « limite »)…"
         className="w-full border-b border-line-soft bg-transparent px-4 py-3.5 text-[15px] text-ink outline-none placeholder:text-faint"
       />
       <Command.List className="max-h-[min(420px,60vh)] overflow-y-auto p-2">
@@ -83,16 +93,16 @@ export function CommandPalette({ projectId, model, open, onOpenChange }: Props) 
           {wanted.length < 2 ? "Tapez au moins deux lettres pour chercher dans le code." : "Rien trouvé sous ce nom."}
         </Command.Empty>
         {journeys.length > 0 && (
-          <Command.Group heading="Histoires" className={group}>
-            {journeys.map((journey) => (
+          <Command.Group heading="Chemins de données" className={group}>
+            {journeys.map(({ journey, step, why }) => (
               <Command.Item
                 key={journey.id}
                 value={`parcours:${journey.id}`}
                 className={item}
-                onSelect={() => go({ projectId, node: ARCHITECTURE_VIEW, expand: false, journey: journey.id, step: 1 })}
+                onSelect={() => go({ projectId, node: ARCHITECTURE_VIEW, expand: false, journey: journey.id, step })}
               >
                 <span className="flex-1 truncate">{journey.nom}</span>
-                <span className="text-[12px] text-faint">{steps(journey.etapes.length)}</span>
+                <span className="text-[12px] text-faint">{why || steps(journey.etapes.length)}</span>
               </Command.Item>
             ))}
           </Command.Group>
@@ -104,7 +114,7 @@ export function CommandPalette({ projectId, model, open, onOpenChange }: Props) 
                 key={block.id}
                 value={`bloc:${block.id}`}
                 className={item}
-                onSelect={() => go({ projectId, node: ARCHITECTURE_VIEW, expand: false, select: block.id })}
+                onSelect={() => go({ projectId, node: levelNode(`part:${block.id}`), expand: false })} // inside the part: found even when grouped
               >
                 <span className="flex-1 truncate">{block.nom}</span>
               </Command.Item>

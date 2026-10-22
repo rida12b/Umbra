@@ -11,6 +11,7 @@ export function ModelPending({ state }: { state: ModelState | null }) {
         <p className="mt-2">Vérifiez que Claude Code est connecté (commande `claude`), puis rechargez la page.</p>
       </StateMessage>
     );
+  if (state === null) return <StateMessage>Ouverture du projet…</StateMessage>; // not asked yet: no study is running
   return (
     <StateMessage title="Claude Code étudie le projet">
       <p>Il lit la carte du code, suit les parcours de bout en bout et écrit le modèle.</p>

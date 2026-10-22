@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 
 // Where the user is, kept in the URL fragment so Back/Forward and reloads work.
-// `#/` lists Projects; `#/p/<id>` shows its architecture; `#/p/<id>?node=<key>&expand=1` one map view.
+// `#/` lists Projects; `#/p/<id>?node=x:<level>` one level of its explorer; any other node is a code map view.
 // A login link arrives as `#login=<code>`: it is consumed once and replaced, never kept in history.
 
 export interface Route {
@@ -13,11 +13,9 @@ export interface Route {
   select?: string | null; // on a map view: the element to select (from a search)
 }
 
-export const APPLICATION = "app:";
 export const ARCHITECTURE_VIEW = "arch:"; // a Project opens on its architecture
 const OLD_JOURNEYS_VIEW = "parcours:"; // journeys now live on the architecture: old links still open
 export const ACTIVITY_VIEW = "activite:";
-export const MAP_VIEW = "carte:"; // every part of the architecture
 const LOGIN = "#login=";
 
 export function takeLoginCode(): string | null {

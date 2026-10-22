@@ -3,7 +3,7 @@ import { ApiError, api, whenSignedOut, type Project } from "./api";
 import { LiveContext, useLiveEvents } from "./live";
 import { useNewVersion } from "./newVersion";
 import { ProjectPage } from "./ProjectPage";
-import { takeLoginCode, useRoute } from "./route";
+import { ACTIVITY_VIEW, takeLoginCode, useRoute } from "./route";
 import { TopBar } from "./shell/TopBar";
 import { useTheme } from "./theme";
 import { Command, StateMessage } from "./ui";
@@ -59,7 +59,13 @@ export function App() {
             </button>
           </div>
         )}
-        <TopBar project={project} theme={theme} onToggleTheme={toggleTheme} onSearch={() => setSearching(true)} />
+        <TopBar
+          project={project}
+          activity={route.node === ACTIVITY_VIEW}
+          theme={theme}
+          onToggleTheme={toggleTheme}
+          onSearch={() => setSearching(true)}
+        />
         {projects === null && <StateMessage>Connexion au moteur local…</StateMessage>}
         {projects && "error" in projects && <ConnectionProblem error={projects.error} />}
         {projects && "list" in projects && !route.projectId && <ProjectList projects={projects.list} />}

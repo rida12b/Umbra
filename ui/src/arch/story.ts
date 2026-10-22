@@ -1,4 +1,4 @@
-import type { ArchBlock, Journey, JourneyStep, ProjectModel } from "../api";
+import type { ArchBlock, JourneyStep, ProjectModel } from "../api";
 
 const FALLBACK_WORDS = 5;
 
@@ -19,26 +19,4 @@ export function stepActors(model: ProjectModel, step: JourneyStep): ArchBlock[] 
   // « Personne qui lance le service → Serveur de réception », not the other way round.
   if (reached && step.manuel) [here, reached] = [reached, here];
   return [here, reached].filter((b): b is ArchBlock => b !== null);
-}
-
-/** Every block a journey goes through, in the order the story meets them. */
-export function journeyCast(model: ProjectModel, journey: Journey): ArchBlock[] {
-  const cast: ArchBlock[] = [];
-  for (const step of journey.etapes) for (const block of stepActors(model, step)) if (!cast.includes(block)) cast.push(block);
-  return cast;
-}
-
-/** The journeys a block takes part in, and at which steps. */
-export function journeysOf(model: ProjectModel, block: ArchBlock): { journey: Journey; steps: number[] }[] {
-  return model.parcours
-    .map((journey) => ({
-      journey,
-      steps: journey.etapes.flatMap((step, index) => (stepActors(model, step).includes(block) ? [index + 1] : [])),
-    }))
-    .filter(({ steps }) => steps.length > 0);
-}
-
-/** « envoie les demandes à » when the model has a verb; the longer description otherwise. */
-export function flowWords(flow: { verbe?: string; quoi: string }): string {
-  return flow.verbe || flow.quoi;
 }

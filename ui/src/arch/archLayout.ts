@@ -10,6 +10,7 @@ export interface LayoutBox {
   id: string;
   width: number;
   height: number;
+  column?: number; // boxes of a lower column always sit left of higher ones (the map's zones)
 }
 
 /** An arrow and the labels written on it (sizes are estimates of the rendered text). */
@@ -23,8 +24,8 @@ export interface LayoutArrow {
 export interface Placed {
   size: { width: number; height: number }; // the whole drawing, labels included
   boxes: Map<string, Point>;
-  /** Each arrow as a polyline, and the top-left corner of each of its labels, in the same space. */
-  arrows: Map<string, { points: Point[]; labels: Point[] }>;
+  /** Each arrow as a polyline, in the same space (its labels only reserve room: they are drawn at its middle). */
+  arrows: Map<string, { points: Point[] }>;
 }
 
 const elk = new ELK();
@@ -34,6 +35,7 @@ const elk = new ELK();
  * angles and keeps room for their labels, so step labels never sit on a block.
  */
 export async function placeArchitecture(boxes: LayoutBox[], arrows: LayoutArrow[]): Promise<Placed> {
+  const zoned = boxes.some((box) => box.column !== undefined);
   const graph: ElkNode = {
     id: "root",
     layoutOptions: {
@@ -47,11 +49,16 @@ export async function placeArchitecture(boxes: LayoutBox[], arrows: LayoutArrow[
       "elk.layered.spacing.nodeNodeBetweenLayers": "72",
       "elk.layered.spacing.edgeNodeBetweenLayers": "20",
       "elk.layered.nodePlacement.strategy": "BRANDES_KOEPF",
-      "elk.separateConnectedComponents": "true",
+      // Columns only hold inside one connected part: a zoned map is laid out as a whole.
+      "elk.separateConnectedComponents": String(!zoned),
       "elk.spacing.componentComponent": "48",
       "elk.aspectRatio": "1.5",
+      "elk.partitioning.activate": String(zoned),
     },
-    children: boxes.map((box) => ({ ...box })),
+    children: boxes.map(({ column, ...box }) => ({
+      ...box,
+      layoutOptions: column === undefined ? undefined : { "elk.partitioning.partition": String(column) },
+    })),
     edges: arrows.map(
       (arrow): ElkExtendedEdge => ({
         id: arrow.key,
@@ -70,8 +77,7 @@ export async function placeArchitecture(boxes: LayoutBox[], arrows: LayoutArrow[
   for (const child of result.children ?? []) placed.boxes.set(child.id, { x: child.x ?? 0, y: child.y ?? 0 });
   for (const edge of result.edges ?? []) {
     const points = (edge.sections ?? []).flatMap((s) => [s.startPoint, ...(s.bendPoints ?? []), s.endPoint]);
-    const labels = (edge.labels ?? []).map((label) => ({ x: label.x ?? 0, y: label.y ?? 0 }));
-    placed.arrows.set(edge.id, { points, labels }); // ELK keeps labels clear of blocks and of each other
+    placed.arrows.set(edge.id, { points });
   }
   return placed;
 }
