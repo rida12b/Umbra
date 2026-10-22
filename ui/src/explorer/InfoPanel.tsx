@@ -71,7 +71,10 @@ function Journeys({ model, onPlay, only }: { model: ProjectModel; onPlay: (id: s
                 <span className="block text-[13.5px] text-muted">
                   {only ? `À partir de l'étape ${only.get(journey.id)}` : `${journey.depart || journey.declencheur}`}
                 </span>
-                <span className="block text-[12.5px] text-faint">{steps(journey.etapes.length)}</span>
+                <span className="block text-[12.5px] text-faint">
+                  {steps(journey.etapes.length)}
+                  {journey.branches?.length ? ` · ${otherCases(journey.branches.length)}` : ""}
+                </span>
               </span>
             </button>
           </li>
@@ -102,6 +105,7 @@ function BoxInfo({ projectId, model, box, onEnter, onPlay }: {
   const name = (id: string) => model.blocs.find((b) => b.id === id)?.nom ?? id;
   const entre = block?.entre?.length ? block.entre : incoming.map((f) => `${name(f.de)} : ${f.quoi}`);
   const sort = block?.sort?.length ? block.sort : outgoing.map((f) => `vers ${name(f.vers)} : ${f.quoi}`);
+  const files = component?.fichiers ?? block?.code.map((c) => c.chemin).filter(Boolean) ?? [];
 
   return (
     <Panel>
@@ -120,6 +124,7 @@ function BoxInfo({ projectId, model, box, onEnter, onPlay }: {
       {entre.length > 0 && <List title="Ce qui entre" items={entre} />}
       {sort.length > 0 && <List title="Ce qui sort" items={sort} />}
       {through.size > 0 && <Journeys model={model} onPlay={onPlay} only={through} />}
+      {files.length > 0 && <Files title="Pour la modifier : ses fichiers" paths={files} />}
       {(block || component) && (
         <details className="mt-7 border-t border-line-soft pt-3 text-[14px]">
           <summary className="cursor-pointer text-muted hover:text-ink">Détails pour développeur</summary>
@@ -152,6 +157,21 @@ function List({ title, items }: { title: string; items: string[] }) {
   );
 }
 
+function Files({ title, paths }: { title: string; paths: string[] }) {
+  return (
+    <section className="mt-6">
+      <h3 className="text-[15px] font-semibold">{title}</h3>
+      <ul className="mt-1.5 space-y-1 font-mono text-[13px] break-all text-muted">
+        {paths.map((path) => (
+          <li key={path}>{path}</li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+const otherCases = (n: number) => (n === 1 ? "1 cas particulier" : `${n} cas particuliers`);
+
 function StepInfo({ projectId, journey, number, onStep }: {
   projectId: string; journey: Journey; number: number; onStep: (n: number) => void;
 }) {
@@ -181,7 +201,7 @@ function StepInfo({ projectId, journey, number, onStep }: {
                   {index + 1}
                 </span>
                 {stepLabel(step)}
-                {step.manuel && <span className="ml-auto text-[12px] font-normal text-ok">vous</span>}
+                {step.manuel && <span className="ml-auto shrink-0 text-[12px] font-normal text-ok">fait à la main</span>}
               </button>
             </li>
           );
@@ -193,6 +213,20 @@ function StepInfo({ projectId, journey, number, onStep }: {
           <p className="mt-1 text-[15px] leading-relaxed">{journey.fin || journey.resultat}</p>
         </section>
       )}
+      {current.fichier && <Files title={`Pour changer l'étape ${number}`} paths={[current.fichier]} />}
+      {(journey.branches ?? []).length > 0 && (
+        <section className="mt-6">
+          <h3 className="text-[15px] font-semibold">Quand ça ne se passe pas comme prévu</h3>
+          <ul className="mt-2 space-y-2.5">
+            {(journey.branches ?? []).map((branch, index) => (
+              <li key={index} className="rounded-lg border border-line-soft px-3.5 py-2.5 text-[14.5px] leading-relaxed">
+                <span className="font-medium">Si {lowerFirst(branch.quand)}</span>
+                <span className="block text-muted">{branch.alors}</span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
       <details className="mt-6 border-t border-line-soft pt-3 text-[14px]">
         <summary className="cursor-pointer text-muted hover:text-ink">Détails pour développeur (étape {number})</summary>
         <div className="mt-3 space-y-2 text-muted">
@@ -200,7 +234,7 @@ function StepInfo({ projectId, journey, number, onStep }: {
             <div className="flex flex-wrap gap-1.5">
               {(current.conditions ?? []).map((condition) => (
                 <Tag key={condition} tone="condition">
-                  {condition}
+                  {condition.replace(/^seulement si\s*/i, "")}
                 </Tag>
               ))}
             </div>
@@ -211,4 +245,10 @@ function StepInfo({ projectId, journey, number, onStep }: {
       </details>
     </Panel>
   );
+}
+
+/** « Le serveur… », « L'en-tête… » → « le serveur… », « l'en-tête… »; a name (« WeasyPrint », « API ») keeps its capitals. */
+function lowerFirst(text: string): string {
+  const word = text.split(/[\s'’]/)[0] ?? "";
+  return /[A-Z]/.test(word.slice(1)) ? text : text.charAt(0).toLowerCase() + text.slice(1);
 }

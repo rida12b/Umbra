@@ -2,6 +2,7 @@ import { Command } from "cmdk";
 import { useEffect, useState } from "react";
 import { api, type ProjectModel, type SearchHit } from "../api";
 import { KIND_LABEL } from "../map/ElementNode";
+import { levelNode } from "../explorer/Explorer";
 import { ARCHITECTURE_VIEW, navigate } from "../route";
 import { steps } from "../ui";
 
@@ -83,7 +84,7 @@ export function CommandPalette({ projectId, model, open, onOpenChange }: Props) 
           {wanted.length < 2 ? "Tapez au moins deux lettres pour chercher dans le code." : "Rien trouvé sous ce nom."}
         </Command.Empty>
         {journeys.length > 0 && (
-          <Command.Group heading="Histoires" className={group}>
+          <Command.Group heading="Chemins de données" className={group}>
             {journeys.map((journey) => (
               <Command.Item
                 key={journey.id}
@@ -104,7 +105,7 @@ export function CommandPalette({ projectId, model, open, onOpenChange }: Props) 
                 key={block.id}
                 value={`bloc:${block.id}`}
                 className={item}
-                onSelect={() => go({ projectId, node: ARCHITECTURE_VIEW, expand: false, select: block.id })}
+                onSelect={() => go({ projectId, node: levelNode(`part:${block.id}`), expand: false })} // inside the part: found even when grouped
               >
                 <span className="flex-1 truncate">{block.nom}</span>
               </Command.Item>

@@ -64,17 +64,22 @@ export function PlayerBar({ journey, step, where, onStep, onStop, onEnterElsewhe
             </button>
           )}
         </div>
-        <button
-          type="button"
-          onClick={() => onStep(step + 1)}
-          disabled={step >= last}
-          className="rounded-lg bg-ink px-4 py-2 text-[15px] font-medium text-bg hover:opacity-90 disabled:opacity-30"
-          aria-label="Étape suivante"
-        >
-          <span className="flex items-center gap-1">
-            Suivante <ChevronRight size={18} aria-hidden="true" />
-          </span>
-        </button>
+        {step < last ? (
+          <button
+            type="button"
+            onClick={() => onStep(step + 1)}
+            className="rounded-lg bg-ink px-4 py-2 text-[15px] font-medium text-bg hover:opacity-90"
+            aria-label="Étape suivante"
+          >
+            <span className="flex items-center gap-1">
+              Suivante <ChevronRight size={18} aria-hidden="true" />
+            </span>
+          </button>
+        ) : (
+          <button type="button" onClick={onStop} className="rounded-lg bg-ink px-4 py-2 text-[15px] font-medium text-bg hover:opacity-90">
+            Terminer
+          </button>
+        )}
         <button type="button" onClick={onStop} className="rounded-lg p-2 text-muted hover:bg-raised" aria-label="Arrêter le chemin">
           <X size={18} />
         </button>

@@ -2,73 +2,82 @@ import { BaseEdge, EdgeLabelRenderer, getBezierPath, Handle, Position, type Edge
 import { ChevronRight } from "lucide-react";
 import { roundedPath, type Point } from "../arch/archLayout";
 import type { Box } from "./levels";
+import type { RowLabel } from "./rowLayout";
 
 // The pieces the explorer map is drawn with: a box, a zone title, an arrow placed by ELK, and the
 // arrow of the step being played when the level has no arrow of its own between those boxes.
 
-export const BOX_WIDTH = 248;
-export const BOX_HEIGHT = 156;
+export const BOX_WIDTH = 288;
+export const BOX_HEIGHT = 148;
 
 export type Look = "normal" | "lit" | "dim";
 export type BoxData = {
   box: Box;
   look: Look;
   selected: boolean;
+  vertical: boolean; // rows read top to bottom: arrows leave at the bottom, arrive at the top
   onSelect: (id: string) => void;
   onEnter: (box: Box) => void;
 };
 export type BoxFlowNode = Node<BoxData, "box">;
 
 export function BoxNode({ data }: NodeProps<BoxFlowNode>) {
-  const { box, look, selected, onSelect, onEnter } = data;
+  const { box, look, selected, vertical, onSelect, onEnter } = data;
   const tone =
     look === "lit" ? "border-lamp-line" : look === "dim" || box.faded ? "border-line-soft opacity-40" : "border-line";
   return (
+    // Two separate controls (select, enter): a button inside a button is neither announced nor usable by keyboard.
     <div
-      role="button"
-      tabIndex={0}
-      aria-pressed={selected}
-      aria-label={`${box.title} : ${box.words}`}
-      onKeyDown={(event) => {
-        if (event.key === "Enter" || event.key === " ") {
-          event.preventDefault();
-          onSelect(box.id);
-        }
-      }}
       onDoubleClick={() => box.inside > 0 && onEnter(box)}
       className={`flex flex-col rounded-xl border-2 bg-panel px-3.5 py-3 text-left ${tone} ${
         selected ? "shadow-[0_0_0_4px_var(--u-lamp-soft)] ring-2 ring-lamp" : ""
       } ${box.faded ? "border-dashed" : ""}`}
       style={{ width: BOX_WIDTH, height: BOX_HEIGHT }}
     >
-      <Handle type="target" position={Position.Left} />
-      <span className="text-[12.5px] text-faint">{box.kind}</span>
-      <span className="line-clamp-2 text-[16px] leading-snug font-semibold text-ink">{box.title}</span>
-      <span className="mt-0.5 line-clamp-2 text-[13.5px] leading-snug text-muted">{box.words}</span>
-      {box.inside > 0 && (
+      <Handle type="target" position={vertical ? Position.Top : Position.Left} />
+      <button
+        type="button"
+        aria-pressed={selected}
+        className="nodrag flex min-h-0 flex-col rounded-md text-left"
+        onClick={(event) => {
+          event.stopPropagation();
+          onSelect(box.id);
+        }}
+      >
+        <span className="line-clamp-2 text-[18px] leading-snug font-semibold text-ink">{box.title}</span>
+        <span className="mt-1 line-clamp-2 text-[15px] leading-snug text-muted">{box.words}</span>
+      </button>
+      <div className="mt-auto flex items-center justify-between gap-2">
+        <span className="truncate text-[13px] text-faint">{box.kind}</span>
+        {box.inside > 0 && (
         <button
           type="button"
-          className="nodrag mt-auto flex items-center gap-1 self-start rounded-md text-[13px] font-medium text-lamp-ink hover:underline"
+          className="nodrag flex shrink-0 items-center gap-1 rounded-md text-[14px] font-medium text-lamp-ink hover:underline"
+          aria-label={`Entrer dedans : ${box.title}`}
           onClick={(event) => {
             event.stopPropagation();
             onEnter(box);
           }}
         >
-          Entrer dedans <ChevronRight size={14} aria-hidden="true" />
+          Entrer dedans <ChevronRight size={15} aria-hidden="true" />
         </button>
-      )}
-      <Handle type="source" position={Position.Right} />
+        )}
+      </div>
+      <Handle type="source" position={vertical ? Position.Bottom : Position.Right} />
     </div>
   );
 }
 
-export type ZoneData = { title: string; width: number };
+export type ZoneData = { title: string; width: number; height: number };
 export type ZoneFlowNode = Node<ZoneData, "zone">;
 
-/** A column title over the boxes of one zone (« Ce qui reçoit »). */
+/** The title of one zone's row (« Ce qui reçoit »), on its left. */
 export function ZoneNode({ data }: NodeProps<ZoneFlowNode>) {
   return (
-    <div className="border-b border-line pb-1 text-[13px] font-semibold tracking-wide text-faint" style={{ width: data.width }}>
+    <div
+      className="flex items-center justify-end border-r-2 border-line pr-3 text-right text-[17px] leading-snug font-semibold text-faint"
+      style={{ width: data.width, height: data.height }}
+    >
       {data.title}
     </div>
   );
@@ -77,6 +86,7 @@ export function ZoneNode({ data }: NodeProps<ZoneFlowNode>) {
 export type ArrowData = {
   points: Point[] | null; // ELK's route; null: a plain curve between the two boxes (a played step)
   label: string | null; // shown on hover, selection or play only
+  labelAt: RowLabel | null; // where the layout keeps room for it; null: the middle of its longest part
   look: Look;
   moving: boolean; // the step being played: a light runs along the arrow
 };
@@ -90,7 +100,7 @@ export function ArrowEdge(props: EdgeProps<ArrowFlowEdge>) {
   if (!data) return null;
   const [curve, curveX, curveY] = getBezierPath({ sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition });
   const path = data.points && data.points.length > 1 ? roundedPath(data.points) : curve;
-  const middle = data.points && data.points.length > 1 ? midpoint(data.points) : { x: curveX, y: curveY };
+  const middle = data.labelAt?.at ?? (data.points && data.points.length > 1 ? midpoint(data.points) : { x: curveX, y: curveY });
   return (
     <>
       <BaseEdge

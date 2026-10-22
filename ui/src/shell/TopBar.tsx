@@ -49,7 +49,7 @@ export function TopBar({ project, activity, theme, onToggleTheme, onSearch }: Pr
           className="ml-2 hidden h-[30px] max-w-[460px] flex-1 items-center gap-2 rounded-md border border-line bg-panel px-2.5 text-faint hover:text-muted sm:flex"
         >
           <Search size={14} aria-hidden="true" />
-          <span className="truncate">Chercher une histoire, une pièce, un fichier</span>
+          <span className="truncate">Chercher un chemin, une pièce, un fichier</span>
           <kbd className="ml-auto rounded border border-line px-1.5 font-mono text-[11px] text-muted">Ctrl K</kbd>
         </button>
       )}

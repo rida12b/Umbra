@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 
 // Where the user is, kept in the URL fragment so Back/Forward and reloads work.
-// `#/` lists Projects; `#/p/<id>` shows its architecture; `#/p/<id>?node=<key>&expand=1` one map view.
+// `#/` lists Projects; `#/p/<id>?node=x:<level>` one level of its explorer; any other node is a code map view.
 // A login link arrives as `#login=<code>`: it is consumed once and replaced, never kept in history.
 
 export interface Route {

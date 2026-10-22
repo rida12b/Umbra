@@ -1,12 +1,13 @@
 import type { Journey, ProjectModel } from "../api";
-import { stepActors } from "../arch/story";
-import type { Level } from "./levels";
+import { stepActors, stepLabel } from "../arch/story";
+import { zoneOf, type Level, type Target } from "./levels";
 
 /** Where one step of a journey shows on the current level. */
 export interface StepOnMap {
   boxes: string[]; // the boxes lit: one (it happens inside) or two (from → to)
   link: string | null; // the arrow it runs along, if the level has one between those boxes
   elsewhere: { id: string; title: string } | null; // the step happens inside this box: « entrer pour la voir »
+  words: string; // the step's short action, on its arrow
 }
 
 /**
@@ -14,27 +15,33 @@ export interface StepOnMap {
  * boxes that contain them at this zoom (the whole system, a part, a component).
  */
 export function trackJourney(model: ProjectModel, journey: Journey, level: Level): StepOnMap[] {
-  const boxIds = new Set(level.boxes.map((b) => b.id));
+  const boxOf = (kind: Target["kind"], id?: string) =>
+    level.boxes.find((b) => b.target.kind === kind && (id === undefined || ("id" in b.target && b.target.id === id)))?.id ?? null;
   const componentBlock = new Map(model.composants.map((c) => [c.id, c.bloc]));
-  const atThisLevel = (blockId: string, componentId: string | null): string | null => {
-    if (componentId && boxIds.has(componentId)) return componentId; // inside the part being looked at
-    if (boxIds.has(blockId)) return blockId;
-    if (boxIds.has("system") && level.key === "context") return "system";
-    if (boxIds.has("around")) return "around";
-    return null;
+  // A grouped part shows as the group of its zone.
+  const groupOf = (blockId: string) => {
+    const block = model.blocs.find((b) => b.id === blockId);
+    return block ? (level.boxes.find((b) => b.target.kind === "around" && b.zone === zoneOf(block))?.id ?? null) : null;
   };
+  const atThisLevel = (blockId: string, componentId: string | null): string | null =>
+    (componentId ? boxOf("component", componentId) : null) ?? // inside the part being looked at
+    boxOf("block", blockId) ??
+    boxOf("system") ??
+    groupOf(blockId);
 
   return journey.etapes.map((step) => {
     const [doer, target] = stepActors(model, step);
-    const ownComponent = componentBlock.get(step.composant) === doer?.id ? step.composant : null;
-    const from = doer ? atThisLevel(doer.id, ownComponent) : null;
-    const to = target ? atThisLevel(target.id, null) : null;
+    // The step's component belongs to one of the two (the target when the step is done by hand).
+    const componentOf = (blockId: string | undefined) => (componentBlock.get(step.composant) === blockId ? step.composant : null);
+    const from = doer ? atThisLevel(doer.id, componentOf(doer.id)) : null;
+    const to = target ? atThisLevel(target.id, componentOf(target.id)) : null;
     const boxes = [...new Set([from, to].filter((id): id is string => id !== null))];
     const link =
       from && to && from !== to
-        ? (level.links.find((l) => (l.from === from && l.to === to) || (l.from === to && l.to === from))?.id ?? null)
+        ? (level.links.find((l) => l.from === from && l.to === to)?.id ?? null) // an answer going back gets its own arrow
         : null;
     const single = boxes.length === 1 ? level.boxes.find((b) => b.id === boxes[0]) : undefined;
-    return { boxes, link, elsewhere: single && single.inside > 0 ? { id: single.id, title: single.title } : null };
+    const elsewhere = single && single.inside > 0 ? { id: single.id, title: single.title } : null;
+    return { boxes, link, elsewhere, words: stepLabel(step) };
   });
 }

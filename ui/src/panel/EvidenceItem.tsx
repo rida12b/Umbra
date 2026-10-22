@@ -39,6 +39,19 @@ export function EvidenceItem({ projectId, source, onClose }: Props) {
     };
   }, [projectId, sourceKey]); // `source` is a new object on each render: `sourceKey` identifies it
 
+  // Esc closes the open excerpt before anything else on the page reacts to it (going up a level).
+  useEffect(() => {
+    if (!onClose) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      if (event.target instanceof HTMLElement && event.target.closest("[cmdk-root]")) return; // the search closes first
+      event.stopImmediatePropagation();
+      onClose();
+    };
+    window.addEventListener("keydown", onKey, true);
+    return () => window.removeEventListener("keydown", onKey, true);
+  }, [onClose]);
+
   if (loaded === null) return <div className="mt-2 text-[12px] text-faint">Lecture du code…</div>;
   if ("error" in loaded) return <div className="mt-2 text-[12px] text-danger">Code indisponible : {loaded.error}</div>;
   const { claim, excerpt } = loaded;

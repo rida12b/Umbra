@@ -15,7 +15,10 @@ import { PlayerBar } from "./PlayerBar";
 import { trackJourney } from "./track";
 
 /** Explorer levels live in the URL as `x:<level>` (« x:parts », « x:part:engine »); anything else is code. */
-export const LEVEL_PREFIX = "x:";
+const LEVEL_PREFIX = "x:";
+
+/** The route node that opens one level of the explorer. */
+export const levelNode = (key: LevelKey) => `${LEVEL_PREFIX}${key}`;
 export const DEFAULT_LEVEL: LevelKey = "parts";
 
 export function explorerLevel(node: string): LevelKey | null {
@@ -46,7 +49,7 @@ export function Explorer({ project, route, theme, narrow }: Props) {
     (change: Partial<Route>) => navigate({ ...route, projectId: project.id, expand: false, ...change }),
     [route, project.id],
   );
-  const openLevel = useCallback((key: LevelKey) => go({ node: `${LEVEL_PREFIX}${key}`, select: null }), [go]);
+  const openLevel = useCallback((key: LevelKey) => go({ node: levelNode(key), select: null }), [go]);
   const enter = useCallback(
     (box: Box) => {
       const next = levelOf(box.target);
@@ -103,6 +106,7 @@ export function Explorer({ project, route, theme, narrow }: Props) {
         expand={route.expand}
         select={route.select ?? null}
         theme={theme}
+        narrow={narrow}
         onView={setCodeView}
         onOpen={(node, expand) => go({ node, expand, select: null })}
       />
@@ -173,7 +177,7 @@ export function Explorer({ project, route, theme, narrow }: Props) {
             </span>
           );
         })}
-        {levelKey && <span className="ml-auto text-[13px] text-faint">Échap : remonter d'un niveau</span>}
+        {levelKey && !narrow && <span className="ml-auto text-[13px] text-faint">Échap : remonter d'un niveau</span>}
       </nav>
       <div className="min-h-0 flex-1">{body}</div>
       {journey && (

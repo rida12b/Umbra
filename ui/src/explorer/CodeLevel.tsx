@@ -13,12 +13,13 @@ interface Props {
   expand: boolean;
   select: string | null;
   theme: Theme;
-  onView: (view: MapView) => void; // its breadcrumbs, for the explorer's trail
+  narrow: boolean; // a phone: the map above its explanation
+  onView: (view: MapView | null) => void; // its breadcrumbs, for the explorer's trail
   onOpen: (node: string, expand: boolean) => void; // a group of small elements opens expanded, in place
 }
 
 /** The deepest levels: the code itself (folders, files, functions, calls), read from the index. */
-export function CodeLevel({ projectId, node, expand, select, theme, onView, onOpen }: Props) {
+export function CodeLevel({ projectId, node, expand, select, theme, narrow, onView, onOpen }: Props) {
   const [view, setView] = useState<MapView | ApiError | null>(null);
   const [selection, setSelection] = useState<Selection>(null);
   const selectApplied = useRef(false);
@@ -39,7 +40,11 @@ export function CodeLevel({ projectId, node, expand, select, theme, onView, onOp
           setSelection({ type: "node", node: picked });
         }
       })
-      .catch((error: ApiError) => current && setView(error));
+      .catch((error: ApiError) => {
+        if (!current) return;
+        setView(error);
+        onView(null); // no trail of the element shown before
+      });
     return () => {
       current = false;
     };
@@ -70,7 +75,7 @@ export function CodeLevel({ projectId, node, expand, select, theme, onView, onOp
   }
   const labels = new Map(view.nodes.map((element) => [element.key, element.label]));
   return (
-    <div className="grid h-full min-h-0 grid-cols-[minmax(0,1fr)_400px]">
+    <div className={narrow ? "grid h-full min-h-0 grid-rows-[minmax(0,3fr)_minmax(0,2fr)]" : "grid h-full min-h-0 grid-cols-[minmax(0,1fr)_400px]"}>
       <div className="map-surface relative min-h-0">
         {view.nodes.length === 0 ? (
           <StateMessage>Rien n'a été trouvé à l'intérieur.</StateMessage>
@@ -78,7 +83,7 @@ export function CodeLevel({ projectId, node, expand, select, theme, onView, onOp
           <MapCanvas view={view} roles={roles} theme={theme} vertical={false} selection={selection} onSelect={setSelection} onOpen={open} />
         )}
       </div>
-      <aside className="min-h-0 overflow-y-auto border-l border-line-soft" aria-label="Explication et preuves">
+      <aside className={`min-h-0 overflow-y-auto border-line-soft ${narrow ? "border-t" : "border-l"}`} aria-label="Explication et preuves">
         <DetailsPanel
           projectId={projectId}
           selection={selection}

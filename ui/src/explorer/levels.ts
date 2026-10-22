@@ -50,6 +50,14 @@ const ZONE_OF_TYPE: Record<BlockType, Zone> = {
   infra: "utilise",
 };
 
+const GROUP_TITLE: Record<Zone, string> = {
+  utilise: "Autour du projet",
+  recoit: "Autres entrées",
+  traite: "Autres traitements",
+  range: "Autres rangements",
+  exterieur: "Autres services extérieurs",
+};
+
 export function zoneOf(block: ArchBlock): Zone {
   return block.zone || ZONE_OF_TYPE[block.type];
 }
@@ -92,9 +100,22 @@ export interface Level {
   zoned: boolean;
 }
 
-const MAX_BOXES = 9; // more than this and nobody reads the map: the rest goes in a group
+const MAX_BOXES = 12; // more than this and nobody reads the map: the rest goes in a group
+// Box ids of things that are not a block: « @ » keeps them apart from the model's ids.
+const SYSTEM_BOX = "@system";
+const AROUND_BOX = "@around";
 
-const isMain = (b: ArchBlock) => (b.importance ?? "coeur") === "coeur";
+/** A core part, or one a data path goes through (a fallback model is « secondary » but on the path). */
+function mainTest(model: ProjectModel): (b: ArchBlock) => boolean {
+  const onPath = new Set<string>();
+  const blockOf = new Map(model.composants.map((c) => [c.id, c.bloc]));
+  for (const journey of model.parcours)
+    for (const step of journey.etapes) {
+      onPath.add(blockOf.get(step.composant) ?? step.composant);
+      for (const id of step.touche) onPath.add(id);
+    }
+  return (b) => (b.importance ?? "coeur") === "coeur" || (b.importance !== "ancien" && onPath.has(b.id));
+}
 const isOutside = (b: ArchBlock) => zoneOf(b) === "utilise" || zoneOf(b) === "exterieur";
 
 function blockBox(model: ProjectModel, block: ArchBlock, faded = false): Box {
@@ -125,10 +146,11 @@ function linksBetween(model: ProjectModel, boxOf: (blockId: string) => string | 
 }
 
 export function buildLevel(model: ProjectModel, key: LevelKey, projectName: string): Level | null {
+  const isMain = mainTest(model);
   if (key === "context") {
     const outside = model.blocs.filter((b) => isMain(b) && isOutside(b));
     const system: Box = {
-      id: "system",
+      id: SYSTEM_BOX,
       kind: "Le logiciel",
       title: projectName,
       words: model.pitch || model.resume,
@@ -143,45 +165,60 @@ export function buildLevel(model: ProjectModel, key: LevelKey, projectName: stri
       title: "Vue d'ensemble",
       hint: "Le logiciel, qui l'utilise et les services extérieurs qu'il appelle.",
       boxes: [system, ...outside.map((b) => blockBox(model, b))],
-      links: linksBetween(model, (id) => (shown.has(id) ? id : model.blocs.some((b) => b.id === id && isMain(b)) ? "system" : null)),
+      links: linksBetween(model, (id) => (shown.has(id) ? id : model.blocs.some((b) => b.id === id && isMain(b)) ? SYSTEM_BOX : null)),
       zoned: true,
     };
   }
 
   if (key === "parts" || key === "around") {
-    // The most connected core parts are shown; past nine boxes, the rest joins the group.
+    // Core parts first, then the parts a data path goes through, then the most connected. Past
+    // twelve boxes the rest is grouped by zone (« Autres services extérieurs »), so a played step
+    // that reaches a grouped part still lights the right row.
     const degree = (b: ArchBlock) => model.flux.filter((f) => f.de === b.id || f.vers === b.id).length;
-    const core = model.blocs.filter(isMain).sort((x, y) => degree(y) - degree(x));
-    const rest = model.blocs.filter((b) => !isMain(b));
-    const room = rest.length > 0 || core.length > MAX_BOXES ? MAX_BOXES - 1 : MAX_BOXES;
-    const main = core.slice(0, room);
-    const others = [...core.slice(room), ...rest];
+    const rank = (b: ArchBlock) => ((b.importance ?? "coeur") === "coeur" ? 2 : isMain(b) ? 1 : 0) * 1000 + degree(b);
+    const ordered = [...model.blocs].sort((x, y) => rank(y) - rank(x));
+    let room = MAX_BOXES;
+    let main: ArchBlock[] = [];
+    let others: ArchBlock[] = [];
+    for (let pass = 0; pass < 3; pass++) {
+      main = ordered.filter((b) => isMain(b)).slice(0, room);
+      others = ordered.filter((b) => !main.includes(b));
+      room = MAX_BOXES - new Set(others.map(zoneOf)).size;
+    }
     const shown = key === "around" ? others : main;
-    const group: Box[] =
-      key === "parts" && others.length > 0
-        ? [
-            {
-              id: "around",
-              kind: "Groupe",
-              title: "Autour du projet",
-              words: others.map((b) => b.nom).join(", "),
-              zone: "utilise",
-              faded: true,
-              target: { kind: "around" },
-              inside: others.length,
-            },
-          ]
+    const groups: Box[] =
+      key === "parts"
+        ? ZONES.flatMap((zone) => {
+            const inside = others.filter((b) => zoneOf(b) === zone);
+            if (inside.length === 0) return [];
+            return [
+              {
+                id: `${AROUND_BOX}:${zone}`,
+                kind: "Groupe",
+                title: GROUP_TITLE[zone],
+                words: inside.map((b) => b.nom).join(", "),
+                zone,
+                faded: true,
+                target: { kind: "around" as const },
+                inside: inside.length,
+              },
+            ];
+          })
         : [];
     const ids = new Set(shown.map((b) => b.id));
+    const groupOf = (id: string) => {
+      const block = others.find((b) => b.id === id);
+      return block && key === "parts" ? `${AROUND_BOX}:${zoneOf(block)}` : null;
+    };
     return {
       key,
-      title: key === "around" ? "Autour du projet" : "Les pièces",
+      title: key === "around" ? "Les autres pièces" : "Les pièces",
       hint:
         key === "around"
-          ? "Ce qui accompagne le projet sans en être le cœur : tests, documentation, ancien outil."
+          ? "Les pièces qui ne tiennent pas sur la carte principale : outils, documentation, services de secours."
           : "Les pièces du projet, de qui l'utilise jusqu'aux services extérieurs.",
-      boxes: [...group, ...shown.map((b) => blockBox(model, b))],
-      links: linksBetween(model, (id) => (ids.has(id) ? id : key === "parts" && others.some((b) => b.id === id) ? "around" : null)),
+      boxes: [...groups, ...shown.map((b) => blockBox(model, b))],
+      links: linksBetween(model, (id) => (ids.has(id) ? id : groupOf(id))),
       zoned: true,
     };
   }
@@ -205,8 +242,8 @@ export function buildLevel(model: ProjectModel, key: LevelKey, projectName: stri
       for (const code of block.code)
         boxes.push({
           id: `file:${code.chemin}`,
-          kind: code.element.startsWith("dir:") ? "Dossier" : "Fichier",
-          title: code.chemin.split("/").pop() || code.chemin,
+          kind: code.element.startsWith("dir:") || code.element === "app:" ? "Dossier" : "Fichier",
+          title: code.chemin.split("/").pop() || block.nom, // « app: » is the whole project folder
           words: model.modules[code.chemin] ?? model.dossiers[code.chemin] ?? code.chemin,
           zone: null,
           faded: false,
@@ -217,8 +254,12 @@ export function buildLevel(model: ProjectModel, key: LevelKey, projectName: stri
     const neighbour = (id: string) => {
       const other = model.blocs.find((b) => b.id === id);
       if (!other || other.id === block.id) return null;
-      if (!boxes.some((b) => b.id === other.id)) boxes.push(blockBox(model, other, true));
-      return other.id;
+      const shown = boxes.find((b) => b.target.kind === "block" && b.target.id === other.id);
+      if (shown) return shown.id;
+      const box = blockBox(model, other, true);
+      if (own.has(box.id)) box.id = `@bloc:${box.id}`; // a component may share a neighbour's id
+      boxes.push(box);
+      return box.id;
     };
     const add = (from: string | null, to: string | null, verb: string, full: string) => {
       if (!from || !to || from === to) return;
@@ -279,7 +320,7 @@ export function trail(model: ProjectModel, key: LevelKey): { key: LevelKey; titl
   ];
   if (key === "context") return top.slice(0, 1);
   if (key === "parts") return top;
-  if (key === "around") return [...top, { key, title: "Autour du projet" }];
+  if (key === "around") return [...top, { key, title: "Les autres pièces" }];
   if (key.startsWith("part:")) {
     const block = model.blocs.find((b) => b.id === key.slice(5));
     return [...top, { key, title: block?.nom ?? "Pièce" }];

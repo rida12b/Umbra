@@ -54,8 +54,24 @@ test("a data path played on the map, step by step, with its code on demand", asy
   await expect(page.locator('[data-cited="true"]').first()).toContainText("def create_order");
 });
 
+test("on a phone, from a part down to its functions: lists, then the map over its explanation", async ({ page, isMobile }) => {
+  test.skip(!isMobile, "the phone layout");
+  const project = await signIn(page);
+  await page.goto(`/#/p/${project}?node=x%3Apart%3Aapi`);
+  await page.getByRole("button", { name: /Entrer dedans/ }).first().click();
+  await expect(page).toHaveURL(/node=x%3Acomponent%3A/);
+  await page.getByRole("button", { name: /Entrer dedans/ }).first().click();
+  const map = page.locator(".react-flow");
+  const panel = page.getByLabel("Explication et preuves");
+  await expect(map).toBeVisible();
+  await expect(panel).toBeVisible();
+  const [mapBox, panelBox] = [await map.boundingBox(), await panel.boundingBox()];
+  expect(mapBox && mapBox.width).toBeGreaterThan(300); // not squeezed by a side panel
+  expect(panelBox && mapBox && panelBox.y).toBeGreaterThanOrEqual((mapBox?.y ?? 0) + (mapBox?.height ?? 0) - 1);
+});
+
 test("from a part down to its functions, on the same map", async ({ page, isMobile }) => {
-  test.skip(isMobile, "the code level is a desktop map");
+  test.skip(isMobile, "the desktop map");
   const project = await signIn(page);
   await page.goto(`/#/p/${project}?node=x%3Apart%3Aapi`);
   await page.locator('.react-flow__node[data-id="orders"]').getByRole("button", { name: /Entrer dedans/ }).click();
