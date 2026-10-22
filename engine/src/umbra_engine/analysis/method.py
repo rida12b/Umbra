@@ -46,8 +46,8 @@ Rules:
   [start, end] that you actually read. If you did not read it, do not cite it; say "probablement".
 - Name concrete things: routes, functions, tables, collections, models, environment settings.
 - Two kinds of text. "texte" (and roles of components, modules, folders) is for a developer: name the
-  code. The reader texts, "pitch", the block "nom" and "en_bref", the flow "verbe", the journey
-  "depart" and "fin", the step "action" and "simple",
+  code. The reader texts, "pitch", the block "nom", "en_bref", "entre" and "sort", the component
+  "en_bref", the flow "verbe", the journey "depart" and "fin", the step "action" and "simple",
   are for a reader who does NOT code: everyday French words, no names of functions, files, classes,
   commands or internal terms (say "les faits tirés du code", not "les Claims"; "le moteur", not
   "le démon"). Put technologies (SQLite, FastAPI...) in "techno", not in the name.
@@ -65,10 +65,15 @@ SCHEMA = """{
              queue|external|ml_model|device|cli|library|docs|tests|infra", "role": "one sentence",
              "importance": "coeur (what the product is about) | secondaire (supporting: tests, docs,
              CI, tooling) | ancien (legacy, being replaced)",
+             "zone": "utilise (people and tools that use the product) | recoit (what receives requests:
+             pages, APIs, commands, listeners) | traite (what does the work) | range (where data is
+             kept) | exterieur (outside services the product calls)",
+             "entre": ["what comes in, 1 to 4 short plain items"], "sort": ["what goes out, 1 to 4"],
              "techno": "...", "code": ["folders or files"], "indices": "what shows it"}],
   "flux": [{"de": "bloc id", "vers": "bloc id", "quoi": "what goes through",
             "verbe": "1 to 4 plain words read as 'de VERBE vers' (e.g. 'envoie les demandes à')"}],
-  "composants": [{"id": "short-id", "nom": "...", "bloc": "bloc id", "role": "one sentence",
+  "composants": [{"id": "short-id", "nom": "...", "en_bref": "at most 8 plain words",
+                  "bloc": "bloc id", "role": "one sentence",
                   "responsabilites": ["..."],
                   "expose": [{"quoi": "route, function or event", "fichier": "...", "lignes": [a, b]}],
                   "utilise": ["other composant ids or bloc ids"], "fichiers": ["paths"]}],

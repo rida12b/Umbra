@@ -18,6 +18,8 @@ MAX_SHORT = 90  # a block's "en bref": a few words under its name
 MAX_SIMPLE = 400
 MAX_VERB = 50
 IMPORTANCE = ("coeur", "secondaire", "ancien")
+ZONES = ("utilise", "recoit", "traite", "range", "exterieur")
+MAX_IO = 4
 
 
 class ModelFormatError(ValueError):
@@ -132,6 +134,9 @@ def _block(item: object, line_counts: dict[str, int], directories: set[str]) -> 
         "role": str(item.get("role", "")),
         "en_bref": str(item.get("en_bref", ""))[:MAX_SHORT],
         "importance": item.get("importance") if item.get("importance") in IMPORTANCE else "coeur",
+        "zone": item.get("zone") if item.get("zone") in ZONES else "",
+        "entre": [t[:MAX_SHORT] for t in _texts(item.get("entre"))][:MAX_IO],
+        "sort": [t[:MAX_SHORT] for t in _texts(item.get("sort"))][:MAX_IO],
         "techno": str(item.get("techno", "")),
         "code": code,
         "indices": str(item.get("indices", "")),
@@ -153,6 +158,7 @@ def _component(item: object, line_counts: dict[str, int]) -> dict | None:
     return {
         "id": item["id"],
         "nom": item["nom"],
+        "en_bref": str(item.get("en_bref", ""))[:MAX_SHORT],
         "bloc": str(item.get("bloc", "")),
         "role": str(item.get("role", "")),
         "responsabilites": _texts(item.get("responsabilites")),

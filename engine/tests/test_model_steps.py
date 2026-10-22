@@ -62,3 +62,19 @@ def test_reader_texts_of_v15_are_kept_and_old_models_get_safe_defaults():
     assert [b["importance"] for b in model["blocs"]] == ["ancien", "coeur"]
     assert model["flux"][0]["verbe"] == "range dans"
     assert (model["parcours"][0]["depart"], model["parcours"][0]["fin"]) == ("On clique.", "Rangé.")
+
+
+def test_explorer_texts_of_v16_are_kept_with_caps_and_safe_defaults():
+    raw = {
+        "resume": "r",
+        "blocs": [
+            {"id": "a", "nom": "A", "type": "backend", "zone": "traite", "entre": ["x"] * 9, "sort": ["y"]},
+            {"id": "b", "nom": "B", "type": "database", "zone": "nowhere"},
+        ],
+        "composants": [{"id": "c", "nom": "C", "bloc": "a", "en_bref": "Vérifie l'identité"}],
+    }
+    model = checked_model(raw, {}, set())
+    a, b = model["blocs"]
+    assert (a["zone"], len(a["entre"]), a["sort"]) == ("traite", 4, ["y"])
+    assert (b["zone"], b["entre"]) == ("", [])  # unknown zone: the explorer places it by its type
+    assert model["composants"][0]["en_bref"] == "Vérifie l'identité"
