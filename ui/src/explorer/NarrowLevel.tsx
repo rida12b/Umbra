@@ -13,17 +13,28 @@ interface Props {
 /** A level on a phone: the same boxes as a list, since a map is unreadable that narrow. The floor reads top to
  * bottom: ENTRÉE, each room of the belt followed by what it calls and what joins it, then what never runs. */
 export function NarrowLevel({ level, selected, play, onSelect, onEnter }: Props) {
+  const ends = level.floor && level.floor.entree && level.floor.sortie ? level.floor : null;
+  const name = (id: string) => level.boxes.find((b) => b.id === id)?.title ?? id;
   const groups: { title: string; boxes: Entry[] }[] = level.floor ? floorGroups(level) : [{ title: level.title, boxes: level.boxes.map((box) => ({ box, depth: 0, badge: null })) }];
   return (
     <div className="px-4 py-4">
+      {ends && (
+        <p className="mb-4 text-[14.5px] leading-relaxed">
+          <span className="font-semibold text-kind-person">▶ Entrée :</span> {name(ends.entree!)}
+          <br />
+          <span className="font-semibold text-kind-store">Sortie ■ :</span>{" "}
+          {ends.sortie!.kind === "store" ? name(ends.sortie!.id) : `réponse renvoyée à ${name(ends.sortie!.to)}`}
+        </p>
+      )}
       {groups.map((group) => (
         <section key={group.title} className="mb-5">
           <h3 className="mb-2 text-[13px] font-semibold text-faint">{group.title}</h3>
           <ul className="flex flex-col gap-2">
-            {group.boxes.map(({ box, depth, badge, relation }) => {
+            {group.boxes.map(({ box, depth, badge, relation, fed }) => {
               const lit = play?.step.boxes.includes(box.id);
               return (
                 <li key={box.id} style={{ marginLeft: depth * 20 }}>
+                  {fed && <p className="mb-1 pl-4 text-[13.5px] text-muted">↓ {fed}</p>}
                   <div
                     className={`rounded-xl border-2 bg-panel px-4 py-3 ${lit ? "border-lamp-line" : box.id === selected ? "border-ink/40" : "border-line"} ${
                       box.faded ? "opacity-60" : ""
@@ -52,7 +63,7 @@ export function NarrowLevel({ level, selected, play, onSelect, onEnter }: Props)
   );
 }
 
-type Entry = { box: Box; depth: number; badge: string | null; relation?: string };
+type Entry = { box: Box; depth: number; badge: string | null; relation?: string; fed?: string };
 
 function floorGroups(level: Level): { title: string; boxes: Entry[] }[] {
   const floor = level.floor!;
@@ -65,8 +76,9 @@ function floorGroups(level: Level): { title: string; boxes: Entry[] }[] {
   // What hangs on a room follows it, one step in: a part it calls, a side door, a door on that door.
   const hung = (id: string, depth: number): Entry[] => floor.items.filter((i) => i.attach === id).flatMap((i) => [...entry(i.id, depth), ...hung(i.id, depth + 1)]);
   const belt = [...(floor.entree ? [floor.entree] : []), ...floor.belt];
+  const fed = (id: string) => entry(id, 0).map((e) => ({ ...e, fed: floor.beltLinks.find((l) => l.to === id)?.verb }));
   return [
-    { title: "Le chemin de la donnée, de l'entrée à la sortie", boxes: belt.flatMap((id) => [...entry(id, 0), ...hung(id, 1)]) },
+    { title: "Le chemin de la donnée, de l'entrée à la sortie", boxes: belt.flatMap((id) => [...fed(id), ...hung(id, 1)]) },
     { title: "Pièces sans chemin connu", boxes: floor.items.filter((i) => i.role === "orphan").flatMap((i) => entry(i.id, 0)) },
     { title: "Autour du projet (ne tourne pas)", boxes: floor.strip.flatMap((id) => entry(id, 0)) },
   ].filter((g) => g.boxes.length > 0);

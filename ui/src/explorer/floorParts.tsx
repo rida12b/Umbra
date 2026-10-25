@@ -81,7 +81,7 @@ export function FloorPiece({ box, shape, rect, tag, look, selected, badge, foote
           event.stopPropagation();
           onSelect(box.id);
         }}
-        className="flex min-h-0 flex-col rounded-md text-left"
+        className="flex min-h-0 shrink-0 flex-col rounded-md text-left"
       >
         <span className="sr-only">{badge === "entree" ? "Entrée : " : badge === "sortie" ? "Sortie : " : ""}</span>
         <span className="flex items-start gap-1.5">
@@ -89,12 +89,12 @@ export function FloorPiece({ box, shape, rect, tag, look, selected, badge, foote
           <span className={`font-semibold leading-snug text-ink ${tag ? "line-clamp-2 text-[14px]" : "line-clamp-3 text-[16px]"}`}>{box.title}</span>
         </span>
         <span className="sr-only"> ({KIND_NAME[shape]}) </span>
-        <span className={`leading-snug ${tag ? "line-clamp-2 text-[13px]" : "mt-0.5 line-clamp-2 text-[14px]"} ${relation ? "text-ink/80 italic" : "text-muted"}`}>
+        <span className={`shrink-0 leading-snug ${tag ? "line-clamp-3 text-[13px]" : "mt-0.5 line-clamp-2 text-[14px]"} ${relation ? "text-ink/80 italic" : "text-muted"}`}>
           {relation ?? box.words}
         </span>
       </button>
       {!tag && limit && (
-        <em className="mt-auto line-clamp-2 pt-1 text-[12.5px] leading-snug text-muted" title={limit}>
+        <em className="mt-auto line-clamp-2 shrink-0 pt-1 text-[12.5px] leading-snug text-muted" title={limit}>
           « {limit} »
         </em>
       )}

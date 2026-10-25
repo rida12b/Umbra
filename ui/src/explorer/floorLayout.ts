@@ -29,8 +29,8 @@ export interface FloorPlan {
   size: { width: number; height: number };
 }
 
-const ROOM = { w: 200, h: 176 }; // a 3-line title, 2 lines of words, the SORTIE's limit and the footer
-const TAG = { w: 200, h: 96 }; // a 2-line name and a 2-line link to its room
+const ROOM = { w: 200, h: 212 }; // a 3-line title, 2 lines of words, the SORTIE's limit and a 2-line footer
+const TAG = { w: 200, h: 114 }; // a 2-line name and a 3-line link to its room
 const GAP = 88; // between two rooms: room for the arrow's words on three short lines (three rooms fit a laptop)
 const STACK = 44; // between a room and its tags, and between two tags: room for the reply line and a short verb
 const LINE_GAP = 52; // between two lines of the belt

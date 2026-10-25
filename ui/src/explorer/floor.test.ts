@@ -198,3 +198,8 @@ test("the key never lists a kind whose only part was folded, and folding keeps e
   const shown = new Set(floor.items.map((i) => i.id));
   for (const item of floor.items) if (item.attach) assert.ok(shown.has(item.attach), item.id);
 });
+
+test("a hung part's link fits its tag (three short lines) on the real models", () => {
+  for (const model of [watchdog(), justicia()])
+    for (const [id, words] of Object.entries(buildFloor(model).relations)) assert.ok(words.length <= 75, `${id}: ${words}`);
+});
