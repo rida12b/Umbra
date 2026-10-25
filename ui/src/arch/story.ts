@@ -12,7 +12,7 @@ export function stepLabel(step: JourneyStep): string {
 /** Who takes part in a step: the block at work, then the block it acts on (if another one). */
 export function stepActors(model: ProjectModel, step: JourneyStep): ArchBlock[] {
   const blocks = new Map(model.blocs.map((b) => [b.id, b]));
-  const owner = model.composants.find((c) => c.id === step.composant)?.bloc ?? step.composant;
+  const owner = model.composants.find((c) => c.id === step.composant)?.bloc ?? step.composant ?? "";
   let here = blocks.get(owner) ?? null;
   let reached = step.touche.map((id) => blocks.get(id)).find((b) => b && b !== here) ?? null;
   // A step done by hand is done by the part it reaches (a person, whatever type Claude gave it):

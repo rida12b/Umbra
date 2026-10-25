@@ -125,7 +125,8 @@ export interface ArchBlock {
   role: string;
   en_bref?: string; // a few plain words for the diagram (models studied before v1.4 have none)
   importance?: "coeur" | "secondaire" | "ancien"; // v1.5: the home shows the core only
-  zone?: "utilise" | "recoit" | "traite" | "range" | "exterieur" | ""; // v1.6, no longer drawn: the factory floor places parts by the data (ADR-0006)
+  zone?: "utilise" | "recoit" | "traite" | "range" | "exterieur" | "atelier" | ""; // v1.6, no longer drawn: the factory floor places parts by the data (ADR-0006)
+  interieur?: "" | "personne" | "externe" | "fichiers"; // v1.7: what « Entrer » shows in a part without components
   entre?: string[]; // v1.6: what comes in, in plain words
   sort?: string[]; // v1.6: what goes out
   techno: string;
@@ -138,6 +139,32 @@ export interface ArchFlow {
   vers: string;
   quoi: string;
   verbe?: string; // v1.5: read as « de VERBE vers »
+  nature?: "donnee" | "controle"; // v1.7: does data move, or does one part start or check another
+}
+
+/** v1.7: a setting a person would change, checked word for word in the lines it cites. */
+export interface Setting extends Cited {
+  nom: string;
+  code: string; // the exact text in the file
+  sorte: "env" | "entete" | "constante" | "champ" | "limite" | "branchement" | "";
+  valeur: string;
+  effet: string;
+  valeur_vue: boolean; // the value itself is in the cited lines too
+}
+
+export interface ProjectSetting extends Cited {
+  nom: string;
+  code: string;
+  valeur: string;
+  valeur_vue: boolean;
+  lu_par_le_code: "oui" | "non";
+}
+
+export interface Lever extends Cited {
+  intention: string; // « Je veux changer … »
+  composant: string;
+  reglage: string;
+  motif?: string; // why it is not shown as verified (« non lu par le code »)
 }
 
 /** A place in the code the model cites; `verifie` = Umbra found the file and those lines. */
@@ -157,13 +184,17 @@ export interface Component {
   expose: (Cited & { quoi: string })[];
   utilise: string[];
   fichiers: string[];
+  entre?: string[]; // v1.7
+  sort?: string[];
+  reglages?: Setting[];
+  termes?: { simple: string; code: string }[];
 }
 
 export interface JourneyStep extends Cited {
   texte: string;
   action?: string; // 2-5 words for the diagram (models studied before v1.3 have none)
   simple?: string; // the step in one plain sentence, for a reader who does not code (v1.4)
-  composant: string;
+  composant: string | null; // null only on a step done by hand (v1.7)
   touche: string[]; // blocks this step reaches: the user, a database, a model, an outside service
   conditions?: string[]; // what must hold for the step to happen at all
   manuel?: boolean; // done by a person (a command, a click), not by the code
@@ -172,6 +203,9 @@ export interface JourneyStep extends Cited {
 export interface Branch extends Cited {
   quand: string;
   alors: string;
+  quand_simple?: string; // v1.7: in everyday words
+  alors_simple?: string;
+  etape?: number | null; // v1.7: the step that handles it (1-based)
 }
 
 export interface Journey {
@@ -183,6 +217,11 @@ export interface Journey {
   etapes: JourneyStep[];
   resultat: string;
   branches?: Branch[];
+  principal?: boolean; // v1.7: the journey the belt follows
+  principal_deduit?: boolean;
+  entree?: string | null;
+  sortie?: string[];
+  phases?: { nom: string; de: number; a: number }[];
 }
 
 /** What Claude Code understood of the whole Project in one study (a Hypothesis, citations checked). */
@@ -196,14 +235,19 @@ export interface ProjectModel {
   modules: Record<string, string>;
   dossiers: Record<string, string>;
   incertitudes: string[];
+  donnee?: { nom: string; dans_le_code: string; entre_par: string | null; finit_dans: string | null }[]; // v1.7
+  reglages_projet?: ProjectSetting[];
+  pour_changer?: Lever[];
 }
 
 export interface ModelState {
-  state: "ready" | "stale" | "missing" | "queued" | "working" | "error";
+  state: "ready" | "stale" | "methode" | "missing" | "queued" | "working" | "error";
   model: ProjectModel | null;
   created_at: string | null;
   changed: string[];
   message: string | null;
+  producer?: string | null; // the method version that wrote the model
+  methode_ancienne?: boolean; // written by an older method: only « Relancer l'étude » studies it again
 }
 
 export interface Explanation<T = Card> {
@@ -312,6 +356,9 @@ export const api = {
     call<MapView>(`${project(id)}/map?${new URLSearchParams({ node, expand: String(expand) })}`),
   model: (id: string) => call<ModelState>(`${project(id)}/model`),
   study: (id: string) => call<ModelState>(`${project(id)}/model`, { method: "POST" }),
+  /** The user's « Relancer l'étude »: the only call that studies a model written by an older method. */
+  relaunchStudy: (id: string) =>
+    call<ModelState>(`${project(id)}/model`, { method: "POST", body: JSON.stringify({ relancer: true }) }),
   explanation: (id: string, node: string) =>
     call<Explanation>(`${project(id)}/explain?${new URLSearchParams({ node })}`),
   explain: (id: string, node: string) =>

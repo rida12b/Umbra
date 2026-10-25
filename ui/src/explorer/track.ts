@@ -28,7 +28,7 @@ export function trackJourney(model: ProjectModel, journey: Journey, level: Level
   return journey.etapes.map((step, index) => {
     const [doer, target] = stepActors(model, step);
     // The step's component belongs to one of the two (the target when the step is done by hand).
-    const componentOf = (blockId: string | undefined) => (componentBlock.get(step.composant) === blockId ? step.composant : null);
+    const componentOf = (blockId: string | undefined) => (step.composant && componentBlock.get(step.composant) === blockId ? step.composant : null);
     const from = doer ? atThisLevel(doer.id, componentOf(doer.id)) : null;
     const to = target ? atThisLevel(target.id, componentOf(target.id)) : null;
     const also = step.touche.filter((id) => id !== doer?.id && id !== target?.id).map((id) => atThisLevel(id, null));

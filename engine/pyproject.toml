@@ -44,6 +44,7 @@ testpaths = ["tests"]
 [tool.ruff]
 line-length = 110
 target-version = "py311"
+extend-exclude = ["tests/fixtures"]  # verbatim copies of a real project: their line numbers are cited
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "N", "W", "B", "UP"]

@@ -100,7 +100,7 @@ function BoxInfo({ projectId, model, box, onEnter, onPlay }: {
     journey.etapes.forEach((step, index) => {
       const here = component
         ? step.composant === component.id
-        : block !== undefined && (step.touche.includes(block.id) || ownComponent(step.composant));
+        : block !== undefined && (step.touche.includes(block.id) || (step.composant !== null && ownComponent(step.composant)));
       if (here && !through.has(journey.id)) through.set(journey.id, index + 1);
     });
   const incoming = block ? model.flux.filter((f) => f.vers === block.id) : [];
