@@ -1,0 +1,3138 @@
+{
+ "pitch": "Un modèle d'application web prêt à l'emploi : les gens créent un compte, se connectent et gèrent leur propre liste d'éléments, et un administrateur gère les comptes.",
+ "resume": "Le produit est une base de départ pour une application web complète. Les gens s'inscrivent, se connectent, créent, modifient et suppriment leurs éléments, changent leur mot de passe ou en demandent un nouveau par courriel. Un super-administrateur voit tous les éléments et gère les comptes. L'application est faite de pages React servies par Nginx, d'une API FastAPI et d'une base PostgreSQL. Avant le lancement, un conteneur de préparation fait évoluer la base et crée le premier administrateur. Chaque demande part d'une page, passe par un client généré qui ajoute le jeton de connexion, arrive à une route FastAPI qui vérifie ce jeton, puis lit ou écrit dans PostgreSQL via SQLModel. La réponse revient en JSON.",
+ "blocs": [
+  {
+   "id": "utilisateur",
+   "nom": "Utilisateur",
+   "type": "user",
+   "role": "Personne connectée (simple utilisateur ou super-administrateur) qui utilise les pages dans son navigateur.",
+   "en_bref": "La personne qui se sert de l'application",
+   "importance": "coeur",
+   "zone": "utilise",
+   "entre": [
+    "Les pages affichées",
+    "Les courriels de mot de passe"
+   ],
+   "sort": [
+    "Ses identifiants",
+    "Les éléments qu'elle saisit"
+   ],
+   "techno": "Navigateur web",
+   "code": [],
+   "indices": "Les formulaires de connexion, d'inscription et d'ajout d'éléments dans frontend/src/routes.",
+   "interieur": "personne"
+  },
+  {
+   "id": "web",
+   "nom": "Application web",
+   "type": "frontend",
+   "role": "Application React d'une seule page : routage côté navigateur, formulaires validés par zod, appels à l'API par le client généré, jeton gardé dans localStorage.",
+   "en_bref": "Les pages pour se connecter et gérer",
+   "importance": "coeur",
+   "zone": "recoit",
+   "entre": [
+    "Les saisies de la personne",
+    "Les réponses du serveur"
+   ],
+   "sort": [
+    "Les demandes au serveur",
+    "Les listes et messages affichés"
+   ],
+   "techno": "React, TanStack Router et Query, Vite, Tailwind, Nginx",
+   "code": [
+    {
+     "chemin": "frontend/src",
+     "element": "dir:frontend/src"
+    },
+    {
+     "chemin": "frontend/Dockerfile",
+     "element": "frontend/Dockerfile"
+    },
+    {
+     "chemin": "frontend/nginx.conf",
+     "element": "frontend/nginx.conf"
+    }
+   ],
+   "indices": "frontend/src/main.tsx monte le routeur, frontend/Dockerfile construit avec Bun puis sert avec Nginx.",
+   "interieur": ""
+  },
+  {
+   "id": "api",
+   "nom": "Serveur de l'application",
+   "type": "backend",
+   "role": "API FastAPI sous /api/v1 : connexion par jeton JWT, comptes, éléments, courriels, accès à la base par SQLModel.",
+   "en_bref": "Vérifie les accès et fait le travail",
+   "importance": "coeur",
+   "zone": "traite",
+   "entre": [
+    "Les demandes des pages",
+    "Le jeton de connexion"
+   ],
+   "sort": [
+    "Les réponses en données",
+    "Les refus d'accès",
+    "Les courriels à envoyer"
+   ],
+   "techno": "Python, FastAPI, SQLModel, PyJWT, pwdlib (Argon2)",
+   "code": [
+    {
+     "chemin": "backend/app",
+     "element": "dir:backend/app"
+    }
+   ],
+   "indices": "backend/app/main.py crée l'application FastAPI, backend/Dockerfile la lance avec 'fastapi run --workers 4'.",
+   "interieur": ""
+  },
+  {
+   "id": "prestart",
+   "nom": "Préparation au démarrage",
+   "type": "worker",
+   "role": "Conteneur lancé une fois avant le serveur : attend la base, applique les migrations Alembic, crée le premier super-administrateur.",
+   "en_bref": "Prépare la base avant le lancement",
+   "importance": "coeur",
+   "zone": "traite",
+   "entre": [
+    "Les réglages de connexion à la base",
+    "L'adresse du premier administrateur"
+   ],
+   "sort": [
+    "Une base à jour",
+    "Le compte administrateur de départ"
+   ],
+   "techno": "Bash, Alembic, Tenacity",
+   "code": [
+    {
+     "chemin": "backend/scripts/prestart.sh",
+     "element": "backend/scripts/prestart.sh"
+    },
+    {
+     "chemin": "backend/app/backend_pre_start.py",
+     "element": "backend/app/backend_pre_start.py"
+    },
+    {
+     "chemin": "backend/app/initial_data.py",
+     "element": "backend/app/initial_data.py"
+    },
+    {
+     "chemin": "backend/app/alembic",
+     "element": "dir:backend/app/alembic"
+    }
+   ],
+   "indices": "Service 'prestart' dans compose.yml avec 'command: bash scripts/prestart.sh'.",
+   "interieur": ""
+  },
+  {
+   "id": "db",
+   "nom": "Base de données",
+   "type": "database",
+   "role": "PostgreSQL avec deux tables, 'user' et 'item' ; chaque élément est relié à son propriétaire et part avec lui si le compte est supprimé.",
+   "en_bref": "Garde les comptes et les éléments",
+   "importance": "coeur",
+   "zone": "range",
+   "entre": [
+    "Les comptes créés",
+    "Les éléments enregistrés"
+   ],
+   "sort": [
+    "Les comptes et éléments lus"
+   ],
+   "techno": "PostgreSQL 18",
+   "code": [
+    {
+     "chemin": "backend/app/models.py",
+     "element": "backend/app/models.py"
+    },
+    {
+     "chemin": "backend/app/alembic/versions",
+     "element": "dir:backend/app/alembic/versions"
+    }
+   ],
+   "indices": "Service 'db' avec l'image postgres:18 et le volume app-db-data dans compose.yml.",
+   "interieur": "fichiers"
+  },
+  {
+   "id": "smtp",
+   "nom": "Serveur de courriel",
+   "type": "external",
+   "role": "Serveur SMTP externe qui envoie le lien de nouveau mot de passe, l'avis de compte créé et le courriel de test. En local, c'est mailcatcher.",
+   "en_bref": "Envoie les courriels aux personnes",
+   "importance": "secondaire",
+   "zone": "exterieur",
+   "entre": [
+    "Les courriels préparés par le serveur"
+   ],
+   "sort": [
+    "Les courriels livrés"
+   ],
+   "techno": "SMTP (bibliothèque emails), mailcatcher en local",
+   "code": [
+    {
+     "chemin": "backend/app/utils.py",
+     "element": "backend/app/utils.py"
+    }
+   ],
+   "indices": "send_email dans backend/app/utils.py ; SMTP_HOST: \"mailcatcher\" dans compose.override.yml.",
+   "interieur": "externe"
+  },
+  {
+   "id": "sentry",
+   "nom": "Suivi des erreurs",
+   "type": "external",
+   "role": "Service Sentry, activé seulement si une adresse Sentry est donnée et hors du mode local.",
+   "en_bref": "Reçoit les erreurs du serveur",
+   "importance": "secondaire",
+   "zone": "exterieur",
+   "entre": [
+    "Les erreurs et les traces du serveur"
+   ],
+   "sort": [
+    "Des alertes pour l'équipe"
+   ],
+   "techno": "Sentry",
+   "code": [
+    {
+     "chemin": "backend/app/main.py",
+     "element": "backend/app/main.py"
+    }
+   ],
+   "indices": "sentry_sdk.init dans backend/app/main.py.",
+   "interieur": "externe"
+  },
+  {
+   "id": "tests",
+   "nom": "Tests automatiques",
+   "type": "tests",
+   "role": "Tests Pytest du serveur et tests Playwright de bout en bout dans le navigateur.",
+   "en_bref": "Vérifient que tout fonctionne",
+   "importance": "secondaire",
+   "zone": "atelier",
+   "entre": [
+    "Le code à vérifier"
+   ],
+   "sort": [
+    "Un rapport réussi ou échoué"
+   ],
+   "techno": "Pytest, Playwright",
+   "code": [
+    {
+     "chemin": "backend/tests",
+     "element": "dir:backend/tests"
+    },
+    {
+     "chemin": "frontend/tests",
+     "element": "dir:frontend/tests"
+    },
+    {
+     "chemin": "frontend/playwright.config.ts",
+     "element": "frontend/playwright.config.ts"
+    }
+   ],
+   "indices": "Les fichiers test_*.py et *.spec.ts.",
+   "interieur": "fichiers"
+  },
+  {
+   "id": "ci",
+   "nom": "Intégration et déploiement",
+   "type": "infra",
+   "role": "Workflows GitHub Actions : tests, pre-commit, Playwright et déploiement en préproduction et en production.",
+   "en_bref": "Lance les tests et déploie",
+   "importance": "secondaire",
+   "zone": "atelier",
+   "entre": [
+    "Les changements du code"
+   ],
+   "sort": [
+    "Les résultats des tests",
+    "Les déploiements"
+   ],
+   "techno": "GitHub Actions",
+   "code": [],
+   "indices": "Les fichiers test-backend.yml, playwright.yml, deploy-production.yml.",
+   "interieur": "fichiers"
+  },
+  {
+   "id": "gabarit",
+   "nom": "Outils du modèle de projet",
+   "type": "cli",
+   "role": "Configuration Copier et scripts qui remplissent le fichier .env et génèrent le client des pages.",
+   "en_bref": "Créent un nouveau projet depuis ce modèle",
+   "importance": "secondaire",
+   "zone": "atelier",
+   "entre": [
+    "Les réponses de la personne qui crée le projet"
+   ],
+   "sort": [
+    "Un fichier de réglages rempli",
+    "Le client des pages régénéré"
+   ],
+   "techno": "Copier, Bash, Python",
+   "code": [
+    {
+     "chemin": "copier.yml",
+     "element": "copier.yml"
+    },
+    {
+     "chemin": ".copier",
+     "element": "dir:.copier"
+    },
+    {
+     "chemin": "hooks",
+     "element": "dir:hooks"
+    },
+    {
+     "chemin": "scripts",
+     "element": "dir:scripts"
+    }
+   ],
+   "indices": "copier.yml lance .copier/update_dotenv.py ; scripts/generate-client.sh.",
+   "interieur": "fichiers"
+  },
+  {
+   "id": "docs",
+   "nom": "Documentation",
+   "type": "docs",
+   "role": "Guides en Markdown pour le développement, le déploiement et les notes de version.",
+   "en_bref": "Explique comment développer et déployer",
+   "importance": "secondaire",
+   "zone": "atelier",
+   "entre": [],
+   "sort": [
+    "Des guides à lire"
+   ],
+   "techno": "Markdown",
+   "code": [
+    {
+     "chemin": "README.md",
+     "element": "README.md"
+    },
+    {
+     "chemin": "development.md",
+     "element": "development.md"
+    },
+    {
+     "chemin": "deployment.md",
+     "element": "deployment.md"
+    },
+    {
+     "chemin": "backend/README.md",
+     "element": "backend/README.md"
+    },
+    {
+     "chemin": "frontend/README.md",
+     "element": "frontend/README.md"
+    }
+   ],
+   "indices": "Les fichiers .md à la racine.",
+   "interieur": "fichiers"
+  }
+ ],
+ "composants": [
+  {
+   "id": "pages",
+   "nom": "Pages et formulaires",
+   "en_bref": "Écrans pour se connecter et gérer",
+   "bloc": "web",
+   "role": "Routes TanStack (login, signup, recover-password, reset-password, _layout/items, _layout/admin, _layout/settings) et composants de formulaires validés par zod.",
+   "responsabilites": [
+    "Afficher les formulaires et valider les saisies avant l'envoi",
+    "Afficher les listes d'éléments et de comptes",
+    "Montrer les messages de réussite ou d'erreur"
+   ],
+   "expose": [
+    {
+     "quoi": "Page /items (liste et bouton Add Item)",
+     "fichier": "frontend/src/routes/_layout/items.tsx",
+     "lignes": [
+      19,
+      69
+     ],
+     "verifie": true
+    },
+    {
+     "quoi": "Fenêtre AddItem",
+     "fichier": "frontend/src/components/Items/AddItem.tsx",
+     "lignes": [
+      40,
+      142
+     ],
+     "verifie": true
+    },
+    {
+     "quoi": "Page /login",
+     "fichier": "frontend/src/routes/login.tsx",
+     "lignes": [
+      35,
+      142
+     ],
+     "verifie": true
+    },
+    {
+     "quoi": "Page /recover-password",
+     "fichier": "frontend/src/routes/recover-password.tsx",
+     "lignes": [
+      33,
+      130
+     ],
+     "verifie": true
+    },
+    {
+     "quoi": "Page /reset-password",
+     "fichier": "frontend/src/routes/reset-password.tsx",
+     "lignes": [
+      49,
+      166
+     ],
+     "verifie": true
+    },
+    {
+     "quoi": "Page /admin (réservée au super-administrateur)",
+     "fichier": "frontend/src/routes/_layout/admin.tsx",
+     "lignes": [
+      19,
+      73
+     ],
+     "verifie": true
+    }
+   ],
+   "utilise": [
+    "session",
+    "client-api"
+   ],
+   "fichiers": [
+    "frontend/src/utils.ts"
+   ],
+   "entre": [
+    "Les saisies de la personne",
+    "Les données renvoyées par le serveur"
+   ],
+   "sort": [
+    "Les demandes prêtes à partir",
+    "Des messages d'erreur si une saisie est incomplète"
+   ],
+   "reglages": [
+    {
+     "nom": "Titre obligatoire",
+     "code": "title: z.string().min(1, { message: \"Title is required\" }),",
+     "sorte": "limite",
+     "valeur": "au moins 1 caractère",
+     "effet": "Refuse un élément sans titre avant l'envoi",
+     "fichier": "frontend/src/components/Items/AddItem.tsx",
+     "lignes": [
+      33,
+      36
+     ],
+     "verifie": true,
+     "valeur_vue": false
+    },
+    {
+     "nom": "Taille de la liste affichée",
+     "code": "ItemsService.readItems({ skip: 0, limit: 100 })",
+     "sorte": "limite",
+     "valeur": "100",
+     "effet": "Nombre maximum d'éléments montrés sur la page",
+     "fichier": "frontend/src/routes/_layout/items.tsx",
+     "lignes": [
+      12,
+      17
+     ],
+     "verifie": true,
+     "valeur_vue": true
+    },
+    {
+     "nom": "Longueur minimale du mot de passe",
+     "code": ".min(8, { message: \"Password must be at least 8 characters\" }),",
+     "sorte": "limite",
+     "valeur": "8",
+     "effet": "Refuse un mot de passe trop court à la connexion",
+     "fichier": "frontend/src/routes/login.tsx",
+     "lignes": [
+      25,
+      31
+     ],
+     "verifie": true,
+     "valeur_vue": false
+    }
+   ],
+   "termes": [
+    {
+     "simple": "élément",
+     "code": "Item"
+    },
+    {
+     "simple": "ajouter un élément",
+     "code": "AddItem"
+    },
+    {
+     "simple": "page d'administration",
+     "code": "/admin"
+    }
+   ]
+  },
+  {
+   "id": "session",
+   "nom": "Session dans le navigateur",
+   "en_bref": "Garde le jeton et protège les pages",
+   "bloc": "web",
+   "role": "useAuth et main.tsx : garder access_token dans localStorage, rediriger vers /login si absent ou refusé, se connecter, s'inscrire et se déconnecter.",
+   "responsabilites": [
+    "Garder le jeton après la connexion",
+    "Bloquer les pages privées sans jeton",
+    "Effacer le jeton et revenir à la connexion quand le serveur refuse l'accès"
+   ],
+   "expose": [
+    {
+     "quoi": "isLoggedIn",
+     "fichier": "frontend/src/hooks/useAuth.ts",
+     "lignes": [
+      14,
+      16
+     ],
+     "verifie": true
+    },
+    {
+     "quoi": "useAuth (loginMutation, signUpMutation, logout, user)",
+     "fichier": "frontend/src/hooks/useAuth.ts",
+     "lignes": [
+      18,
+      67
+     ],
+     "verifie": true
+    },
+    {
+     "quoi": "Garde de la mise en page privée (beforeLoad)",
+     "fichier": "frontend/src/routes/_layout.tsx",
+     "lignes": [
+      12,
+      21
+     ],
+     "verifie": true
+    },
+    {
+     "quoi": "handleApiError (401/403)",
+     "fichier": "frontend/src/main.tsx",
+     "lignes": [
+      21,
+      34
+     ],
+     "verifie": true
+    }
+   ],
+   "utilise": [
+    "client-api"
+   ],
+   "fichiers": [
+    "frontend/src/hooks/useAuth.ts",
+    "frontend/src/main.tsx",
+    "frontend/src/routes/_layout.tsx"
+   ],
+   "entre": [
+    "Le jeton renvoyé par le serveur",
+    "Les refus d'accès"
+   ],
+   "sort": [
+    "Le jeton joint à chaque demande",
+    "Un renvoi vers la page de connexion"
+   ],
+   "reglages": [
+    {
+     "nom": "Endroit où le jeton est gardé",
+     "code": "localStorage.getItem(\"access_token\")",
+     "sorte": "champ",
+     "valeur": "access_token",
+     "effet": "Nom sous lequel le navigateur garde le jeton",
+     "fichier": "frontend/src/main.tsx",
+     "lignes": [
+      16,
+      19
+     ],
+     "verifie": true,
+     "valeur_vue": true
+    },
+    {
+     "nom": "Adresse du serveur",
+     "code": "OpenAPI.BASE = import.meta.env.VITE_API_URL",
+     "sorte": "env",
+     "valeur": "fixée à la construction des pages",
+     "effet": "Choisit le serveur que les pages appellent",
+     "fichier": "frontend/src/main.tsx",
+     "lignes": [
+      16,
+      16
+     ],
+     "verifie": true,
+     "valeur_vue": false
+    },
+    {
+     "nom": "Codes qui déconnectent",
+     "code": "[401, 403].includes(error.status)",
+     "sorte": "branchement",
+     "valeur": "401 et 403",
+     "effet": "Ces refus effacent le jeton et renvoient à la connexion",
+     "fichier": "frontend/src/main.tsx",
+     "lignes": [
+      21,
+      26
+     ],
+     "verifie": true,
+     "valeur_vue": false
+    },
+    {
+     "nom": "Thème par défaut",
+     "code": "defaultTheme=\"dark\"",
+     "sorte": "constante",
+     "valeur": "dark",
+     "effet": "Les pages s'ouvrent en thème sombre",
+     "fichier": "frontend/src/main.tsx",
+     "lignes": [
+      45,
+      45
+     ],
+     "verifie": true,
+     "valeur_vue": true
+    }
+   ],
+   "termes": [
+    {
+     "simple": "jeton de connexion",
+     "code": "access_token"
+    },
+    {
+     "simple": "être connecté",
+     "code": "isLoggedIn"
+    }
+   ]
+  },
+  {
+   "id": "client-api",
+   "nom": "Client du serveur",
+   "en_bref": "Envoie les demandes au serveur",
+   "bloc": "web",
+   "role": "Client TypeScript généré depuis l'OpenAPI (ItemsService, LoginService, UsersService...) qui construit l'URL, les en-têtes et le corps de chaque demande.",
+   "responsabilites": [
+    "Appeler les routes /api/v1",
+    "Ajouter l'en-tête Authorization: Bearer",
+    "Transformer les erreurs HTTP en ApiError"
+   ],
+   "expose": [
+    {
+     "quoi": "ItemsService.createItem (POST /api/v1/items/)",
+     "fichier": "frontend/src/client/sdk.gen.ts",
+     "lignes": [
+      40,
+      50
+     ],
+     "verifie": true
+    },
+    {
+     "quoi": "LoginService.loginAccessToken (POST /api/v1/login/access-token)",
+     "fichier": "frontend/src/client/sdk.gen.ts",
+     "lignes": [
+      128,
+      138
+     ],
+     "verifie": true
+    },
+    {
+     "quoi": "getHeaders (ajoute le jeton)",
+     "fichier": "frontend/src/client/core/request.ts",
+     "lignes": [
+      120,
+      169
+     ],
+     "verifie": true
+    }
+   ],
+   "utilise": [
+    "api"
+   ],
+   "fichiers": [
+    "frontend/openapi-ts.config.ts",
+    "scripts/generate-client.sh"
+   ],
+   "entre": [
+    "Une demande des pages",
+    "Le jeton gardé"
+   ],
+   "sort": [
+    "Une demande au serveur",
+    "Une erreur si le serveur refuse"
+   ],
+   "reglages": [
+    {
+     "nom": "En-tête du jeton",
+     "code": "headers['Authorization'] = `Bearer ${token}`;",
+     "sorte": "entete",
+     "valeur": "Authorization: Bearer",
+     "effet": "Façon dont le jeton est joint à chaque demande",
+     "fichier": "frontend/src/client/core/request.ts",
+     "lignes": [
+      143,
+      145
+     ],
+     "verifie": true,
+     "valeur_vue": false
+    }
+   ],
+   "termes": [
+    {
+     "simple": "en-tête du jeton",
+     "code": "Authorization"
+    }
+   ]
+  },
+  {
+   "id": "api-elements",
+   "nom": "Gestion des éléments",
+   "en_bref": "Crée, lit, modifie et supprime les éléments",
+   "bloc": "api",
+   "role": "Routeur /items : CRUD des éléments ; un simple utilisateur ne voit et ne touche que ses éléments, le super-administrateur voit tout.",
+   "responsabilites": [
+    "Créer un élément rattaché à la personne connectée",
+    "Lister les éléments, du plus récent au plus ancien",
+    "Refuser l'accès aux éléments d'un autre"
+   ],
+   "expose": [
+    {
+     "quoi": "GET /api/v1/items/",
+     "fichier": "backend/app/api/routes/items.py",
+     "lignes": [
+      13,
+      45
+     ],
+     "verifie": true
+    },
+    {
+     "quoi": "GET /api/v1/items/{id}",
+     "fichier": "backend/app/api/routes/items.py",
+     "lignes": [
+      48,
+      58
+     ],
+     "verifie": true
+    },
+    {
+     "quoi": "POST /api/v1/items/",
+     "fichier": "backend/app/api/routes/items.py",
+     "lignes": [
+      61,
+      72
+     ],
+     "verifie": true
+    },
+    {
+     "quoi": "PUT /api/v1/items/{id}",
+     "fichier": "backend/app/api/routes/items.py",
+     "lignes": [
+      75,
+      96
+     ],
+     "verifie": true
+    },
+    {
+     "quoi": "DELETE /api/v1/items/{id}",
+     "fichier": "backend/app/api/routes/items.py",
+     "lignes": [
+      99,
+      113
+     ],
+     "verifie": true
+    }
+   ],
+   "utilise": [
+    "auth",
+    "donnees",
+    "db"
+   ],
+   "fichiers": [
+    "backend/app/api/routes/items.py"
+   ],
+   "entre": [
+    "Un titre et une description",
+    "La personne connectée"
+   ],
+   "sort": [
+    "L'élément enregistré ou la liste",
+    "Un refus si l'élément appartient à un autre",
+    "Un refus si l'élément n'existe pas"
+   ],
+   "reglages": [
+    {
+     "nom": "Taille de page par défaut",
+     "code": "limit: int = 100",
+     "sorte": "limite",
+     "valeur": "100",
+     "effet": "Nombre d'éléments renvoyés si la page n'en demande pas",
+     "fichier": "backend/app/api/routes/items.py",
+     "lignes": [
+      14,
+      16
+     ],
+     "verifie": true,
+     "valeur_vue": true
+    },
+    {
+     "nom": "Le super-administrateur voit tout",
+     "code": "if current_user.is_superuser:",
+     "sorte": "branchement",
+     "valeur": "is_superuser",
+     "effet": "Le super-administrateur reçoit les éléments de tout le monde",
+     "fichier": "backend/app/api/routes/items.py",
+     "lignes": [
+      21,
+      27
+     ],
+     "verifie": true,
+     "valeur_vue": true
+    },
+    {
+     "nom": "Longueur du titre",
+     "code": "title: str = Field(min_length=1, max_length=255)",
+     "sorte": "limite",
+     "valeur": "1 à 255",
+     "effet": "Le serveur refuse un titre vide ou trop long",
+     "fichier": "backend/app/models.py",
+     "lignes": [
+      71,
+      73
+     ],
+     "verifie": true,
+     "valeur_vue": false
+    }
+   ],
+   "termes": [
+    {
+     "simple": "élément",
+     "code": "Item"
+    },
+    {
+     "simple": "propriétaire",
+     "code": "owner_id"
+    },
+    {
+     "simple": "super-administrateur",
+     "code": "is_superuser"
+    }
+   ]
+  },
+  {
+   "id": "api-comptes",
+   "nom": "Gestion des comptes",
+   "en_bref": "Inscription, profil et comptes par l'admin",
+   "bloc": "api",
+   "role": "Routeur /users (inscription, profil, mot de passe, gestion par le super-administrateur) et routeur /private, actif seulement en local.",
+   "responsabilites": [
+    "Inscrire une personne sans connexion",
+    "Modifier son profil, son mot de passe ou supprimer son compte",
+    "Laisser le super-administrateur créer, modifier et supprimer des comptes"
+   ],
+   "expose": [
+    {
+     "quoi": "GET et POST /api/v1/users/ (super-administrateur)",
+     "fichier": "backend/app/api/routes/users.py",
+     "lignes": [
+      32,
+      78
+     ],
+     "verifie": true
+    },
+    {
+     "quoi": "GET, PATCH et DELETE /api/v1/users/me, PATCH /users/me/password",
+     "fichier": "backend/app/api/routes/users.py",
+     "lignes": [
+      81,
+      143
+     ],
+     "verifie": true
+    },
+    {
+     "quoi": "POST /api/v1/users/signup",
+     "fichier": "backend/app/api/routes/users.py",
+     "lignes": [
+      146,
+      159
+     ],
+     "verifie": true
+    },
+    {
+     "quoi": "GET, PATCH et DELETE /api/v1/users/{user_id}",
+     "fichier": "backend/app/api/routes/users.py",
+     "lignes": [
+      162,
+      232
+     ],
+     "verifie": true
+    },
+    {
+     "quoi": "POST /api/v1/private/users/ (local seulement)",
+     "fichier": "backend/app/api/routes/private.py",
+     "lignes": [
+      23,
+      38
+     ],
+     "verifie": true
+    }
+   ],
+   "utilise": [
+    "auth",
+    "donnees",
+    "courriel",
+    "db"
+   ],
+   "fichiers": [
+    "backend/app/api/routes/users.py",
+    "backend/app/api/routes/private.py"
+   ],
+   "entre": [
+    "Adresse, nom et mot de passe",
+    "La personne connectée et son rôle"
+   ],
+   "sort": [
+    "Le compte créé ou modifié",
+    "Un refus si l'adresse existe déjà",
+    "Un refus si la personne n'est pas super-administrateur"
+   ],
+   "reglages": [
+    {
+     "nom": "Courriel au nouveau compte",
+     "code": "if settings.emails_enabled and user_in.email:",
+     "sorte": "branchement",
+     "valeur": "seulement si le courriel est configuré",
+     "effet": "Envoie ses accès au compte créé par l'admin",
+     "fichier": "backend/app/api/routes/users.py",
+     "lignes": [
+      68,
+      77
+     ],
+     "verifie": true,
+     "valeur_vue": false
+    },
+    {
+     "nom": "Routes privées en local",
+     "code": "if settings.ENVIRONMENT == \"local\":",
+     "sorte": "branchement",
+     "valeur": "local",
+     "effet": "La création de compte sans contrôle n'existe qu'en local",
+     "fichier": "backend/app/api/main.py",
+     "lignes": [
+      13,
+      14
+     ],
+     "verifie": true,
+     "valeur_vue": true
+    },
+    {
+     "nom": "Longueur du mot de passe",
+     "code": "password: str = Field(min_length=8, max_length=128)",
+     "sorte": "limite",
+     "valeur": "8 à 128",
+     "effet": "Le serveur refuse un mot de passe trop court ou trop long",
+     "fichier": "backend/app/models.py",
+     "lignes": [
+      22,
+      23
+     ],
+     "verifie": true,
+     "valeur_vue": false
+    }
+   ],
+   "termes": [
+    {
+     "simple": "compte",
+     "code": "User"
+    },
+    {
+     "simple": "inscription",
+     "code": "signup"
+    },
+    {
+     "simple": "compte actif",
+     "code": "is_active"
+    }
+   ]
+  },
+  {
+   "id": "auth",
+   "nom": "Connexion et contrôle d'accès",
+   "en_bref": "Vérifie qui demande et ses droits",
+   "bloc": "api",
+   "role": "login.py, deps.py et security.py : jeton JWT HS256, hachage Argon2 (avec reprise des anciens hachages bcrypt), dépendances CurrentUser et get_current_active_superuser, récupération du mot de passe.",
+   "responsabilites": [
+    "Vérifier l'adresse et le mot de passe, puis donner un jeton",
+    "Lire le jeton à chaque demande et retrouver la personne",
+    "Réserver certaines routes au super-administrateur",
+    "Gérer le lien de nouveau mot de passe"
+   ],
+   "expose": [
+    {
+     "quoi": "POST /api/v1/login/access-token",
+     "fichier": "backend/app/api/routes/login.py",
+     "lignes": [
+      23,
+      42
+     ],
+     "verifie": true
+    },
+    {
+     "quoi": "POST /api/v1/password-recovery/{email}",
+     "fichier": "backend/app/api/routes/login.py",
+     "lignes": [
+      53,
+      74
+     ],
+     "verifie": true
+    },
+    {
+     "quoi": "POST /api/v1/reset-password/",
+     "fichier": "backend/app/api/routes/login.py",
+     "lignes": [
+      77,
+      97
+     ],
+     "verifie": true
+    },
+    {
+     "quoi": "get_current_user (CurrentUser)",
+     "fichier": "backend/app/api/deps.py",
+     "lignes": [
+      30,
+      49
+     ],
+     "verifie": true
+    },
+    {
+     "quoi": "get_current_active_superuser",
+     "fichier": "backend/app/api/deps.py",
+     "lignes": [
+      52,
+      57
+     ],
+     "verifie": true
+    },
+    {
+     "quoi": "create_access_token, verify_password, get_password_hash",
+     "fichier": "backend/app/core/security.py",
+     "lignes": [
+      22,
+      36
+     ],
+     "verifie": true
+    }
+   ],
+   "utilise": [
+    "donnees",
+    "courriel",
+    "config",
+    "db"
+   ],
+   "fichiers": [
+    "backend/app/api/routes/login.py",
+    "backend/app/api/deps.py",
+    "backend/app/core/security.py"
+   ],
+   "entre": [
+    "Adresse et mot de passe",
+    "Le jeton joint à la demande"
+   ],
+   "sort": [
+    "Un jeton de connexion",
+    "Un refus si le mot de passe est faux",
+    "Un refus si le jeton est invalide ou le compte inactif"
+   ],
+   "reglages": [
+    {
+     "nom": "Durée du jeton",
+     "code": "ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 8",
+     "sorte": "env",
+     "valeur": "8 jours",
+     "effet": "Temps pendant lequel on reste connecté",
+     "fichier": "backend/app/core/config.py",
+     "lignes": [
+      35,
+      36
+     ],
+     "verifie": true,
+     "valeur_vue": false
+    },
+    {
+     "nom": "Algorithme de signature",
+     "code": "ALGORITHM = \"HS256\"",
+     "sorte": "constante",
+     "valeur": "HS256",
+     "effet": "Méthode de signature des jetons",
+     "fichier": "backend/app/core/security.py",
+     "lignes": [
+      19,
+      19
+     ],
+     "verifie": true,
+     "valeur_vue": true
+    },
+    {
+     "nom": "Clé secrète",
+     "code": "SECRET_KEY: str = secrets.token_urlsafe(32)",
+     "sorte": "env",
+     "valeur": "aléatoire si non fournie",
+     "effet": "Signe les jetons ; la changer déconnecte tout le monde",
+     "fichier": "backend/app/core/config.py",
+     "lignes": [
+      34,
+      34
+     ],
+     "verifie": true,
+     "valeur_vue": false
+    },
+    {
+     "nom": "Méthode de hachage",
+     "code": "Argon2Hasher(),",
+     "sorte": "constante",
+     "valeur": "Argon2, puis bcrypt",
+     "effet": "Façon de protéger les mots de passe enregistrés",
+     "fichier": "backend/app/core/security.py",
+     "lignes": [
+      11,
+      16
+     ],
+     "verifie": true,
+     "valeur_vue": false
+    }
+   ],
+   "termes": [
+    {
+     "simple": "jeton de connexion",
+     "code": "access_token"
+    },
+    {
+     "simple": "mot de passe protégé",
+     "code": "hashed_password"
+    },
+    {
+     "simple": "lien de nouveau mot de passe",
+     "code": "password_reset_token"
+    }
+   ]
+  },
+  {
+   "id": "donnees",
+   "nom": "Accès aux données",
+   "en_bref": "Lit et écrit les comptes et éléments",
+   "bloc": "api",
+   "role": "models.py (tables User et Item, schémas d'entrée et de sortie), crud.py (création, mise à jour, authentification) et core/db.py (moteur SQLAlchemy, init_db).",
+   "responsabilites": [
+    "Décrire les tables et les champs",
+    "Créer et mettre à jour les comptes avec un mot de passe protégé",
+    "Ouvrir la connexion à PostgreSQL"
+   ],
+   "expose": [
+    {
+     "quoi": "Tables User et Item",
+     "fichier": "backend/app/models.py",
+     "lignes": [
+      49,
+      96
+     ],
+     "verifie": true
+    },
+    {
+     "quoi": "crud.create_user, update_user, get_user_by_email, authenticate",
+     "fichier": "backend/app/crud.py",
+     "lignes": [
+      10,
+      60
+     ],
+     "verifie": true
+    },
+    {
+     "quoi": "engine et init_db",
+     "fichier": "backend/app/core/db.py",
+     "lignes": [
+      7,
+      33
+     ],
+     "verifie": true
+    },
+    {
+     "quoi": "get_db (une session par demande)",
+     "fichier": "backend/app/api/deps.py",
+     "lignes": [
+      21,
+      26
+     ],
+     "verifie": true
+    }
+   ],
+   "utilise": [
+    "config",
+    "db"
+   ],
+   "fichiers": [
+    "backend/app/models.py",
+    "backend/app/crud.py",
+    "backend/app/core/db.py"
+   ],
+   "entre": [
+    "Les données à enregistrer"
+   ],
+   "sort": [
+    "Les lignes lues ou enregistrées",
+    "Rien si l'adresse est inconnue"
+   ],
+   "reglages": [
+    {
+     "nom": "Adresse de la base",
+     "code": "scheme=\"postgresql+psycopg\",",
+     "sorte": "constante",
+     "valeur": "postgresql+psycopg",
+     "effet": "Type de base et pilote utilisés",
+     "fichier": "backend/app/core/config.py",
+     "lignes": [
+      59,
+      69
+     ],
+     "verifie": true,
+     "valeur_vue": true
+    },
+    {
+     "nom": "Suppression en cascade",
+     "code": "foreign_key=\"user.id\", nullable=False, ondelete=\"CASCADE\"",
+     "sorte": "champ",
+     "valeur": "CASCADE",
+     "effet": "Supprimer un compte supprime ses éléments",
+     "fichier": "backend/app/models.py",
+     "lignes": [
+      93,
+      95
+     ],
+     "verifie": true,
+     "valeur_vue": true
+    }
+   ],
+   "termes": [
+    {
+     "simple": "compte",
+     "code": "User"
+    },
+    {
+     "simple": "élément",
+     "code": "Item"
+    },
+    {
+     "simple": "date de création",
+     "code": "created_at"
+    }
+   ]
+  },
+  {
+   "id": "courriel",
+   "nom": "Envoi des courriels",
+   "en_bref": "Prépare et envoie les courriels",
+   "bloc": "api",
+   "role": "utils.py : remplit les modèles HTML Jinja (email-templates/build), crée et vérifie le jeton de nouveau mot de passe, envoie par SMTP.",
+   "responsabilites": [
+    "Préparer le courriel de nouveau mot de passe avec son lien",
+    "Préparer le courriel de nouveau compte et le courriel de test",
+    "Envoyer par le serveur de courriel configuré"
+   ],
+   "expose": [
+    {
+     "quoi": "send_email",
+     "fichier": "backend/app/utils.py",
+     "lignes": [
+      33,
+      55
+     ],
+     "verifie": true
+    },
+    {
+     "quoi": "generate_reset_password_email",
+     "fichier": "backend/app/utils.py",
+     "lignes": [
+      68,
+      82
+     ],
+     "verifie": true
+    },
+    {
+     "quoi": "generate_password_reset_token, verify_password_reset_token",
+     "fichier": "backend/app/utils.py",
+     "lignes": [
+      103,
+      123
+     ],
+     "verifie": true
+    },
+    {
+     "quoi": "POST /api/v1/utils/test-email/ (super-administrateur)",
+     "fichier": "backend/app/api/routes/utils.py",
+     "lignes": [
+      11,
+      26
+     ],
+     "verifie": true
+    }
+   ],
+   "utilise": [
+    "config",
+    "smtp"
+   ],
+   "fichiers": [
+    "backend/app/utils.py",
+    "backend/app/api/routes/utils.py"
+   ],
+   "entre": [
+    "L'adresse de destination",
+    "Le type de courriel"
+   ],
+   "sort": [
+    "Un courriel envoyé",
+    "Une erreur si le courriel n'est pas configuré"
+   ],
+   "reglages": [
+    {
+     "nom": "Courriel activé",
+     "code": "return bool(self.SMTP_HOST and self.EMAILS_FROM_EMAIL)",
+     "sorte": "branchement",
+     "valeur": "serveur et expéditeur remplis",
+     "effet": "Sans les deux, aucun courriel ne peut partir",
+     "fichier": "backend/app/core/config.py",
+     "lignes": [
+      88,
+      91
+     ],
+     "verifie": true,
+     "valeur_vue": false
+    },
+    {
+     "nom": "Durée du lien de mot de passe",
+     "code": "EMAIL_RESET_TOKEN_EXPIRE_HOURS: int = 48",
+     "sorte": "env",
+     "valeur": "48 heures",
+     "effet": "Temps pendant lequel le lien reçu marche",
+     "fichier": "backend/app/core/config.py",
+     "lignes": [
+      86,
+      86
+     ],
+     "verifie": true,
+     "valeur_vue": false
+    },
+    {
+     "nom": "Port du serveur de courriel",
+     "code": "SMTP_PORT: int = 587",
+     "sorte": "env",
+     "valeur": "587",
+     "effet": "Port utilisé pour joindre le serveur de courriel",
+     "fichier": "backend/app/core/config.py",
+     "lignes": [
+      71,
+      78
+     ],
+     "verifie": true,
+     "valeur_vue": true
+    },
+    {
+     "nom": "Adresse du lien envoyé",
+     "code": "link = f\"{settings.FRONTEND_HOST}/reset-password?token={token}\"",
+     "sorte": "champ",
+     "valeur": "FRONTEND_HOST",
+     "effet": "Page vers laquelle mène le lien du courriel",
+     "fichier": "backend/app/utils.py",
+     "lignes": [
+      68,
+      72
+     ],
+     "verifie": true,
+     "valeur_vue": true
+    }
+   ],
+   "termes": [
+    {
+     "simple": "serveur de courriel",
+     "code": "SMTP_HOST"
+    },
+    {
+     "simple": "expéditeur",
+     "code": "EMAILS_FROM_EMAIL"
+    }
+   ]
+  },
+  {
+   "id": "config",
+   "nom": "Réglages du serveur",
+   "en_bref": "Lit les réglages au démarrage",
+   "bloc": "api",
+   "role": "Classe Settings (pydantic-settings) qui lit ../.env et les variables d'environnement, calcule l'adresse PostgreSQL et les origines CORS, et refuse 'changethis' hors du mode local.",
+   "responsabilites": [
+    "Lire les variables d'environnement",
+    "Refuser les mots de passe par défaut hors du mode local",
+    "Fixer le préfixe des routes et les origines autorisées"
+   ],
+   "expose": [
+    {
+     "quoi": "settings (Settings)",
+     "fichier": "backend/app/core/config.py",
+     "lignes": [
+      26,
+      119
+     ],
+     "verifie": true
+    },
+    {
+     "quoi": "Montage de l'API, CORS et Sentry",
+     "fichier": "backend/app/main.py",
+     "lignes": [
+      14,
+      33
+     ],
+     "verifie": true
+    }
+   ],
+   "utilise": [
+    "sentry"
+   ],
+   "fichiers": [
+    "backend/app/core/config.py",
+    "backend/app/main.py",
+    "backend/app/api/main.py"
+   ],
+   "entre": [
+    "Le fichier de réglages et l'environnement"
+   ],
+   "sort": [
+    "Les réglages pour tout le serveur",
+    "Un arrêt si un secret vaut encore la valeur par défaut hors local"
+   ],
+   "reglages": [
+    {
+     "nom": "Préfixe des routes",
+     "code": "API_V1_STR: str = \"/api/v1\"",
+     "sorte": "constante",
+     "valeur": "/api/v1",
+     "effet": "Début commun de toutes les adresses du serveur",
+     "fichier": "backend/app/core/config.py",
+     "lignes": [
+      33,
+      33
+     ],
+     "verifie": true,
+     "valeur_vue": true
+    },
+    {
+     "nom": "Mode de déploiement",
+     "code": "ENVIRONMENT: Literal[\"local\", \"staging\", \"production\"] = \"local\"",
+     "sorte": "env",
+     "valeur": "local",
+     "effet": "Active les routes privées, Sentry et la sévérité des secrets",
+     "fichier": "backend/app/core/config.py",
+     "lignes": [
+      38,
+      38
+     ],
+     "verifie": true,
+     "valeur_vue": true
+    },
+    {
+     "nom": "Adresse des pages",
+     "code": "FRONTEND_HOST: str = \"http://localhost:5173\"",
+     "sorte": "env",
+     "valeur": "http://localhost:5173",
+     "effet": "Autorisée à appeler le serveur et utilisée dans les liens",
+     "fichier": "backend/app/core/config.py",
+     "lignes": [
+      37,
+      37
+     ],
+     "verifie": true,
+     "valeur_vue": true
+    },
+    {
+     "nom": "Origines autorisées",
+     "code": "BACKEND_CORS_ORIGINS: Annotated[",
+     "sorte": "env",
+     "valeur": "vide",
+     "effet": "Autres sites autorisés à appeler le serveur",
+     "fichier": "backend/app/core/config.py",
+     "lignes": [
+      40,
+      49
+     ],
+     "verifie": true,
+     "valeur_vue": false
+    },
+    {
+     "nom": "Refus des secrets par défaut",
+     "code": "if value == \"changethis\":",
+     "sorte": "branchement",
+     "valeur": "changethis",
+     "effet": "Avertit en local, bloque le démarrage ailleurs",
+     "fichier": "backend/app/core/config.py",
+     "lignes": [
+      97,
+      106
+     ],
+     "verifie": true,
+     "valeur_vue": true
+    },
+    {
+     "nom": "Fichier de réglages",
+     "code": "env_file=\"../.env\"",
+     "sorte": "champ",
+     "valeur": "../.env",
+     "effet": "Fichier lu au démarrage pour les réglages",
+     "fichier": "backend/app/core/config.py",
+     "lignes": [
+      27,
+      32
+     ],
+     "verifie": true,
+     "valeur_vue": true
+    }
+   ],
+   "termes": [
+    {
+     "simple": "mode de déploiement",
+     "code": "ENVIRONMENT"
+    },
+    {
+     "simple": "clé secrète",
+     "code": "SECRET_KEY"
+    }
+   ]
+  },
+  {
+   "id": "demarrage",
+   "nom": "Préparation de la base",
+   "en_bref": "Attend, met à jour et remplit la base",
+   "bloc": "prestart",
+   "role": "prestart.sh (avec set -e) lance backend_pre_start.py (attente de la base), 'alembic upgrade head', puis initial_data.py (premier super-administrateur).",
+   "responsabilites": [
+    "Attendre que PostgreSQL réponde",
+    "Appliquer les migrations",
+    "Créer le premier super-administrateur s'il manque"
+   ],
+   "expose": [
+    {
+     "quoi": "scripts/prestart.sh",
+     "fichier": "backend/scripts/prestart.sh",
+     "lignes": [
+      1,
+      13
+     ],
+     "verifie": true
+    },
+    {
+     "quoi": "init (attente avec reprises)",
+     "fichier": "backend/app/backend_pre_start.py",
+     "lignes": [
+      12,
+      29
+     ],
+     "verifie": true
+    },
+    {
+     "quoi": "init_db",
+     "fichier": "backend/app/core/db.py",
+     "lignes": [
+      15,
+      33
+     ],
+     "verifie": true
+    }
+   ],
+   "utilise": [
+    "donnees",
+    "config",
+    "db"
+   ],
+   "fichiers": [
+    "backend/scripts/prestart.sh",
+    "backend/app/backend_pre_start.py",
+    "backend/app/initial_data.py"
+   ],
+   "entre": [
+    "Les réglages de la base",
+    "L'adresse et le mot de passe du premier admin"
+   ],
+   "sort": [
+    "Une base à jour avec un administrateur",
+    "Un échec si la base ne répond pas en 5 minutes"
+   ],
+   "reglages": [
+    {
+     "nom": "Nombre d'essais",
+     "code": "max_tries = 60 * 5",
+     "sorte": "limite",
+     "valeur": "300",
+     "effet": "Combien de fois on attend la base avant d'abandonner",
+     "fichier": "backend/app/backend_pre_start.py",
+     "lignes": [
+      12,
+      13
+     ],
+     "verifie": true,
+     "valeur_vue": false
+    },
+    {
+     "nom": "Pause entre essais",
+     "code": "wait_seconds = 1",
+     "sorte": "limite",
+     "valeur": "1 seconde",
+     "effet": "Temps d'attente entre deux essais",
+     "fichier": "backend/app/backend_pre_start.py",
+     "lignes": [
+      12,
+      13
+     ],
+     "verifie": true,
+     "valeur_vue": false
+    },
+    {
+     "nom": "Mise à jour de la base",
+     "code": "alembic upgrade head",
+     "sorte": "branchement",
+     "valeur": "dernière version",
+     "effet": "Amène la base à la dernière version des tables",
+     "fichier": "backend/scripts/prestart.sh",
+     "lignes": [
+      9,
+      10
+     ],
+     "verifie": true,
+     "valeur_vue": false
+    },
+    {
+     "nom": "Premier administrateur",
+     "code": "email=settings.FIRST_SUPERUSER,",
+     "sorte": "env",
+     "valeur": "FIRST_SUPERUSER",
+     "effet": "Adresse du compte administrateur créé au départ",
+     "fichier": "backend/app/core/db.py",
+     "lignes": [
+      27,
+      33
+     ],
+     "verifie": true,
+     "valeur_vue": true
+    }
+   ],
+   "termes": [
+    {
+     "simple": "mise à jour des tables",
+     "code": "migrations Alembic"
+    },
+    {
+     "simple": "premier administrateur",
+     "code": "FIRST_SUPERUSER"
+    }
+   ]
+  }
+ ],
+ "modules": {
+  "backend/app/main.py": "Crée l'application FastAPI, active Sentry et CORS selon les réglages et monte toutes les routes sous /api/v1.",
+  "backend/app/api/main.py": "Regroupe les routeurs login, users, utils et items, et ajoute private seulement en local.",
+  "backend/app/api/deps.py": "Fournit la session de base par demande, l'utilisateur courant tiré du jeton JWT et la garde super-administrateur.",
+  "backend/app/api/routes/items.py": "Routes CRUD des éléments avec contrôle du propriétaire.",
+  "backend/app/api/routes/login.py": "Routes de connexion, de test du jeton, de demande de lien et de nouveau mot de passe.",
+  "backend/app/api/routes/users.py": "Routes d'inscription, de profil, de mot de passe et de gestion des comptes par le super-administrateur.",
+  "backend/app/api/routes/private.py": "Route de création de compte sans contrôle, montée seulement en local pour les tests.",
+  "backend/app/api/routes/utils.py": "Route de courriel de test (super-administrateur) et route de santé.",
+  "backend/app/core/config.py": "Réglages du serveur lus dans l'environnement et .env, avec contrôle des secrets par défaut.",
+  "backend/app/core/db.py": "Moteur SQLAlchemy et création du premier super-administrateur.",
+  "backend/app/core/security.py": "Création des jetons JWT et hachage Argon2/bcrypt des mots de passe.",
+  "backend/app/crud.py": "Fonctions de création, mise à jour, recherche et authentification des comptes, et création d'éléments.",
+  "backend/app/models.py": "Tables User et Item et schémas d'entrée et de sortie de l'API.",
+  "backend/app/utils.py": "Préparation et envoi des courriels, et jetons de nouveau mot de passe.",
+  "backend/app/backend_pre_start.py": "Attend que la base réponde avant les migrations.",
+  "backend/app/initial_data.py": "Lance la création des données de départ.",
+  "backend/app/tests_pre_start.py": "Attend la base avant de lancer les tests.",
+  "backend/app/alembic/env.py": "Configuration Alembic qui prend l'adresse de la base dans les réglages.",
+  "backend/scripts/prestart.sh": "Script de préparation : attente de la base, migrations, données de départ.",
+  "backend/scripts/test.sh": "Lance les tests Pytest avec mesure de couverture (probablement).",
+  "backend/Dockerfile": "Image Python du serveur, lancée avec fastapi run et 4 processus.",
+  "frontend/src/main.tsx": "Point d'entrée des pages : adresse du serveur, jeton, gestion des refus 401/403, routeur et thème.",
+  "frontend/src/hooks/useAuth.ts": "Connexion, inscription, déconnexion et chargement de l'utilisateur courant.",
+  "frontend/src/routes/_layout.tsx": "Mise en page des pages privées, réservée aux personnes connectées.",
+  "frontend/src/routes/_layout/items.tsx": "Page de la liste des éléments.",
+  "frontend/src/routes/_layout/admin.tsx": "Page de gestion des comptes, réservée au super-administrateur.",
+  "frontend/src/routes/_layout/settings.tsx": "Page des réglages du compte (profil, mot de passe, apparence, suppression).",
+  "frontend/src/routes/_layout/index.tsx": "Page d'accueil après connexion.",
+  "frontend/src/routes/login.tsx": "Page de connexion.",
+  "frontend/src/routes/signup.tsx": "Page d'inscription.",
+  "frontend/src/routes/recover-password.tsx": "Page de demande de lien de nouveau mot de passe.",
+  "frontend/src/routes/reset-password.tsx": "Page de choix du nouveau mot de passe depuis le lien reçu.",
+  "frontend/src/components/Items/AddItem.tsx": "Fenêtre d'ajout d'un élément.",
+  "frontend/src/components/Items/EditItem.tsx": "Fenêtre de modification d'un élément.",
+  "frontend/src/components/Items/DeleteItem.tsx": "Fenêtre de suppression d'un élément.",
+  "frontend/src/components/Admin/AddUser.tsx": "Fenêtre de création de compte par le super-administrateur.",
+  "frontend/src/components/Admin/EditUser.tsx": "Fenêtre de modification d'un compte par le super-administrateur.",
+  "frontend/src/components/Admin/DeleteUser.tsx": "Fenêtre de suppression d'un compte par le super-administrateur.",
+  "frontend/src/components/Common/DataTable.tsx": "Tableau paginé commun aux listes d'éléments et de comptes.",
+  "frontend/src/components/UserSettings/UserInformation.tsx": "Formulaire de modification du profil.",
+  "frontend/src/components/UserSettings/ChangePassword.tsx": "Formulaire de changement de mot de passe.",
+  "frontend/src/components/UserSettings/DeleteConfirmation.tsx": "Confirmation de suppression de son propre compte.",
+  "frontend/src/components/Sidebar/AppSidebar.tsx": "Barre latérale de navigation.",
+  "frontend/src/client/sdk.gen.ts": "Client généré : une méthode par route de l'API.",
+  "frontend/src/client/core/request.ts": "Construit et envoie les demandes HTTP avec axios, ajoute le jeton, transforme les erreurs.",
+  "frontend/src/utils.ts": "Extrait le message d'erreur d'une réponse et l'affiche.",
+  "frontend/Dockerfile": "Construit les pages avec Bun et les sert avec Nginx.",
+  "frontend/playwright.config.ts": "Configuration des tests de bout en bout Playwright.",
+  "compose.yml": "Définit les services db, adminer, prestart, backend et frontend, avec les règles Traefik.",
+  "compose.override.yml": "Réglages de développement local : ports ouverts, mailcatcher, rechargement, Playwright.",
+  "compose.traefik.yml": "Proxy Traefik public avec HTTPS pour le déploiement.",
+  "copier.yml": "Questions posées à la création d'un projet depuis ce modèle.",
+  ".copier/update_dotenv.py": "Écrit les réponses Copier dans le fichier .env.",
+  "scripts/generate-client.sh": "Régénère le client des pages depuis le schéma OpenAPI du serveur (probablement)."
+ },
+ "dossiers": {
+  "backend": "Le serveur Python : code, scripts, tests et image Docker.",
+  "backend/app": "Code de l'application FastAPI.",
+  "backend/app/api": "Montage des routes et dépendances communes (session, utilisateur courant).",
+  "backend/app/api/routes": "Une route par domaine : login, users, items, utils, private.",
+  "backend/app/core": "Réglages, connexion à la base et sécurité.",
+  "backend/app/alembic": "Configuration des migrations de la base.",
+  "backend/app/alembic/versions": "Migrations successives des tables user et item.",
+  "backend/scripts": "Scripts de préparation, de tests, de format et de contrôle du code.",
+  "backend/tests": "Tests Pytest du serveur.",
+  "backend/tests/api/routes": "Tests des routes de l'API.",
+  "backend/tests/crud": "Tests des fonctions d'accès aux comptes.",
+  "backend/tests/scripts": "Tests des scripts d'attente de la base.",
+  "backend/tests/utils": "Aides de test pour créer des comptes, des éléments et des jetons.",
+  "frontend": "Les pages React, leur configuration et leur image Docker.",
+  "frontend/src": "Code source des pages.",
+  "frontend/src/client": "Client de l'API généré depuis OpenAPI.",
+  "frontend/src/client/core": "Mécanique d'envoi des demandes du client généré.",
+  "frontend/src/components": "Composants d'écran regroupés par sujet.",
+  "frontend/src/components/Admin": "Fenêtres et colonnes de gestion des comptes.",
+  "frontend/src/components/Items": "Fenêtres et colonnes de gestion des éléments.",
+  "frontend/src/components/Common": "Composants partagés : tableau, mise en page, erreurs, logo.",
+  "frontend/src/components/Pending": "Squelettes affichés pendant le chargement des listes.",
+  "frontend/src/components/Sidebar": "Barre latérale et menu de la personne connectée.",
+  "frontend/src/components/UserSettings": "Formulaires des réglages du compte.",
+  "frontend/src/components/ui": "Briques d'interface génériques (boutons, fenêtres, champs).",
+  "frontend/src/hooks": "Hooks React : session, messages, copie, écran mobile.",
+  "frontend/src/lib": "Petite aide pour combiner les classes CSS.",
+  "frontend/src/routes": "Pages publiques (connexion, inscription, mot de passe) et racine du routeur.",
+  "frontend/src/routes/_layout": "Pages privées : accueil, éléments, admin, réglages.",
+  "frontend/tests": "Tests Playwright de bout en bout.",
+  "frontend/tests/utils": "Aides de test : comptes, lecture des courriels mailcatcher, valeurs au hasard.",
+  "scripts": "Scripts de projet : génération du client, tests, notes de version.",
+  "hooks": "Script lancé après la génération d'un projet depuis le modèle.",
+  ".copier": "Script qui remplit le fichier .env à partir des réponses Copier."
+ },
+ "incertitudes": [
+  "Si le courriel n'est pas réglé, une personne qui demande un lien pour une adresse connue voit sans doute un message d'erreur général : le code s'arrête sur un contrôle, mais je n'ai pas lu comment les pages traduisent une erreur 500.",
+  "Les vraies valeurs de réglage (domaine, mots de passe, serveur de courriel) sont inconnues : le fichier .env est absent de cette copie.",
+  "Je ne peux pas dire exactement comment se fait la mise en production : je n'ai pas ouvert les workflows de déploiement GitHub Actions ni deployment.md.",
+  "Une personne déconnectée garde un jeton valable jusqu'à 8 jours si quelqu'un l'a copié : la déconnexion efface seulement le jeton du navigateur, et je n'ai trouvé aucune révocation côté serveur.",
+  "Les pages d'accueil, de réglages et les fenêtres de modification n'ont été vues que par leurs noms : je ne les ai pas suivies ligne par ligne."
+ ],
+ "parcours": [
+  {
+   "id": "creer-element",
+   "nom": "Créer un élément",
+   "declencheur": "La personne connectée clique sur « Add Item » puis « Save » sur la page Items.",
+   "depart": "Une personne connectée remplit la fenêtre d'ajout d'un élément et l'enregistre.",
+   "fin": "L'élément est gardé dans la base à son nom et apparaît en haut de sa liste.",
+   "etapes": [
+    {
+     "texte": "Avant d'afficher /items, beforeLoad de la route /_layout appelle isLoggedIn() et redirige vers /login si access_token manque dans localStorage.",
+     "action": "Vérifie la connexion",
+     "simple": "La page vérifie que la personne est connectée.",
+     "composant": "session",
+     "touche": [
+      "utilisateur"
+     ],
+     "conditions": [
+      "Un jeton de connexion est gardé dans le navigateur"
+     ],
+     "manuel": false,
+     "fichier": "frontend/src/routes/_layout.tsx",
+     "lignes": [
+      12,
+      21
+     ],
+     "verifie": true
+    },
+    {
+     "texte": "La fenêtre AddItem valide le formulaire avec zod (title au moins 1 caractère, description facultative), puis onSubmit appelle mutation.mutate(data).",
+     "action": "Saisit l'élément",
+     "simple": "La personne saisit un titre et une description, puis enregistre.",
+     "composant": "pages",
+     "touche": [
+      "utilisateur"
+     ],
+     "conditions": [
+      "Le titre n'est pas vide"
+     ],
+     "manuel": false,
+     "fichier": "frontend/src/components/Items/AddItem.tsx",
+     "lignes": [
+      33,
+      71
+     ],
+     "verifie": true
+    },
+    {
+     "texte": "La mutation appelle ItemsService.createItem, qui envoie POST /api/v1/items/ avec le corps JSON vers OpenAPI.BASE (VITE_API_URL).",
+     "action": "Envoie l'élément",
+     "simple": "Les pages envoient l'élément au serveur.",
+     "composant": "client-api",
+     "touche": [
+      "api"
+     ],
+     "conditions": [
+      "L'adresse du serveur a été fixée à la construction des pages"
+     ],
+     "manuel": false,
+     "fichier": "frontend/src/client/sdk.gen.ts",
+     "lignes": [
+      40,
+      50
+     ],
+     "verifie": true
+    },
+    {
+     "texte": "getHeaders résout OpenAPI.TOKEN (lu dans localStorage par main.tsx) et ajoute l'en-tête 'Authorization: Bearer <jeton>'.",
+     "action": "Joint le jeton",
+     "simple": "Le jeton de connexion est joint à la demande.",
+     "composant": "client-api",
+     "touche": [],
+     "conditions": [
+      "Le jeton n'est pas vide"
+     ],
+     "manuel": false,
+     "fichier": "frontend/src/client/core/request.ts",
+     "lignes": [
+      120,
+      145
+     ],
+     "verifie": true
+    },
+    {
+     "texte": "FastAPI route la demande vers create_item (routeur /items monté sous API_V1_STR) et valide le corps avec ItemCreate (title de 1 à 255 caractères, description jusqu'à 255).",
+     "action": "Reçoit la demande",
+     "simple": "Le serveur reçoit la demande et contrôle le titre et la description.",
+     "composant": "api-elements",
+     "touche": [
+      "api"
+     ],
+     "conditions": [],
+     "manuel": false,
+     "fichier": "backend/app/api/routes/items.py",
+     "lignes": [
+      61,
+      64
+     ],
+     "verifie": true
+    },
+    {
+     "texte": "La dépendance CurrentUser exécute get_current_user : décode le JWT avec SECRET_KEY et HS256, charge l'utilisateur par son id (session ouverte par get_db) et vérifie is_active.",
+     "action": "Vérifie le jeton",
+     "simple": "Le serveur vérifie le jeton et retrouve le compte actif.",
+     "composant": "auth",
+     "touche": [
+      "db"
+     ],
+     "conditions": [
+      "Le jeton est valide et pas expiré",
+      "Le compte existe et est actif"
+     ],
+     "manuel": false,
+     "fichier": "backend/app/api/deps.py",
+     "lignes": [
+      30,
+      46
+     ],
+     "verifie": true
+    },
+    {
+     "texte": "create_item construit Item avec owner_id = current_user.id (id UUID et created_at remplis par défaut), puis session.add, commit et refresh dans la table item.",
+     "action": "Enregistre l'élément",
+     "simple": "Le serveur rattache l'élément à la personne et l'enregistre dans la base.",
+     "composant": "api-elements",
+     "touche": [
+      "db"
+     ],
+     "conditions": [],
+     "manuel": false,
+     "fichier": "backend/app/api/routes/items.py",
+     "lignes": [
+      68,
+      72
+     ],
+     "verifie": true
+    },
+    {
+     "texte": "La route renvoie l'ItemPublic ; onSuccess affiche le toast « Item created successfully », vide le formulaire et ferme la fenêtre.",
+     "action": "Confirme la réussite",
+     "simple": "La personne voit un message de réussite et la fenêtre se ferme.",
+     "composant": "pages",
+     "touche": [
+      "utilisateur"
+     ],
+     "conditions": [
+      "Le serveur a répondu sans erreur"
+     ],
+     "manuel": false,
+     "fichier": "frontend/src/components/Items/AddItem.tsx",
+     "lignes": [
+      55,
+      62
+     ],
+     "verifie": true
+    },
+    {
+     "texte": "onSettled (réussite ou échec) invalide la requête ['items'] ; la page relance ItemsService.readItems(skip 0, limit 100) et read_items renvoie les éléments du propriétaire (tous pour un super-administrateur), triés par created_at décroissant.",
+     "action": "Recharge la liste",
+     "simple": "La liste se recharge et montre le nouvel élément en premier.",
+     "composant": "pages",
+     "touche": [
+      "api",
+      "db"
+     ],
+     "conditions": [],
+     "manuel": false,
+     "fichier": "frontend/src/components/Items/AddItem.tsx",
+     "lignes": [
+      64,
+      66
+     ],
+     "verifie": true
+    }
+   ],
+   "resultat": "Une nouvelle ligne existe dans la table item avec owner_id égal à la personne, et la liste affichée la montre en premier.",
+   "branches": [
+    {
+     "quand": "access_token absent de localStorage",
+     "alors": "beforeLoad lance redirect vers /login",
+     "quand_simple": "La personne n'est pas connectée.",
+     "alors_simple": "Elle arrive sur la page de connexion ; rien n'est gardé.",
+     "etape": 1,
+     "fichier": "frontend/src/routes/_layout.tsx",
+     "lignes": [
+      14,
+      20
+     ],
+     "verifie": true
+    },
+    {
+     "quand": "title vide",
+     "alors": "zod affiche « Title is required » et la demande ne part pas",
+     "quand_simple": "Le titre est vide.",
+     "alors_simple": "Un message demande le titre ; rien n'est envoyé.",
+     "etape": 2,
+     "fichier": "frontend/src/components/Items/AddItem.tsx",
+     "lignes": [
+      33,
+      36
+     ],
+     "verifie": true
+    },
+    {
+     "quand": "Corps refusé par ItemCreate (titre ou description de plus de 255 caractères) : 422",
+     "alors": "handleError affiche le premier detail[].msg dans un toast",
+     "quand_simple": "Le titre ou la description est trop long.",
+     "alors_simple": "Un message d'erreur s'affiche ; l'élément n'est pas gardé.",
+     "etape": 5,
+     "fichier": "frontend/src/utils.ts",
+     "lignes": [
+      4,
+      22
+     ],
+     "verifie": true
+    },
+    {
+     "quand": "JWT invalide ou expiré : 403 « Could not validate credentials »",
+     "alors": "handleApiError retire access_token et renvoie vers /login",
+     "quand_simple": "La connexion a expiré ou le jeton est faux.",
+     "alors_simple": "La personne est déconnectée et renvoyée à la connexion ; l'élément n'est pas gardé.",
+     "etape": 6,
+     "fichier": "frontend/src/main.tsx",
+     "lignes": [
+      21,
+      26
+     ],
+     "verifie": true
+    },
+    {
+     "quand": "Utilisateur introuvable (404) ou inactif (400)",
+     "alors": "HTTPException ; le toast affiche le détail",
+     "quand_simple": "Le compte n'existe plus ou est désactivé.",
+     "alors_simple": "Un message d'erreur s'affiche ; rien n'est gardé.",
+     "etape": 6,
+     "fichier": "backend/app/api/deps.py",
+     "lignes": [
+      41,
+      45
+     ],
+     "verifie": true
+    },
+    {
+     "quand": "items.data vide",
+     "alors": "La page affiche « You don't have any items yet »",
+     "quand_simple": "La personne n'a encore aucun élément.",
+     "alors_simple": "Un message invite à ajouter un premier élément.",
+     "etape": 9,
+     "fichier": "frontend/src/routes/_layout/items.tsx",
+     "lignes": [
+      30,
+      43
+     ],
+     "verifie": true
+    }
+   ],
+   "principal": true,
+   "entree": "web",
+   "sortie": [
+    "db"
+   ],
+   "phases": []
+  },
+  {
+   "id": "connexion",
+   "nom": "Se connecter",
+   "declencheur": "La personne remplit la page de connexion et clique sur « Log In ».",
+   "depart": "Une personne saisit son adresse et son mot de passe sur la page de connexion.",
+   "fin": "La personne reçoit un jeton de connexion gardé dans son navigateur et arrive sur l'accueil.",
+   "etapes": [
+    {
+     "texte": "beforeLoad de /login renvoie vers / si isLoggedIn() est vrai.",
+     "action": "Vérifie la connexion",
+     "simple": "Si la personne est déjà connectée, elle va directement à l'accueil.",
+     "composant": "session",
+     "touche": [
+      "utilisateur"
+     ],
+     "conditions": [
+      "Aucun jeton gardé dans le navigateur"
+     ],
+     "manuel": false,
+     "fichier": "frontend/src/routes/login.tsx",
+     "lignes": [
+      35,
+      43
+     ],
+     "verifie": true
+    },
+    {
+     "texte": "Le formulaire valide username (adresse) et password (au moins 8 caractères), puis onSubmit appelle loginMutation.mutate si aucune demande n'est en cours.",
+     "action": "Saisit ses identifiants",
+     "simple": "La personne saisit son adresse et son mot de passe.",
+     "composant": "pages",
+     "touche": [
+      "utilisateur"
+     ],
+     "conditions": [
+      "Adresse valide",
+      "Mot de passe d'au moins 8 caractères"
+     ],
+     "manuel": false,
+     "fichier": "frontend/src/routes/login.tsx",
+     "lignes": [
+      25,
+      68
+     ],
+     "verifie": true
+    },
+    {
+     "texte": "login() appelle LoginService.loginAccessToken : POST /api/v1/login/access-token en application/x-www-form-urlencoded.",
+     "action": "Envoie les identifiants",
+     "simple": "Les pages envoient les identifiants au serveur.",
+     "composant": "session",
+     "touche": [
+      "api"
+     ],
+     "conditions": [],
+     "manuel": false,
+     "fichier": "frontend/src/hooks/useAuth.ts",
+     "lignes": [
+      41,
+      46
+     ],
+     "verifie": true
+    },
+    {
+     "texte": "login_access_token appelle crud.authenticate : get_user_by_email, puis verify_password (pwdlib). Si l'adresse est inconnue, une vérification sur DUMMY_HASH garde un temps de réponse égal.",
+     "action": "Vérifie le mot de passe",
+     "simple": "Le serveur cherche le compte et compare le mot de passe.",
+     "composant": "auth",
+     "touche": [
+      "db"
+     ],
+     "conditions": [],
+     "manuel": false,
+     "fichier": "backend/app/crud.py",
+     "lignes": [
+      45,
+      54
+     ],
+     "verifie": true
+    },
+    {
+     "texte": "Si verify_and_update renvoie un nouveau hachage (ancien bcrypt), authenticate l'enregistre en Argon2.",
+     "action": "Modernise la protection",
+     "simple": "Si le mot de passe était protégé à l'ancienne, le serveur le protège à nouveau avec la méthode actuelle.",
+     "composant": "donnees",
+     "touche": [
+      "db"
+     ],
+     "conditions": [
+      "Le mot de passe enregistré utilise l'ancienne méthode bcrypt"
+     ],
+     "manuel": false,
+     "fichier": "backend/app/crud.py",
+     "lignes": [
+      55,
+      60
+     ],
+     "verifie": true
+    },
+    {
+     "texte": "La route refuse si l'utilisateur est absent ou inactif, sinon crée un JWT (sub = id, exp = maintenant + ACCESS_TOKEN_EXPIRE_MINUTES) signé HS256 avec SECRET_KEY.",
+     "action": "Crée le jeton",
+     "simple": "Le serveur donne un jeton de connexion valable 8 jours par défaut.",
+     "composant": "auth",
+     "touche": [],
+     "conditions": [
+      "Mot de passe correct",
+      "Compte actif"
+     ],
+     "manuel": false,
+     "fichier": "backend/app/api/routes/login.py",
+     "lignes": [
+      30,
+      42
+     ],
+     "verifie": true
+    },
+    {
+     "texte": "Le navigateur garde access_token dans localStorage, puis onSuccess navigue vers /.",
+     "action": "Garde le jeton",
+     "simple": "Le navigateur garde le jeton et ouvre l'accueil.",
+     "composant": "session",
+     "touche": [
+      "utilisateur"
+     ],
+     "conditions": [],
+     "manuel": false,
+     "fichier": "frontend/src/hooks/useAuth.ts",
+     "lignes": [
+      45,
+      54
+     ],
+     "verifie": true
+    },
+    {
+     "texte": "useAuth lance la requête ['currentUser'] (UsersService.readUserMe, GET /api/v1/users/me) dès que isLoggedIn() est vrai ; read_user_me renvoie l'utilisateur courant.",
+     "action": "Charge le profil",
+     "simple": "Les pages chargent le profil de la personne connectée.",
+     "composant": "session",
+     "touche": [
+      "api",
+      "db"
+     ],
+     "conditions": [
+      "Un jeton est gardé"
+     ],
+     "manuel": false,
+     "fichier": "frontend/src/hooks/useAuth.ts",
+     "lignes": [
+      23,
+      27
+     ],
+     "verifie": true
+    }
+   ],
+   "resultat": "Un jeton JWT valable ACCESS_TOKEN_EXPIRE_MINUTES est gardé dans localStorage et joint ensuite à chaque demande.",
+   "branches": [
+    {
+     "quand": "Adresse inconnue ou mot de passe faux : 400 « Incorrect email or password »",
+     "alors": "handleError affiche le détail dans un toast",
+     "quand_simple": "L'adresse ou le mot de passe est faux.",
+     "alors_simple": "Un message d'erreur s'affiche ; la personne reste déconnectée.",
+     "etape": 6,
+     "fichier": "backend/app/api/routes/login.py",
+     "lignes": [
+      33,
+      34
+     ],
+     "verifie": true
+    },
+    {
+     "quand": "Compte inactif : 400 « Inactive user »",
+     "alors": "Toast d'erreur, pas de jeton",
+     "quand_simple": "Le compte est désactivé.",
+     "alors_simple": "Un message d'erreur s'affiche ; aucune connexion.",
+     "etape": 6,
+     "fichier": "backend/app/api/routes/login.py",
+     "lignes": [
+      35,
+      36
+     ],
+     "verifie": true
+    },
+    {
+     "quand": "Déjà connecté",
+     "alors": "redirect vers /",
+     "quand_simple": "La personne est déjà connectée.",
+     "alors_simple": "Elle arrive directement sur l'accueil.",
+     "etape": 1,
+     "fichier": "frontend/src/routes/login.tsx",
+     "lignes": [
+      37,
+      43
+     ],
+     "verifie": true
+    }
+   ],
+   "principal": false,
+   "entree": "web",
+   "sortie": [
+    "web"
+   ],
+   "phases": []
+  },
+  {
+   "id": "mot-de-passe-oublie",
+   "nom": "Retrouver l'accès avec un mot de passe oublié",
+   "declencheur": "La personne clique sur « Forgot your password? » et saisit son adresse.",
+   "depart": "Une personne qui a oublié son mot de passe donne son adresse.",
+   "fin": "Elle reçoit un lien par courriel, choisit un nouveau mot de passe et peut se reconnecter.",
+   "etapes": [
+    {
+     "texte": "La page /recover-password (réservée aux personnes non connectées) valide l'adresse avec zod et lance la mutation.",
+     "action": "Saisit son adresse",
+     "simple": "La personne saisit son adresse.",
+     "composant": "pages",
+     "touche": [
+      "utilisateur"
+     ],
+     "conditions": [
+      "La personne n'est pas connectée",
+      "Adresse valide"
+     ],
+     "manuel": false,
+     "fichier": "frontend/src/routes/recover-password.tsx",
+     "lignes": [
+      27,
+      78
+     ],
+     "verifie": true
+    },
+    {
+     "texte": "LoginService.recoverPassword envoie POST /api/v1/password-recovery/{email}.",
+     "action": "Envoie l'adresse",
+     "simple": "Les pages envoient l'adresse au serveur.",
+     "composant": "client-api",
+     "touche": [
+      "api"
+     ],
+     "conditions": [],
+     "manuel": false,
+     "fichier": "frontend/src/client/sdk.gen.ts",
+     "lignes": [
+      161,
+      172
+     ],
+     "verifie": true
+    },
+    {
+     "texte": "recover_password cherche l'utilisateur avec crud.get_user_by_email.",
+     "action": "Cherche le compte",
+     "simple": "Le serveur cherche un compte avec cette adresse.",
+     "composant": "auth",
+     "touche": [
+      "db"
+     ],
+     "conditions": [],
+     "manuel": false,
+     "fichier": "backend/app/api/routes/login.py",
+     "lignes": [
+      53,
+      58
+     ],
+     "verifie": true
+    },
+    {
+     "texte": "Si le compte existe, generate_password_reset_token crée un JWT (sub = adresse, exp = maintenant + EMAIL_RESET_TOKEN_EXPIRE_HOURS) signé avec SECRET_KEY.",
+     "action": "Crée le lien secret",
+     "simple": "Le serveur crée un lien secret valable 48 heures par défaut.",
+     "composant": "courriel",
+     "touche": [],
+     "conditions": [
+      "Un compte existe avec cette adresse"
+     ],
+     "manuel": false,
+     "fichier": "backend/app/utils.py",
+     "lignes": [
+      103,
+      113
+     ],
+     "verifie": true
+    },
+    {
+     "texte": "generate_reset_password_email remplit reset_password.html avec le lien FRONTEND_HOST/reset-password?token=... .",
+     "action": "Prépare le courriel",
+     "simple": "Le serveur prépare le courriel avec le lien.",
+     "composant": "courriel",
+     "touche": [],
+     "conditions": [
+      "Un compte existe avec cette adresse"
+     ],
+     "manuel": false,
+     "fichier": "backend/app/utils.py",
+     "lignes": [
+      68,
+      82
+     ],
+     "verifie": true
+    },
+    {
+     "texte": "send_email vérifie settings.emails_enabled (assert), puis envoie par SMTP (SMTP_HOST, SMTP_PORT, TLS ou SSL, identifiants s'ils sont remplis).",
+     "action": "Envoie le courriel",
+     "simple": "Le serveur envoie le courriel par le serveur de courriel.",
+     "composant": "courriel",
+     "touche": [
+      "smtp"
+     ],
+     "conditions": [
+      "Un compte existe avec cette adresse",
+      "SMTP_HOST et EMAILS_FROM_EMAIL sont remplis"
+     ],
+     "manuel": false,
+     "fichier": "backend/app/utils.py",
+     "lignes": [
+      33,
+      55
+     ],
+     "verifie": true
+    },
+    {
+     "texte": "La route renvoie toujours le même message ; onSuccess affiche « Password recovery email sent successfully » et vide le formulaire.",
+     "action": "Confirme l'envoi",
+     "simple": "La personne voit qu'un courriel a été envoyé, que l'adresse existe ou non.",
+     "composant": "pages",
+     "touche": [
+      "utilisateur"
+     ],
+     "conditions": [],
+     "manuel": false,
+     "fichier": "backend/app/api/routes/login.py",
+     "lignes": [
+      72,
+      74
+     ],
+     "verifie": true
+    },
+    {
+     "texte": "La personne ouvre le courriel et clique sur le lien vers /reset-password?token=... .",
+     "action": "Clique sur le lien",
+     "simple": "La personne ouvre le courriel et clique sur le lien.",
+     "composant": null,
+     "touche": [
+      "utilisateur",
+      "smtp"
+     ],
+     "conditions": [
+      "Le courriel est bien arrivé"
+     ],
+     "manuel": true,
+     "fichier": "backend/app/utils.py",
+     "lignes": [
+      71,
+      71
+     ],
+     "verifie": true
+    },
+    {
+     "texte": "beforeLoad de /reset-password renvoie vers / si connecté et vers /login si token manque ; le formulaire exige un nouveau mot de passe d'au moins 8 caractères et une confirmation identique.",
+     "action": "Saisit le nouveau mot de passe",
+     "simple": "La page vérifie le lien, puis la personne saisit deux fois son nouveau mot de passe.",
+     "composant": "pages",
+     "touche": [
+      "utilisateur"
+     ],
+     "conditions": [
+      "Le lien contient le secret",
+      "Les deux saisies sont identiques"
+     ],
+     "manuel": false,
+     "fichier": "frontend/src/routes/reset-password.tsx",
+     "lignes": [
+      28,
+      59
+     ],
+     "verifie": true
+    },
+    {
+     "texte": "La mutation appelle LoginService.resetPassword : POST /api/v1/reset-password/ avec { new_password, token }.",
+     "action": "Envoie le nouveau mot de passe",
+     "simple": "Les pages envoient le nouveau mot de passe et le secret du lien.",
+     "composant": "pages",
+     "touche": [
+      "api"
+     ],
+     "conditions": [],
+     "manuel": false,
+     "fichier": "frontend/src/routes/reset-password.tsx",
+     "lignes": [
+      84,
+      97
+     ],
+     "verifie": true
+    },
+    {
+     "texte": "reset_password décode le token (verify_password_reset_token), cherche l'utilisateur par adresse et vérifie is_active.",
+     "action": "Vérifie le lien",
+     "simple": "Le serveur vérifie le lien et retrouve le compte actif.",
+     "composant": "auth",
+     "touche": [
+      "db"
+     ],
+     "conditions": [
+      "Lien valide et pas expiré",
+      "Compte existant et actif"
+     ],
+     "manuel": false,
+     "fichier": "backend/app/api/routes/login.py",
+     "lignes": [
+      77,
+      90
+     ],
+     "verifie": true
+    },
+    {
+     "texte": "crud.update_user hache le nouveau mot de passe (Argon2) et enregistre hashed_password.",
+     "action": "Enregistre le mot de passe",
+     "simple": "Le serveur protège et enregistre le nouveau mot de passe.",
+     "composant": "donnees",
+     "touche": [
+      "db"
+     ],
+     "conditions": [],
+     "manuel": false,
+     "fichier": "backend/app/crud.py",
+     "lignes": [
+      20,
+      31
+     ],
+     "verifie": true
+    },
+    {
+     "texte": "onSuccess affiche « Password updated successfully », vide le formulaire et navigue vers /login.",
+     "action": "Renvoie à la connexion",
+     "simple": "La personne voit la réussite et revient à la page de connexion.",
+     "composant": "pages",
+     "touche": [
+      "utilisateur"
+     ],
+     "conditions": [],
+     "manuel": false,
+     "fichier": "frontend/src/routes/reset-password.tsx",
+     "lignes": [
+      87,
+      91
+     ],
+     "verifie": true
+    }
+   ],
+   "resultat": "hashed_password du compte est remplacé ; la personne peut se connecter avec son nouveau mot de passe.",
+   "branches": [
+    {
+     "quand": "Adresse inconnue",
+     "alors": "Aucun jeton ni courriel ; même message de réponse",
+     "quand_simple": "L'adresse ne correspond à aucun compte.",
+     "alors_simple": "La personne voit le même message de réussite, mais aucun courriel ne part.",
+     "etape": 3,
+     "fichier": "backend/app/api/routes/login.py",
+     "lignes": [
+      60,
+      74
+     ],
+     "verifie": true
+    },
+    {
+     "quand": "Courriel non configuré : l'assert de send_email échoue (erreur 500)",
+     "alors": "La page affiche un toast d'erreur, probablement « Something went wrong. »",
+     "quand_simple": "Le serveur de courriel n'est pas réglé.",
+     "alors_simple": "Un message d'erreur s'affiche et aucun courriel ne part.",
+     "etape": 6,
+     "fichier": "backend/app/utils.py",
+     "lignes": [
+      39,
+      39
+     ],
+     "verifie": true
+    },
+    {
+     "quand": "token absent de l'adresse de la page",
+     "alors": "redirect vers /login",
+     "quand_simple": "Le lien est incomplet.",
+     "alors_simple": "La personne arrive sur la page de connexion ; rien ne change.",
+     "etape": 9,
+     "fichier": "frontend/src/routes/reset-password.tsx",
+     "lignes": [
+      56,
+      58
+     ],
+     "verifie": true
+    },
+    {
+     "quand": "Confirmation différente",
+     "alors": "zod affiche « The passwords don't match »",
+     "quand_simple": "Les deux saisies ne sont pas identiques.",
+     "alors_simple": "Un message le signale ; rien n'est envoyé.",
+     "etape": 9,
+     "fichier": "frontend/src/routes/reset-password.tsx",
+     "lignes": [
+      42,
+      45
+     ],
+     "verifie": true
+    },
+    {
+     "quand": "Token invalide ou expiré, ou compte introuvable : 400 « Invalid token »",
+     "alors": "Toast d'erreur",
+     "quand_simple": "Le lien est faux ou trop vieux.",
+     "alors_simple": "Un message d'erreur s'affiche ; l'ancien mot de passe reste.",
+     "etape": 11,
+     "fichier": "backend/app/api/routes/login.py",
+     "lignes": [
+      82,
+      88
+     ],
+     "verifie": true
+    },
+    {
+     "quand": "Compte inactif : 400 « Inactive user »",
+     "alors": "Toast d'erreur",
+     "quand_simple": "Le compte est désactivé.",
+     "alors_simple": "Un message d'erreur s'affiche ; rien ne change.",
+     "etape": 11,
+     "fichier": "backend/app/api/routes/login.py",
+     "lignes": [
+      89,
+      90
+     ],
+     "verifie": true
+    }
+   ],
+   "principal": false,
+   "entree": "web",
+   "sortie": [
+    "smtp",
+    "db"
+   ],
+   "phases": [
+    {
+     "nom": "Demander le lien",
+     "de": 1,
+     "a": 3
+    },
+    {
+     "nom": "Envoyer le courriel",
+     "de": 4,
+     "a": 7
+    },
+    {
+     "nom": "Revenir par le lien",
+     "de": 8,
+     "a": 10
+    },
+    {
+     "nom": "Enregistrer le nouveau mot de passe",
+     "de": 11,
+     "a": 13
+    }
+   ]
+  },
+  {
+   "id": "demarrage",
+   "nom": "Démarrer la plateforme",
+   "declencheur": "Une personne lance la pile Docker Compose.",
+   "depart": "Une personne remplit le fichier de réglages et lance les conteneurs.",
+   "fin": "La base est à jour avec un administrateur, et le serveur et les pages répondent.",
+   "etapes": [
+    {
+     "texte": "La personne remplit .env (SECRET_KEY, POSTGRES_*, FIRST_SUPERUSER, DOMAIN...) puis lance docker compose ; compose.yml exige ces variables ('?Variable not set').",
+     "action": "Lance les conteneurs",
+     "simple": "Une personne remplit les réglages et lance les conteneurs.",
+     "composant": null,
+     "touche": [],
+     "conditions": [
+      "Les variables obligatoires sont remplies"
+     ],
+     "manuel": true,
+     "fichier": "compose.yml",
+     "lignes": [
+      45,
+      77
+     ],
+     "verifie": true
+    },
+    {
+     "texte": "Le service db (postgres:18) démarre avec le volume app-db-data ; son healthcheck lance pg_isready toutes les 10 s.",
+     "action": "Démarre la base",
+     "simple": "La base de données démarre et se signale prête.",
+     "composant": "demarrage",
+     "touche": [
+      "db"
+     ],
+     "conditions": [],
+     "manuel": false,
+     "fichier": "compose.yml",
+     "lignes": [
+      3,
+      20
+     ],
+     "verifie": true
+    },
+    {
+     "texte": "prestart attend que db soit 'service_healthy', puis lance 'bash scripts/prestart.sh' ; le script a 'set -e' et s'arrête à la première commande en échec.",
+     "action": "Lance la préparation",
+     "simple": "La préparation attend la base, puis lance ses trois tâches dans l'ordre.",
+     "composant": "demarrage",
+     "touche": [],
+     "conditions": [
+      "La base est signalée prête"
+     ],
+     "manuel": false,
+     "fichier": "backend/scripts/prestart.sh",
+     "lignes": [
+      1,
+      13
+     ],
+     "verifie": true
+    },
+    {
+     "texte": "backend_pre_start.py essaie 'SELECT 1' jusqu'à 300 fois, avec 1 seconde entre deux essais (tenacity).",
+     "action": "Attend la base",
+     "simple": "La préparation vérifie que la base répond, pendant 5 minutes au plus.",
+     "composant": "demarrage",
+     "touche": [
+      "db"
+     ],
+     "conditions": [],
+     "manuel": false,
+     "fichier": "backend/app/backend_pre_start.py",
+     "lignes": [
+      12,
+      35
+     ],
+     "verifie": true
+    },
+    {
+     "texte": "'alembic upgrade head' applique les migrations de backend/app/alembic/versions, avec l'adresse tirée de settings.SQLALCHEMY_DATABASE_URI.",
+     "action": "Met à jour les tables",
+     "simple": "La préparation met les tables à la dernière version.",
+     "composant": "demarrage",
+     "touche": [
+      "db"
+     ],
+     "conditions": [
+      "La base a répondu"
+     ],
+     "manuel": false,
+     "fichier": "backend/app/alembic/env.py",
+     "lignes": [
+      22,
+      34
+     ],
+     "verifie": true
+    },
+    {
+     "texte": "initial_data.py appelle init_db : si aucun User n'a l'adresse FIRST_SUPERUSER, crud.create_user le crée avec is_superuser=True.",
+     "action": "Crée l'administrateur",
+     "simple": "La préparation crée le premier administrateur s'il n'existe pas.",
+     "composant": "demarrage",
+     "touche": [
+      "db"
+     ],
+     "conditions": [
+      "Aucun compte n'a encore cette adresse"
+     ],
+     "manuel": false,
+     "fichier": "backend/app/core/db.py",
+     "lignes": [
+      15,
+      33
+     ],
+     "verifie": true
+    },
+    {
+     "texte": "Le service backend démarre seulement quand prestart s'est terminé avec succès ('service_completed_successfully') ; il lance 'fastapi run --workers 4 app/main.py'.",
+     "action": "Démarre le serveur",
+     "simple": "Le serveur démarre seulement si la préparation a réussi.",
+     "composant": "config",
+     "touche": [
+      "api"
+     ],
+     "conditions": [
+      "La préparation a réussi"
+     ],
+     "manuel": false,
+     "fichier": "compose.yml",
+     "lignes": [
+      79,
+      91
+     ],
+     "verifie": true
+    },
+    {
+     "texte": "À l'import, Settings lit l'environnement et refuse 'changethis' pour SECRET_KEY, POSTGRES_PASSWORD et FIRST_SUPERUSER_PASSWORD hors local ; main.py initialise Sentry si SENTRY_DSN est rempli hors local, ajoute CORS et monte api_router sous /api/v1 (routes /private seulement en local).",
+     "action": "Lit les réglages",
+     "simple": "Le serveur lit ses réglages, refuse les mots de passe par défaut hors du mode local et ouvre ses adresses.",
+     "composant": "config",
+     "touche": [
+      "sentry"
+     ],
+     "conditions": [
+      "Hors du mode local, aucun secret ne vaut 'changethis'",
+      "Sentry seulement si son adresse est remplie et hors local"
+     ],
+     "manuel": false,
+     "fichier": "backend/app/main.py",
+     "lignes": [
+      14,
+      33
+     ],
+     "verifie": true
+    },
+    {
+     "texte": "En parallèle, l'image frontend (construite par Bun avec VITE_API_URL=https://api.DOMAIN) sert les fichiers par Nginx ; toute adresse inconnue renvoie index.html.",
+     "action": "Sert les pages",
+     "simple": "En même temps, les pages sont servies aux navigateurs.",
+     "composant": "pages",
+     "touche": [
+      "web"
+     ],
+     "conditions": [
+      "L'adresse du serveur a été fixée à la construction"
+     ],
+     "manuel": false,
+     "fichier": "frontend/Dockerfile",
+     "lignes": [
+      15,
+      26
+     ],
+     "verifie": true
+    }
+   ],
+   "resultat": "PostgreSQL est à jour, le premier super-administrateur existe, l'API répond sur /api/v1 et les pages sont servies.",
+   "branches": [
+    {
+     "quand": "La base ne répond pas après 300 essais",
+     "alors": "tenacity lève l'erreur, set -e arrête prestart.sh, backend ne démarre pas",
+     "quand_simple": "La base ne répond pas en 5 minutes.",
+     "alors_simple": "Le serveur ne démarre pas ; rien n'est changé dans la base.",
+     "etape": 4,
+     "fichier": "backend/app/backend_pre_start.py",
+     "lignes": [
+      16,
+      29
+     ],
+     "verifie": true
+    },
+    {
+     "quand": "Un secret vaut 'changethis' et ENVIRONMENT n'est pas 'local'",
+     "alors": "ValueError à la création de Settings : le processus s'arrête",
+     "quand_simple": "Un mot de passe par défaut est resté en production.",
+     "alors_simple": "Le serveur refuse de démarrer.",
+     "etape": 8,
+     "fichier": "backend/app/core/config.py",
+     "lignes": [
+      97,
+      116
+     ],
+     "verifie": true
+    },
+    {
+     "quand": "Le premier super-administrateur existe déjà",
+     "alors": "init_db ne fait rien",
+     "quand_simple": "L'administrateur de départ existe déjà.",
+     "alors_simple": "Rien n'est créé ; son mot de passe n'est pas changé.",
+     "etape": 6,
+     "fichier": "backend/app/core/db.py",
+     "lignes": [
+      24,
+      33
+     ],
+     "verifie": true
+    }
+   ],
+   "principal": false,
+   "entree": "prestart",
+   "sortie": [
+    "db",
+    "api"
+   ],
+   "phases": []
+  }
+ ],
+ "flux": [
+  {
+   "de": "utilisateur",
+   "vers": "web",
+   "quoi": "Identifiants, éléments saisis, demandes de nouveau mot de passe",
+   "verbe": "remplit les formulaires de",
+   "nature": "donnee"
+  },
+  {
+   "de": "web",
+   "vers": "api",
+   "quoi": "Demandes HTTP JSON avec le jeton 'Authorization: Bearer'",
+   "verbe": "envoie les demandes à",
+   "nature": "donnee"
+  },
+  {
+   "de": "api",
+   "vers": "web",
+   "quoi": "Éléments, comptes, jeton de connexion ou refus",
+   "verbe": "répond à",
+   "nature": "donnee"
+  },
+  {
+   "de": "api",
+   "vers": "db",
+   "quoi": "Lecture et écriture des tables user et item",
+   "verbe": "enregistre et lit dans",
+   "nature": "donnee"
+  },
+  {
+   "de": "api",
+   "vers": "smtp",
+   "quoi": "Courriels HTML (nouveau mot de passe, nouveau compte, test)",
+   "verbe": "envoie les courriels via",
+   "nature": "donnee"
+  },
+  {
+   "de": "smtp",
+   "vers": "utilisateur",
+   "quoi": "Courriel avec le lien de nouveau mot de passe",
+   "verbe": "livre les courriels à",
+   "nature": "donnee"
+  },
+  {
+   "de": "api",
+   "vers": "sentry",
+   "quoi": "Erreurs et traces, si SENTRY_DSN est rempli hors du mode local",
+   "verbe": "signale les erreurs à",
+   "nature": "donnee"
+  },
+  {
+   "de": "prestart",
+   "vers": "db",
+   "quoi": "Migrations Alembic et premier super-administrateur",
+   "verbe": "prépare",
+   "nature": "donnee"
+  },
+  {
+   "de": "prestart",
+   "vers": "api",
+   "quoi": "Le serveur ne démarre que si la préparation a réussi",
+   "verbe": "autorise le démarrage de",
+   "nature": "controle"
+  },
+  {
+   "de": "ci",
+   "vers": "tests",
+   "quoi": "Lancement des tests à chaque changement",
+   "verbe": "lance",
+   "nature": "controle"
+  },
+  {
+   "de": "tests",
+   "vers": "api",
+   "quoi": "Appels de test sur les routes",
+   "verbe": "vérifie",
+   "nature": "controle"
+  }
+ ],
+ "donnee": [
+  {
+   "nom": "élément",
+   "dans_le_code": "Item (table item : title, description, owner_id, created_at)",
+   "entre_par": "web",
+   "finit_dans": "db"
+  }
+ ],
+ "reglages_projet": [
+  {
+   "nom": "Version de la base",
+   "code": "image: postgres:18",
+   "valeur": "postgres:18",
+   "fichier": "compose.yml",
+   "lignes": [
+    3,
+    4
+   ],
+   "verifie": true,
+   "valeur_vue": true,
+   "lu_par_le_code": "non"
+  },
+  {
+   "nom": "Hôte de la base pour le serveur",
+   "code": "POSTGRES_SERVER=db",
+   "valeur": "db",
+   "fichier": "compose.yml",
+   "lignes": [
+    105,
+    105
+   ],
+   "verifie": true,
+   "valeur_vue": true,
+   "lu_par_le_code": "oui"
+  },
+  {
+   "nom": "Clé secrète obligatoire",
+   "code": "SECRET_KEY=${SECRET_KEY?Variable not set}",
+   "valeur": "tirée de .env",
+   "fichier": "compose.yml",
+   "lignes": [
+    98,
+    98
+   ],
+   "verifie": true,
+   "valeur_vue": false,
+   "lu_par_le_code": "oui"
+  },
+  {
+   "nom": "Adresse des pages",
+   "code": "FRONTEND_HOST=${FRONTEND_HOST?Variable not set}",
+   "valeur": "tirée de .env",
+   "fichier": "compose.yml",
+   "lignes": [
+    95,
+    95
+   ],
+   "verifie": true,
+   "valeur_vue": false,
+   "lu_par_le_code": "oui"
+  },
+  {
+   "nom": "Adresse du serveur pour les pages",
+   "code": "VITE_API_URL=https://api.${DOMAIN?Variable not set}",
+   "valeur": "https://api.<domaine>",
+   "fichier": "compose.yml",
+   "lignes": [
+    148,
+    150
+   ],
+   "verifie": true,
+   "valeur_vue": false,
+   "lu_par_le_code": "oui"
+  },
+  {
+   "nom": "Contrôle de santé du serveur",
+   "code": "test: [\"CMD\", \"curl\", \"-f\", \"http://localhost:8000/api/v1/utils/health-check/\"]",
+   "valeur": "toutes les 10 s",
+   "fichier": "compose.yml",
+   "lignes": [
+    112,
+    116
+   ],
+   "verifie": true,
+   "valeur_vue": false,
+   "lu_par_le_code": "non"
+  },
+  {
+   "nom": "Adresse publique du serveur",
+   "code": "Host(`api.${DOMAIN?Variable not set}`)",
+   "valeur": "api.<domaine>",
+   "fichier": "compose.yml",
+   "lignes": [
+    128,
+    128
+   ],
+   "verifie": true,
+   "valeur_vue": false,
+   "lu_par_le_code": "non"
+  },
+  {
+   "nom": "Serveur de courriel en local",
+   "code": "SMTP_HOST: \"mailcatcher\"",
+   "valeur": "mailcatcher",
+   "fichier": "compose.override.yml",
+   "lignes": [
+    85,
+    87
+   ],
+   "verifie": true,
+   "valeur_vue": true,
+   "lu_par_le_code": "oui"
+  },
+  {
+   "nom": "Port de courriel en local",
+   "code": "SMTP_PORT: \"1025\"",
+   "valeur": "1025",
+   "fichier": "compose.override.yml",
+   "lignes": [
+    85,
+    87
+   ],
+   "verifie": true,
+   "valeur_vue": true,
+   "lu_par_le_code": "oui"
+  },
+  {
+   "nom": "Clé secrète proposée par le modèle",
+   "code": "default: changethis",
+   "valeur": "changethis",
+   "fichier": "copier.yml",
+   "lignes": [
+    11,
+    17
+   ],
+   "verifie": true,
+   "valeur_vue": true,
+   "lu_par_le_code": "non"
+  },
+  {
+   "nom": "Premier administrateur proposé",
+   "code": "default: admin@example.com",
+   "valeur": "admin@example.com",
+   "fichier": "copier.yml",
+   "lignes": [
+    19,
+    22
+   ],
+   "verifie": true,
+   "valeur_vue": true,
+   "lu_par_le_code": "non"
+  }
+ ],
+ "pour_changer": [
+  {
+   "intention": "Je veux changer la longueur maximale du titre d'un élément",
+   "composant": "api-elements",
+   "reglage": "title: str = Field(min_length=1, max_length=255)",
+   "fichier": "backend/app/models.py",
+   "lignes": [
+    71,
+    73
+   ],
+   "verifie": true
+  },
+  {
+   "intention": "Je veux changer le nombre d'éléments renvoyés par défaut",
+   "composant": "api-elements",
+   "reglage": "limit: int = 100",
+   "fichier": "backend/app/api/routes/items.py",
+   "lignes": [
+    14,
+    16
+   ],
+   "verifie": true
+  },
+  {
+   "intention": "Je veux changer combien de temps on reste connecté",
+   "composant": "auth",
+   "reglage": "ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 8",
+   "fichier": "backend/app/core/config.py",
+   "lignes": [
+    35,
+    36
+   ],
+   "verifie": true
+  },
+  {
+   "intention": "Je veux changer la clé qui signe les jetons",
+   "composant": "auth",
+   "reglage": "SECRET_KEY: str = secrets.token_urlsafe(32)",
+   "fichier": "backend/app/core/config.py",
+   "lignes": [
+    34,
+    34
+   ],
+   "verifie": true
+  },
+  {
+   "intention": "Je veux changer la durée de validité du lien de mot de passe",
+   "composant": "courriel",
+   "reglage": "EMAIL_RESET_TOKEN_EXPIRE_HOURS: int = 48",
+   "fichier": "backend/app/core/config.py",
+   "lignes": [
+    86,
+    86
+   ],
+   "verifie": true
+  },
+  {
+   "intention": "Je veux changer le port du serveur de courriel",
+   "composant": "courriel",
+   "reglage": "SMTP_PORT: int = 587",
+   "fichier": "backend/app/core/config.py",
+   "lignes": [
+    71,
+    78
+   ],
+   "verifie": true
+  },
+  {
+   "intention": "Je veux changer le mode de déploiement (local, préproduction, production)",
+   "composant": "config",
+   "reglage": "ENVIRONMENT: Literal[\"local\", \"staging\", \"production\"] = \"local\"",
+   "fichier": "backend/app/core/config.py",
+   "lignes": [
+    38,
+    38
+   ],
+   "verifie": true
+  },
+  {
+   "intention": "Je veux changer le début commun des adresses du serveur",
+   "composant": "config",
+   "reglage": "API_V1_STR: str = \"/api/v1\"",
+   "fichier": "backend/app/core/config.py",
+   "lignes": [
+    33,
+    33
+   ],
+   "verifie": true
+  },
+  {
+   "intention": "Je veux changer l'adresse du premier administrateur",
+   "composant": "demarrage",
+   "reglage": "email=settings.FIRST_SUPERUSER,",
+   "fichier": "backend/app/core/db.py",
+   "lignes": [
+    27,
+    33
+   ],
+   "verifie": true
+  },
+  {
+   "intention": "Je veux changer combien de temps on attend la base au démarrage",
+   "composant": "demarrage",
+   "reglage": "max_tries = 60 * 5",
+   "fichier": "backend/app/backend_pre_start.py",
+   "lignes": [
+    12,
+    13
+   ],
+   "verifie": true
+  },
+  {
+   "intention": "Je veux changer l'adresse du serveur appelée par les pages",
+   "composant": "session",
+   "reglage": "OpenAPI.BASE = import.meta.env.VITE_API_URL",
+   "fichier": "frontend/src/main.tsx",
+   "lignes": [
+    16,
+    16
+   ],
+   "verifie": true
+  },
+  {
+   "intention": "Je veux changer le thème affiché par défaut",
+   "composant": "session",
+   "reglage": "defaultTheme=\"dark\"",
+   "fichier": "frontend/src/main.tsx",
+   "lignes": [
+    45,
+    45
+   ],
+   "verifie": true
+  }
+ ]
+}

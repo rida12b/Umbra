@@ -25,6 +25,9 @@ export interface FloorLink {
   verb: string;
   full: string;
   style: LinkStyle;
+  // Over every flow in this direction, not only the first: a part may both start its room and send it data.
+  control: boolean;
+  data: boolean;
 }
 
 export type Sortie = { kind: "store"; id: string } | { kind: "reply"; to: string };

@@ -133,7 +133,8 @@ test("a journey's steps are grouped by the room they happen in; the way back is 
 
 test("a person's own action at a door comes in; the machine answering them goes back", () => {
   const site = room(justicia(), "site");
-  assert.deepEqual(site.doors.map((d) => [d.bloc, d.side]), [["user", "left"], ["api", "right"]]);
+  // memoire-nav is the floor's SORTIE for JusticIA: in the room it is a way out (door), as on the floor; doors in step order.
+  assert.deepEqual(site.doors.map((d) => [d.bloc, d.side]), [["user", "left"], ["memoire-nav", "right"], ["api", "right"]]);
   assert.deepEqual(crossings(site, "user"), ["in1", "in2", "out15"]); // step 2: the person sends the question
   assert.deepEqual(crossings(site, "api"), ["out5", "in14"]);
   assert.deepEqual(crossings(room(watchdog(), "api"), "agent-surveille"), ["in1", "out5"]);
@@ -159,4 +160,15 @@ test("« Retour à l'expéditeur » only for a last run back in a part seen befo
   const send = manual.parcours.find((j) => j.id === "envoi-evenement")!;
   send.etapes[4]!.manuel = true; // the last run is the person's own action, not an answer
   assert.ok(!titles(manual, "envoi-evenement").at(-1)!.startsWith("Retour"));
+});
+
+test("a flow the model calls « controle » is never a door, whatever its verb (v1.7 nature)", () => {
+  const model = JSON.parse(readFileSync(new URL("../../test-fixtures/fastapi-template.json", import.meta.url), "utf-8")) as ProjectModel;
+  const room = buildRoom(model, "api")!;
+  assert.ok(!room.doors.some((d) => d.bloc === "prestart"), room.doors.map((d) => d.bloc).join(", "));
+  assert.ok(room.doors.some((d) => d.bloc === "web" && d.role === "entree"));
+  // Where the journey ends is the SORTIE door, never a « va y chercher » under a machine; the answer to the web app is drawn.
+  assert.ok(room.doors.some((d) => d.bloc === "db" && d.side === "right" && d.role === "sortie"), JSON.stringify(room.doors.map((d) => [d.bloc, d.side, d.role])));
+  assert.ok(!room.belt.some((m) => m.hung.some((h) => h.bloc === "db")));
+  assert.equal(room.reply?.door, "web");
 });
