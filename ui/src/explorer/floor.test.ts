@@ -203,3 +203,19 @@ test("a hung part's link fits its tag (three short lines) on the real models", (
   for (const model of [watchdog(), justicia()])
     for (const [id, words] of Object.entries(buildFloor(model).relations)) assert.ok(words.length <= 75, `${id}: ${words}`);
 });
+
+test("a step done by hand with no component (v1.7) changes nothing on the floor", () => {
+  const model = watchdog();
+  model.parcours.find((j) => j.id === "demarrage")!.etapes[0]!.composant = null;
+  const floor = buildFloor(model);
+  assert.deepEqual(floor.belt, buildFloor(watchdog()).belt);
+  assert.equal(floor.skipped, 0);
+});
+
+test("a main journey declared by the study (v1.7) is the one the belt follows", () => {
+  const model = watchdog();
+  model.parcours.find((j) => j.id === "demarrage")!.principal = true;
+  assert.equal(buildFloor(model).journey?.id, "demarrage");
+  model.parcours.find((j) => j.id === "demarrage")!.principal_deduit = true; // deduced: the floor's own rule
+  assert.equal(buildFloor(model).journey?.id, "envoi-evenement");
+});

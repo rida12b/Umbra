@@ -2,6 +2,8 @@
 
 The first request starts a study session; once the code changes, the model is out of date and the
 next request (or live mode) starts an update session that re-reads only the changed files.
+A model written by an older version of the method is kept and served as it is ("methode"): nothing
+studies it again until the user asks, since a full study spends their Claude subscription (#78).
 """
 
 import json
@@ -27,7 +29,7 @@ from umbra_engine.project_store import ProjectStore
 from umbra_engine.projection.graph import ProjectGraph
 from umbra_engine.registry import Project
 
-ModelState = Literal["ready", "stale", "missing", "queued", "working", "error"]
+ModelState = Literal["ready", "stale", "methode", "missing", "queued", "working", "error"]
 
 
 class ProjectModelState(BaseModel):
@@ -36,6 +38,12 @@ class ProjectModelState(BaseModel):
     created_at: str | None = None
     changed: list[str] = []  # files changed since the model was written
     message: str | None = None
+    producer: str | None = None  # the method version that wrote the model
+    methode_ancienne: bool = False  # written by an older method: a full study waits for « Relancer »
+
+
+class StudyRequest(BaseModel):
+    relancer: bool = False  # the user clicked « Relancer l'étude »: the only way to restudy an old model
 
 
 def add_model_routes(
@@ -57,11 +65,14 @@ def add_model_routes(
         state = ProjectModelState(state="missing")
         if row is not None and record is not None:
             changed = changed_files(record["digests"], digests)
+            outdated = row[2] != MODEL_PRODUCER
             state = ProjectModelState(
-                state="stale" if changed or row[2] != MODEL_PRODUCER else "ready",
+                state="methode" if outdated else "stale" if changed else "ready",
                 model=record["model"],
                 created_at=row[3],
                 changed=changed[:50],
+                producer=row[2],
+                methode_ancienne=outdated,
             )
         working = explainer.state(project_id, MODEL_KEY)
         if working in ("queued", "working"):
@@ -70,9 +81,13 @@ def add_model_routes(
             state = state.model_copy(update={"state": "error", "message": working})
         return state, record, digests
 
-    def refresh_model(project_id: str) -> ModelState:
+    def refresh_model(project_id: str, relaunch: bool = False) -> ModelState:
+        """Study or update when needed. A model by an older method is studied again only on `relaunch`:
+        neither live changes, nor a retry after an error, nor an old page asking by itself start one."""
         state, record, digests = current(project_id)
-        if state.state not in ("missing", "stale", "error"):
+        if state.methode_ancienne and not relaunch:
+            return state.state
+        if state.state not in ("missing", "stale", "error", "methode"):
             return state.state
         project = known_project(project_id)
         graph = graph_of(project_id)
@@ -99,10 +114,11 @@ def add_model_routes(
         return current(project_id)[0]
 
     @app.post("/v1/projects/{project_id}/model", dependencies=authorized)
-    def request_model(project_id: str) -> ProjectModelState:
-        """Study the Project when it has no model, or update it when the code changed since."""
+    def request_model(project_id: str, body: StudyRequest | None = None) -> ProjectModelState:
+        """Study the Project when it has no model, update it when the code changed since, or study it
+        again with the current method when the user asks (`relancer`)."""
         known_project(project_id)
-        refresh_model(project_id)
+        refresh_model(project_id, relaunch=body is not None and body.relancer)
         return current(project_id)[0]
 
     return refresh_model

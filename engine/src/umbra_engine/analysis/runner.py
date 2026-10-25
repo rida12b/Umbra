@@ -19,7 +19,7 @@ from umbra_engine.project_store import FileEntry
 from umbra_engine.projection.graph import ProjectGraph
 
 MODEL_KEY = "model:"
-MODEL_PRODUCER = "claude-code-study@1.6"  # another version studies the Project again from scratch
+MODEL_PRODUCER = "claude-code-study@1.7"  # a model by another version waits for an explicit relaunch
 MODEL_FILE = "UMBRA_MODEL.json"
 MAX_LISTED_CHANGES = 200
 
@@ -57,11 +57,12 @@ def run_session(
         changed = changed_files(previous["digests"], digests) if previous is not None else []
         if previous is None or len(changed) > MAX_LISTED_CHANGES:
             # First look, or too much changed to list (a branch switch, a reformat): study it all again.
-            model = checked_model(parse_answer(study(study_prompt(), folder)), line_counts, directories)
+            answer = parse_answer(study(study_prompt(), folder))
+            model = checked_model(answer, line_counts, directories, texts=texts)
         else:
             (folder / MODEL_FILE).write_text(
                 json.dumps(previous["model"], ensure_ascii=False), encoding="utf-8"
             )
             patch = parse_answer(study(update_prompt(changed), folder))
-            model = updated_model(previous["model"], patch, line_counts, directories)
+            model = updated_model(previous["model"], patch, line_counts, directories, texts=texts)
     return json.dumps({"model": model, "digests": digests, "producer": MODEL_PRODUCER}, ensure_ascii=False)

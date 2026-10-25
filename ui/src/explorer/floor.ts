@@ -69,14 +69,19 @@ const LIMIT = /perdu|au plus|seulement|pas encore|limite/i;
 
 const shapeOf = (block: ArchBlock): Shape => SHAPE[block.type] ?? "room";
 
-/** The part a step happens in: its component's bloc, or a bloc named directly (older models). */
-function stepBloc(model: ProjectModel, composant: string): string | null {
+/** The part a step happens in: its component's bloc, or a bloc named directly (older models). A step
+ * done by hand may have no component (v1.7): it happens in no part. */
+function stepBloc(model: ProjectModel, composant: string | null): string | null {
+  if (!composant) return null;
   const owner = model.composants.find((c) => c.id === composant)?.bloc ?? composant;
   return model.blocs.some((b) => b.id === owner) ? owner : null;
 }
 
-/** The journey the belt follows: through the most components, then the most steps, then model order. */
+/** The journey the belt follows: the one the study declares (v1.7), else through the most components,
+ * then the most steps, then model order (the engine deduces it the same way). */
 export function mainJourney(model: ProjectModel): { journey: Journey | null; equivalents: number } {
+  const declared = model.parcours.find((j) => j.principal && !j.principal_deduit);
+  if (declared) return { journey: declared, equivalents: 1 };
   const score = (j: Journey) => [new Set(j.etapes.map((s) => s.composant).filter((c) => stepBloc(model, c))).size, j.etapes.length] as const;
   let best: Journey | null = null;
   let equivalents = 0;
@@ -96,7 +101,7 @@ export function buildFloor(model: ProjectModel): Floor {
   const isTool = (id: string) => blocks.has(id) && shapeOf(blocks.get(id)!) === "tool";
   const { journey, equivalents } = mainJourney(model);
   const steps = journey?.etapes ?? [];
-  const skipped = steps.filter((s) => !stepBloc(model, s.composant)).length;
+  const skipped = steps.filter((s) => s.composant && !stepBloc(model, s.composant)).length;
 
   // In step order: the parts that do the work, and every part a step reaches.
   const workers: string[] = [];

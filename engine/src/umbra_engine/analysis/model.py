@@ -8,6 +8,9 @@ code path must exist on the map. Nothing unchecked is dropped silently: it stays
 import json
 import re
 
+from umbra_engine.analysis import model_v17 as v17
+from umbra_engine.analysis.literal import cut
+
 BLOCK_TYPES = (
     "user", "frontend", "backend", "worker", "database", "storage", "queue", "external",
     "ml_model", "device", "cli", "library", "docs", "tests", "infra",
@@ -18,7 +21,7 @@ MAX_SHORT = 90  # a block's "en bref": a few words under its name
 MAX_SIMPLE = 400
 MAX_VERB = 50
 IMPORTANCE = ("coeur", "secondaire", "ancien")
-ZONES = ("utilise", "recoit", "traite", "range", "exterieur")
+ZONES = ("utilise", "recoit", "traite", "range", "exterieur", "atelier")
 MAX_IO = 4
 
 
@@ -38,11 +41,17 @@ def parse_answer(answer: str) -> dict:
 
 
 def checked_model(
-    raw: dict, line_counts: dict[str, int], directories: set[str], known_blocks: set[str] | None = None
+    raw: dict,
+    line_counts: dict[str, int],
+    directories: set[str],
+    known_blocks: set[str] | None = None,
+    texts: dict[str, str] | None = None,
 ) -> dict:
-    """A complete model, every field in its expected shape, every citation checked."""
+    """A complete model, every field in its expected shape, every citation checked. `texts` are the files
+    the Secret Guard released: settings are checked word for word in them (never in the Project folder)."""
     if not isinstance(raw.get("resume"), str):
         raise ModelFormatError("missing resume")
+    texts = texts or {}
     model = {
         "pitch": str(raw.get("pitch", "")),
         "resume": raw["resume"],
@@ -50,7 +59,7 @@ def checked_model(
             b for b in (_block(item, line_counts, directories) for item in _list(raw.get("blocs"))) if b
         ],
         "composants": [
-            c for c in (_component(item, line_counts) for item in _list(raw.get("composants"))) if c
+            c for c in (_component(item, line_counts, texts) for item in _list(raw.get("composants"))) if c
         ],
         "modules": {
             p: r for p, r in _dict(raw.get("modules")).items() if p in line_counts and isinstance(r, str)
@@ -68,13 +77,26 @@ def checked_model(
         j for j in (_journey(item, line_counts, block_ids) for item in _list(raw.get("parcours"))) if j
     ]
     model["flux"] = _flows(raw.get("flux"), block_ids)
+    v17.main_journey(model["parcours"], model["composants"], block_ids)
+    v17.derived_blocks(model["blocs"], model["composants"], model["parcours"])
+    model["donnee"] = v17.data(raw.get("donnee"), block_ids)
+    model["reglages_projet"] = v17.project_settings(raw.get("reglages_projet"), texts)
+    model["pour_changer"] = v17.levers(
+        raw.get("pour_changer"), model["composants"], model["blocs"], model["reglages_projet"], texts
+    )
     return model
 
 
-def updated_model(model: dict, raw_patch: dict, line_counts: dict[str, int], directories: set[str]) -> dict:
+def updated_model(
+    model: dict,
+    raw_patch: dict,
+    line_counts: dict[str, int],
+    directories: set[str],
+    texts: dict[str, str] | None = None,
+) -> dict:
     """Entries returned by an update session replace the ones with the same id; `supprime` removes."""
     known = {b["id"] for b in model["blocs"]}
-    patch = checked_model({"resume": model["resume"], **raw_patch}, line_counts, directories, known)
+    patch = checked_model({"resume": model["resume"], **raw_patch}, line_counts, directories, known, texts)
     removed = _dict(raw_patch.get("supprime"))
     merged = dict(model)
     for section in ("blocs", "composants", "parcours"):
@@ -91,11 +113,32 @@ def updated_model(model: dict, raw_patch: dict, line_counts: dict[str, int], dir
             merged[text] = raw_patch[text]
     # New flows may join blocks that were not returned again: check them against every block.
     new_flows = _flows(raw_patch.get("flux"), {b["id"] for b in merged["blocs"]})
-    replaced = {(f["de"], f["vers"]) for f in new_flows}
-    merged["flux"] = [f for f in model["flux"] if (f["de"], f["vers"]) not in replaced] + new_flows
+    replaced = {(f["de"], f["vers"], f["nature"]) for f in new_flows}
+    merged["flux"] = [f for f in model["flux"] if (f["de"], f["vers"], f.get("nature", "donnee")) not in replaced]
+    merged["flux"] += new_flows
     merged["incertitudes"] = patch["incertitudes"] or model["incertitudes"]
+    if any(_dict(j).get("principal") is True for j in _list(raw_patch.get("parcours"))):
+        returned = {j["id"] for j in patch["parcours"] if j["principal"]}
+        merged["parcours"] = [j | {"principal": j["id"] in returned} for j in merged["parcours"]]
+    for section, key in PROJECT_SECTIONS:
+        merged[section] = _merged_rows(model.get(section, []), raw_patch, section, key)
+    components = {c["id"] for c in merged["composants"]}
+    merged["pour_changer"] = [p for p in merged["pour_changer"] if p.get("composant") in components]
     # Citations of untouched entries may point to lines that moved: check them all again.
-    return checked_model(merged, line_counts, directories)
+    return checked_model(merged, line_counts, directories, texts=texts)
+
+
+PROJECT_SECTIONS = (("donnee", ("nom",)), ("reglages_projet", ("fichier", "code")), ("pour_changer", ("composant", "intention")))
+
+
+def _merged_rows(stored: list[dict], raw_patch: dict, section: str, key: tuple[str, ...]) -> list[dict]:
+    """Rows of a Project-level section: the patch's replace stored ones with the same key; `supprime`
+    removes by the key's first field (a data name, a file, a component)."""
+    new = [r for r in _list(raw_patch.get(section)) if isinstance(r, dict)]
+    gone = set(_texts(_dict(raw_patch.get("supprime")).get(section)))
+    fresh = {tuple(r.get(k) for k in key) for r in new}
+    kept = [r for r in stored if tuple(r.get(k) for k in key) not in fresh and r.get(key[0]) not in gone]
+    return kept + new
 
 
 def _citation(item: dict, line_counts: dict[str, int]) -> dict:
@@ -143,7 +186,7 @@ def _block(item: object, line_counts: dict[str, int], directories: set[str]) -> 
     }
 
 
-def _component(item: object, line_counts: dict[str, int]) -> dict | None:
+def _component(item: object, line_counts: dict[str, int], texts: dict[str, str]) -> dict | None:
     if (
         not isinstance(item, dict)
         or not isinstance(item.get("id"), str)
@@ -165,6 +208,10 @@ def _component(item: object, line_counts: dict[str, int]) -> dict | None:
         "expose": exposed,
         "utilise": _texts(item.get("utilise")),
         "fichiers": [f for f in _texts(item.get("fichiers")) if f in line_counts],
+        "entre": v17.io(item.get("entre")),
+        "sort": v17.io(item.get("sort")),
+        "reglages": v17.settings(item.get("reglages"), texts),
+        "termes": v17.terms(item.get("termes")),
     }
 
 
@@ -175,20 +222,10 @@ def _journey(item: object, line_counts: dict[str, int], block_ids: set[str]) -> 
         or not isinstance(item.get("nom"), str)
     ):
         return None
-    steps = [
-        {
-            "texte": str(s.get("texte", "")),
-            "action": str(s.get("action", ""))[:MAX_ACTION],
-            "simple": str(s.get("simple", ""))[:MAX_SIMPLE],
-            "composant": str(s.get("composant", "")),
-            "touche": [b for b in _texts(s.get("touche")) if b in block_ids],
-            "conditions": _texts(s.get("conditions")),
-            "manuel": s.get("manuel") is True,
-            **_citation(s, line_counts),
-        }
-        for s in _list(item.get("etapes"))
-        if isinstance(s, dict) and s.get("texte")
-    ]
+    raw_steps = _list(item.get("etapes"))
+    kept_at = [n for n, s in enumerate(raw_steps, 1) if isinstance(s, dict) and s.get("texte")]
+    old_to_new = {old: new for new, old in enumerate(kept_at, 1)}  # branch and phase numbers follow
+    steps = [_step(raw_steps[n - 1], line_counts, block_ids) for n in kept_at]
     return {
         "id": item["id"],
         "nom": item["nom"],
@@ -198,10 +235,37 @@ def _journey(item: object, line_counts: dict[str, int], block_ids: set[str]) -> 
         "etapes": steps,
         "resultat": str(item.get("resultat", "")),
         "branches": [
-            {"quand": str(b.get("quand", "")), "alors": str(b.get("alors", "")), **_citation(b, line_counts)}
+            {
+                "quand": str(b.get("quand", "")),
+                "alors": str(b.get("alors", "")),
+                "quand_simple": cut(b.get("quand_simple"), MAX_SIMPLE),
+                "alors_simple": cut(b.get("alors_simple"), MAX_SIMPLE),
+                "etape": v17.step_index(old_to_new, b.get("etape")),
+                **_citation(b, line_counts),
+            }
             for b in _list(item.get("branches"))
             if isinstance(b, dict) and b.get("quand")
         ],
+        "principal": item.get("principal") is True and not item.get("principal_deduit"),  # deduced: picked again
+        "entree": item.get("entree") if item.get("entree") in block_ids else None,
+        "sortie": [b for b in _texts(item.get("sortie")) if b in block_ids],
+        "phases": v17.phases(item.get("phases"), old_to_new, len(steps)),
+    }
+
+
+def _step(s: dict, line_counts: dict[str, int], block_ids: set[str]) -> dict:
+    manual = s.get("manuel") is True
+    composant = s.get("composant")
+    return {
+        "texte": str(s.get("texte", "")),
+        "action": str(s.get("action", ""))[:MAX_ACTION],
+        "simple": str(s.get("simple", ""))[:MAX_SIMPLE],
+        # A step done by hand may have no component; otherwise a missing one is "", never "None".
+        "composant": None if composant is None and manual else (composant if isinstance(composant, str) else ""),
+        "touche": [b for b in _texts(s.get("touche")) if b in block_ids],
+        "conditions": _texts(s.get("conditions")),
+        "manuel": manual,
+        **_citation(s, line_counts),
     }
 
 
@@ -212,6 +276,7 @@ def _flows(value: object, block_ids: set[str]) -> list[dict]:
             "vers": f["vers"],
             "quoi": str(f.get("quoi", "")),
             "verbe": str(f.get("verbe", ""))[:MAX_VERB],
+            "nature": f.get("nature") if f.get("nature") in v17.NATURES else "donnee",
         }
         for f in _list(value)
         if isinstance(f, dict)

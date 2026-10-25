@@ -131,7 +131,7 @@ export function buildLevel(model: ProjectModel, key: LevelKey, projectName: stri
     // The journeys say which component reaches which outside part, and in what words.
     for (const journey of model.parcours)
       for (const step of journey.etapes)
-        if (own.has(step.composant))
+        if (step.composant && own.has(step.composant))
           for (const reached of step.touche) {
             const other = neighbour(reached);
             // A step done by hand is done by the part it reaches (a person): the arrow starts there.
