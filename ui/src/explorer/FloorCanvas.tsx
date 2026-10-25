@@ -6,6 +6,9 @@ import { placeFloor, type Point, type Rect } from "./floorLayout";
 import { FloorKey, FloorPiece, type Look } from "./floorParts";
 import type { Box, Level } from "./levels";
 
+// Where the reader was on the floor before entering a room: Échap brings them back there, focus on that room.
+const remembered: { model: ProjectModel | null; top: number; entered: string | null } = { model: null, top: 0, entered: null };
+
 const PAD = 24; // around the floor; also room for the ENTRÉE badge and the wrap lane on the left
 const STILL = typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 const STROKE: Record<LinkStyle, { width: number; dash: string }> = {
@@ -39,6 +42,18 @@ export function FloorCanvas({ model, floor, level, selected, play, onSelect, onE
     return () => observer.disconnect();
   }, []);
   const plan = useMemo(() => placeFloor(floor, Math.max(width - 2 * PAD, 240)), [floor, width]);
+  useLayoutEffect(() => {
+    const el = screen.current;
+    if (!el || remembered.model !== model) return;
+    el.scrollTop = remembered.top;
+    const card = remembered.entered && el.querySelector<HTMLElement>(`[data-floor-id="${CSS.escape(remembered.entered)}"] button`);
+    if (card) card.focus({ preventScroll: true });
+    remembered.model = null;
+  }, [model, plan]);
+  const enter = (box: Box) => {
+    Object.assign(remembered, { model, top: screen.current?.scrollTop ?? 0, entered: box.id });
+    onEnter(box);
+  };
   const boxes = new Map(level.boxes.map((b) => [b.id, b]));
   const name = (id: string) => model.blocs.find((b) => b.id === id)?.nom ?? id;
   const stepsHere = (id: string) =>
@@ -147,7 +162,7 @@ export function FloorCanvas({ model, floor, level, selected, play, onSelect, onE
                 relation={floor.relations[item.id] ?? null}
                 limit={item.id === sortieStore ? floor.limit : null}
                 onSelect={onSelect}
-                onEnter={onEnter}
+                onEnter={enter}
               />
             );
           })}

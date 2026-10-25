@@ -2,9 +2,10 @@ import { ChevronRight, Play } from "lucide-react";
 import type { ReactNode } from "react";
 import type { Journey, ProjectModel } from "../api";
 import { CitedCode } from "../arch/CitedCode";
-import { stepLabel } from "../arch/story";
+import { lowerFirst, stepLabel } from "../arch/story";
 import { steps, Tag } from "../ui";
 import type { Box, Level } from "./levels";
+import { stepRuns } from "./room";
 
 interface Props {
   projectId: string;
@@ -21,6 +22,7 @@ interface Props {
 export function InfoPanel({ projectId, model, level, box, playing, onEnter, onPlay, onStep }: Props) {
   if (box) return <BoxInfo projectId={projectId} model={model} box={box} onEnter={onEnter} onPlay={onPlay} />;
   if (playing) return <StepInfo projectId={projectId} journey={playing.journey} number={playing.step} onStep={onStep} />;
+  if (level.room) return <RoomInfo model={model} level={level} onPlay={onPlay} />;
   return (
     <Panel>
       <p className="text-[13px] font-semibold text-faint">Vous êtes ici</p>
@@ -45,6 +47,61 @@ export function InfoPanel({ projectId, model, level, box, playing, onEnter, onPl
             ))}
           </ul>
         </details>
+      )}
+    </Panel>
+  );
+}
+
+function RoomInfo({ model, level, onPlay }: { model: ProjectModel; level: Level; onPlay: (id: string, step: number) => void }) {
+  const room = level.room!;
+  const block = model.blocs.find((b) => b.id === room.bloc);
+  const through = model.parcours.filter((j) => stepRuns(model, j).some((r) => r.bloc === room.bloc));
+  return (
+    <Panel>
+      <p className="text-[13px] font-semibold text-faint">Vous êtes dans la pièce</p>
+      <h2 className="mt-1 text-[22px] leading-tight font-semibold">{level.title}</h2>
+      <p className="mt-2 text-[15px] leading-relaxed text-muted">{block?.en_bref || block?.role}</p>
+      {through.map((journey) => (
+        <section key={journey.id} className="mt-6">
+          <button type="button" onClick={() => onPlay(journey.id, 1)} className="flex items-center gap-2 text-left text-[15px] font-semibold hover:underline">
+            <Play size={15} className="shrink-0 text-lamp-ink" aria-hidden="true" />
+            {journey.nom}
+          </button>
+          <ol className="mt-2 space-y-2.5">
+            {stepRuns(model, journey).map((run) => (
+              <li key={`${run.from}`} className={run.bloc === room.bloc ? "" : "opacity-70"}>
+                <p className="text-[12.5px] font-semibold text-faint">{run.title.startsWith("Retour") ? run.title : `Dans « ${run.title} »`}</p>
+                <ul className="mt-0.5 space-y-0.5 text-[14px]">
+                  {journey.etapes.slice(run.from - 1, run.to).map((step, k) => (
+                    <li key={k}>
+                      <button type="button" onClick={() => onPlay(journey.id, run.from + k)} className="text-left hover:underline">
+                        <span className="mr-1.5 text-faint">{run.from + k}.</span>
+                        {stepLabel(step)}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </li>
+            ))}
+          </ol>
+        </section>
+      ))}
+      {(room.unplaced.length > 0 || room.elsewhere.length > 0) && (
+        <section className="mt-7">
+          <h3 className="text-[15px] font-semibold">Autres cas particuliers</h3>
+          <ul className="mt-2 space-y-2 text-[14px]">
+            {[...room.unplaced, ...room.elsewhere].map((branch, k) => (
+              <li key={k} className="rounded-lg border border-line-soft px-3 py-2">
+                <span className="font-medium">Si {branch.quand_simple || branch.quand}</span>
+                <span className="block text-muted">{branch.alors_simple || branch.alors}</span>
+                <span className="block text-[12.5px] text-faint">
+                  {model.parcours.find((j) => j.id === branch.journey)?.nom}
+                  {room.unplaced.includes(branch as (typeof room.unplaced)[number]) ? " · aucune machine seule ne le porte" : ""}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </section>
       )}
     </Panel>
   );
@@ -252,10 +309,4 @@ function StepInfo({ projectId, journey, number, onStep }: {
       </details>
     </Panel>
   );
-}
-
-/** « Le serveur… », « L'en-tête… » → « le serveur… », « l'en-tête… »; a name (« WeasyPrint », « API ») keeps its capitals. */
-function lowerFirst(text: string): string {
-  const word = text.split(/[\s'’]/)[0] ?? "";
-  return /[A-Z]/.test(word.slice(1)) ? text : text.charAt(0).toLowerCase() + text.slice(1);
 }

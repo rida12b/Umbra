@@ -86,11 +86,14 @@ test("on a phone, from a part down to its functions: lists, then the map over it
   expect(panelBox && mapBox && panelBox.y).toBeGreaterThanOrEqual((mapBox?.y ?? 0) + (mapBox?.height ?? 0) - 1);
 });
 
-test("from a part down to its functions, on the same map", async ({ page, isMobile }) => {
+test("a room opened in place: its machine in data order, the door data comes in by, then down to its functions", async ({ page, isMobile }) => {
   test.skip(isMobile, "the desktop map");
   const project = await signIn(page);
   await page.goto(`/#/p/${project}?node=x%3Apart%3Aapi`);
-  await page.locator('.react-flow__node[data-id="orders"]').getByRole("button", { name: /Entrer dedans/ }).click();
+  await expect(page.locator('[data-room-item="door:web"]')).toContainText("depuis Site web");
+  await expect(page.locator('[data-room-item="hung:db"]')).toContainText("Base PostgreSQL"); // what the machine writes to
+  await page.locator('[data-room-item="orders"]').click();
+  await page.getByLabel("Explication").getByRole("button", { name: /Entrer dedans/ }).click();
   await expect(page).toHaveURL(/node=x%3Acomponent%3Aorders/);
   await page.locator('.react-flow__node').getByRole("button", { name: /Entrer dedans/ }).first().click();
   await expect(page.locator('.react-flow__node[data-id="api/app/orders.py::create_order"]')).toBeVisible();
@@ -113,4 +116,35 @@ test("search jumps to a function and selects it", async ({ page }) => {
   await page.getByRole("option", { name: /validate/ }).first().click();
   await expect(page).toHaveURL(/select=api%2Fapp%2Forders\.py%3A%3Avalidate/);
   await expect(page.getByLabel("Explication et preuves")).toContainText("validate");
+});
+
+test("a person cannot be entered; a link to a part without machines says so and leads back", async ({ page, isMobile }) => {
+  test.skip(isMobile, "the desktop floor");
+  const project = await signIn(page);
+  await page.goto(`/#/p/${project}`);
+  await expect(page.locator('[data-floor-id="user"]')).toBeVisible();
+  await expect(page.locator('[data-floor-id="user"]').getByRole("button", { name: /Entrer/ })).toHaveCount(0);
+  await page.goto(`/#/p/${project}?node=x%3Apart%3Auser`);
+  await expect(page.getByText("n'a pas de machine à ouvrir")).toBeVisible();
+  await expect(page.getByText("README.md")).toHaveCount(0);
+  await page.getByRole("button", { name: "Revenir à l'usine" }).click();
+  await expect(page).toHaveURL(/node=x%3Aparts/);
+});
+
+test("inside a room nothing is cut, and Échap goes back to the floor with the room in focus", async ({ page, isMobile }) => {
+  test.skip(isMobile, "the desktop map");
+  const project = await signIn(page);
+  await page.goto(`/#/p/${project}`);
+  await page.locator('[data-floor-id="api"]').getByRole("button", { name: /Entrer dans/ }).click();
+  await expect(page).toHaveURL(/node=x%3Apart%3Aapi/);
+  const map = await page.locator("section.map-surface").boundingBox();
+  const boxes = await page.locator("[data-room-item]").evaluateAll((els) => els.map((e) => e.getBoundingClientRect().toJSON() as DOMRect));
+  const outside = boxes.filter((b) => !map || b.left < map.x - 1 || b.right > map.x + map.width + 1 || b.top < map.y - 1 || b.bottom > map.y + map.height + 1);
+  const indicator = page.getByRole("button", { name: /hors champ/ });
+  if (outside.length === 0) await expect(indicator).toHaveCount(0);
+  else await expect(indicator).toContainText(String(outside.length));
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true);
+  await page.keyboard.press("Escape");
+  await expect(page).toHaveURL(/node=x%3Aparts/);
+  await expect.poll(() => page.evaluate(() => document.activeElement?.closest("[data-floor-id]")?.getAttribute("data-floor-id"))).toBe("api");
 });

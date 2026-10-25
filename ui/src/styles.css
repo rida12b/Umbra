@@ -84,6 +84,18 @@
   --color-kind-outside: var(--u-kind-outside);
 }
 
+/* A part opening in place: it grows from the floor (no motion when the reader asks for none). */
+@keyframes room-open {
+  from {
+    opacity: 0.35;
+    transform: scale(0.94);
+  }
+}
+.room-open {
+  animation: room-open 220ms ease-out;
+  transform-origin: top left;
+}
+
 @layer base {
   html,
   body,
