@@ -55,14 +55,19 @@ export function InfoPanel({ projectId, model, level, box, playing, onEnter, onPl
 function RoomInfo({ model, level, onPlay }: { model: ProjectModel; level: Level; onPlay: (id: string, step: number) => void }) {
   const room = level.room!;
   const block = model.blocs.find((b) => b.id === room.bloc);
-  const through = model.parcours.filter((j) => stepRuns(model, j).some((r) => r.bloc === room.bloc));
+  // The journey whose step numbers the machines show comes first, and says so.
+  const through = model.parcours
+    .filter((j) => stepRuns(model, j).some((r) => r.bloc === room.bloc))
+    .sort((a, b) => Number(b === room.journey) - Number(a === room.journey));
   return (
     <Panel>
       <p className="text-[13px] font-semibold text-faint">Vous êtes dans la pièce</p>
       <h2 className="mt-1 text-[22px] leading-tight font-semibold">{level.title}</h2>
       <p className="mt-2 text-[15px] leading-relaxed text-muted">{block?.en_bref || block?.role}</p>
-      {through.map((journey) => (
+      {through.map((journey, index) => (
         <section key={journey.id} className="mt-6">
+          {index === 0 && journey === room.journey && <p className="mb-1 text-[12.5px] text-faint">Les numéros sur les machines suivent ce parcours.</p>}
+          {index === 1 && <p className="mb-1 text-[12.5px] font-semibold text-faint">Passent aussi par ici</p>}
           <button type="button" onClick={() => onPlay(journey.id, 1)} className="flex items-center gap-2 text-left text-[15px] font-semibold hover:underline">
             <Play size={15} className="shrink-0 text-lamp-ink" aria-hidden="true" />
             {journey.nom}

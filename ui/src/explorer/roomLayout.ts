@@ -23,15 +23,23 @@ export interface RoomPlan {
   size: { width: number; height: number };
 }
 
-const MACHINE = { w: 180, h: 150 };
-const DOOR = { w: 150, h: 156 }; // a 2-line name, its verb, up to 3 crossings
-const CHUTE_H = 84;
+const MACHINE = { w: 170, h: 150 };
+const DOOR = { w: 170, h: 156 }; // the height grows with the crossings it lists (doorHeight)
+const LINE = 17; // a 12.5px line of a refusal or a door
+const PER_LINE = 26; // characters on one line of a 180px refusal (about 24-28 in practice)
 const HUNG_H = 50;
-const GAP = 56; // between machines: room for the belt arrow
+const GAP = 48; // between machines: room for the belt arrow
 const SIDE = 16; // between the door columns and the machines
 const STACK = 10; // between things stacked under a machine
 const LINE_GAP = 40;
 const BAND_H = 70;
+
+const lines = (text: string, per = PER_LINE) => Math.max(1, Math.ceil(text.length / per));
+/** A refusal shows its condition in full and up to five lines of what follows. */
+const chuteHeight = (c: { quand: string; alors: string; technical: boolean }) =>
+  12 + LINE * (Math.min(lines(`Si ${c.quand}`), 4) + Math.min(lines(c.alors), 5)) + (c.technical ? 16 : 0);
+/** A door: its name and verb on two lines each, then each crossing on up to two lines. */
+const doorHeight = (d: Door) => Math.max(DOOR.h, 20 + LINE * 4 + d.crossings.slice(0, 3).reduce((h, c) => h + LINE * Math.min(lines(`→ ${c.step} · ${c.machine}`, 30), 2), 0));
 
 export function placeRoom(room: Room, available: number): RoomPlan {
   const rects = new Map<string, Rect>();
@@ -48,8 +56,9 @@ export function placeRoom(room: Room, available: number): RoomPlan {
   const rightW = right.length && !stacked ? DOOR.w + SIDE : 0;
   const row = (doors: Door[], from: number) => {
     const per = Math.max(1, Math.floor((available + STACK) / (DOOR.w + STACK)));
-    doors.forEach((door, i) => rects.set(`door:${door.bloc}`, { x: (i % per) * (DOOR.w + STACK), y: from + Math.floor(i / per) * (DOOR.h + STACK), w: DOOR.w, h: DOOR.h }));
-    return doors.length ? from + Math.ceil(doors.length / per) * (DOOR.h + STACK) - STACK + LINE_GAP : from;
+    const rowH = Math.max(0, ...doors.map(doorHeight));
+    doors.forEach((door, i) => rects.set(`door:${door.bloc}`, { x: (i % per) * (DOOR.w + STACK), y: from + Math.floor(i / per) * (rowH + STACK), w: DOOR.w, h: doorHeight(door) }));
+    return doors.length ? from + Math.ceil(doors.length / per) * (rowH + STACK) - STACK + LINE_GAP : from;
   };
   if (stacked) y = row(left, y);
   const middle = Math.max(MACHINE.w, available - leftW - rightW);
@@ -65,9 +74,10 @@ export function placeRoom(room: Room, available: number): RoomPlan {
       const x = leftW + i * (MACHINE.w + GAP);
       rects.set(machine.id, { x, y, w: MACHINE.w, h: MACHINE.h });
       let under = y + MACHINE.h + STACK;
-      machine.chutes.forEach((_, k) => {
-        rects.set(`chute:${machine.id}:${k}`, { x, y: under, w: MACHINE.w, h: CHUTE_H });
-        under += CHUTE_H + STACK;
+      machine.chutes.forEach((chute, k) => {
+        const h = chuteHeight(chute);
+        rects.set(`chute:${machine.id}:${k}`, { x, y: under, w: MACHINE.w, h });
+        under += h + STACK;
       });
       machine.hung.forEach((h) => {
         rects.set(`hung:${machine.id}:${h.bloc}`, { x, y: under, w: MACHINE.w, h: HUNG_H });
@@ -88,8 +98,9 @@ export function placeRoom(room: Room, available: number): RoomPlan {
     for (const door of doors) {
       const target = machineOf(door, dir);
       const at = target ? Math.max(next, rects.get(target.id)!.y) : next;
-      rects.set(`door:${door.bloc}`, { x, y: at, w: DOOR.w, h: DOOR.h });
-      next = at + DOOR.h + STACK;
+      const h = doorHeight(door);
+      rects.set(`door:${door.bloc}`, { x, y: at, w: DOOR.w, h });
+      next = at + h + STACK;
     }
     return next;
   };

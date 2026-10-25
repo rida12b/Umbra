@@ -160,7 +160,8 @@ function roomDoors(model: ProjectModel, bloc: string, steps: JourneyStep[], owne
     if (link.to !== bloc || link.style === "reply" || doors.has(link.from)) continue;
     const touches = steps.flatMap((s, i) => (owner(s) === bloc && s.touche.includes(link.from) ? [i] : []));
     const d = door(link.from, "left");
-    touches.forEach((i, k) => d.crossings.push({ step: i + 1, dir: k === 0 ? "in" : "out", machine: machine(steps[i]!) }));
+    // The first touch, or the person acting by hand, brings data in; a machine answering them sends it back.
+    touches.forEach((i, k) => d.crossings.push({ step: i + 1, dir: k === 0 || steps[i]!.manuel ? "in" : "out", machine: machine(steps[i]!) }));
   }
   // Parts it sends data to that no step only touches (those hang under the machine): doors on the right.
   const touched = new Set(steps.flatMap((s) => (owner(s) === bloc ? s.touche : [])));

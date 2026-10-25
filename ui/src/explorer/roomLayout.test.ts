@@ -30,3 +30,12 @@ test("the Watchdog entry service fits one line on a 1440 screen (≈990 px for t
   assert.equal(ys.size, 1);
   assert.equal(plan.doorLinks.length, 2); // agent → first machine, last machine → store
 });
+
+test("a refusal and a door grow with their words instead of cutting them", () => {
+  const room = buildRoom(load("watchdog"), "api")!;
+  const plan = placeRoom(room, 990);
+  const long = plan.rects.get("chute:schemas:0")!; // its consequence is 120+ characters
+  const short = plan.rects.get("chute:auth-tenant:0")!;
+  assert.ok(long.h > 84 && long.h >= short.h, `${long.h} / ${short.h}`);
+  assert.ok(plan.rects.get("door:memoire")!.w >= 170);
+});

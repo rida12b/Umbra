@@ -130,3 +130,33 @@ test("a journey's steps are grouped by the room they happen in; the way back is 
     "Retour à l'expéditeur 14-16",
   ]);
 });
+
+test("a person's own action at a door comes in; the machine answering them goes back", () => {
+  const site = room(justicia(), "site");
+  assert.deepEqual(site.doors.map((d) => [d.bloc, d.side]), [["user", "left"], ["api", "right"]]);
+  assert.deepEqual(crossings(site, "user"), ["in1", "in2", "out15"]); // step 2: the person sends the question
+  assert.deepEqual(crossings(site, "api"), ["out5", "in14"]);
+  assert.deepEqual(crossings(room(watchdog(), "api"), "agent-surveille"), ["in1", "out5"]);
+});
+
+test("the other journeys' refusals never repeat the driving journey's own", () => {
+  assert.deepEqual([...new Set(room(watchdog(), "api").elsewhere.map((b) => b.journey))], ["demarrage", "acces-sans-client"]);
+  for (const model of [watchdog(), justicia()])
+    for (const bloc of enterable(model)) {
+      const r = room(model, bloc);
+      assert.ok(r.elsewhere.every((b) => b.journey !== r.journey?.id), bloc);
+    }
+});
+
+test("« Retour à l'expéditeur » only for a last run back in a part seen before that answers the sender", () => {
+  const titles = (model: ProjectModel, id: string) => stepRuns(model, model.parcours.find((j) => j.id === id)!).map((r) => `${r.title} ${r.from}-${r.to}`);
+  assert.deepEqual(titles(watchdog(), "acces-sans-client"), ["Porte d'entrée du service 1-2"]);
+  assert.deepEqual(titles(watchdog(), "demarrage"), ["Porte d'entrée du service 1-3"]);
+  assert.deepEqual(titles(justicia(), "remplir-base"), ["Outil de remplissage de la base 1-6"]);
+  assert.deepEqual(titles(justicia(), "courrier-pdf"), ["Fabrique de courriers 1-4"]);
+  assert.equal(titles(justicia(), "voir-article").at(-1), "Retour à l'expéditeur 4-4");
+  const manual = watchdog();
+  const send = manual.parcours.find((j) => j.id === "envoi-evenement")!;
+  send.etapes[4]!.manuel = true; // the last run is the person's own action, not an answer
+  assert.ok(!titles(manual, "envoi-evenement").at(-1)!.startsWith("Retour"));
+});
