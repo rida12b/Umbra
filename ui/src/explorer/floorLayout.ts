@@ -46,20 +46,6 @@ export function placeFloor(floor: Floor, available: number, machines: Record<str
   const row = [...(floor.entree ? [floor.entree] : []), ...floor.belt];
   const widthOf = (id: string) => WIDTH[byId.get(id)?.shape ?? "room"];
   const roomHeight = (id: string) => Math.max(HEIGHT, 100 + 26 * Math.min(machines[id] ?? 0, 5) + (machines[id] ? 24 : 0));
-  const lines: string[][] = [];
-  let used = 0;
-  for (const id of row) {
-    const w = widthOf(id);
-    const line = lines.at(-1);
-    if (line && used + GAP + w <= available - LANE * 2) {
-      line.push(id);
-      used += GAP + w;
-    } else {
-      lines.push([id]);
-      used = w;
-    }
-  }
-
   // Tags are stacked in the column of the belt room they belong to (through any number of hangs).
   const column = (item: FloorItem): string | null => {
     if (row.includes(item.id)) return item.id;
@@ -72,15 +58,30 @@ export function placeFloor(floor: Floor, available: number, machines: Record<str
     if (item.role !== "supplier" && item.role !== "side") continue;
     const col = column(item);
     if (!col) continue;
-    // Above: a person, or a part that sends to its room (the mockup's installer who starts it, V8). Below: what the room
-    // calls (a service, a store), so a second belt line is not pushed down by everything the first one uses.
-    // A part starts the exchange when it controls its room (start-up), or sends to it with nothing coming back: a called
-    // service that also answers (« répond à ») is still called, so it stays below.
+    // Above: a person, or a part that starts the exchange with its room: it controls it (the mockup's installer, V8), or
+    // sends to it with nothing coming back. Below: what the room calls, even when it answers (« répond à »), so a second
+    // belt line is not pushed down by everything the first one uses.
     const toRoom = floor.links.filter((l) => l.from === item.id && l.to === item.attach);
     const answered = floor.links.some((l) => l.from === item.attach && l.to === item.id);
-    const starts = toRoom.some((l) => l.style === "control") || (toRoom.length > 0 && !answered);
+    const starts = toRoom.some((l) => l.control) || (toRoom.some((l) => l.data) && !answered);
     const side = item.role === "side" && (item.shape === "person" || starts) ? above : below;
     side.set(col, [...(side.get(col) ?? []), item.id]);
+  }
+
+  const lines: string[][] = [];
+  let used = 0;
+  for (const id of row) {
+    const w = widthOf(id);
+    const line = lines.at(-1);
+    // A 280 px tag hung below a narrower item sticks out on its right: the wrap lane goes past it, so reserve it.
+    const overhang = below.has(id) ? Math.max(0, (Math.min(SIDE.w, w + GAP - 16) - w) / 2) : 0;
+    if (line && used + GAP + w + overhang <= available - LANE * 2) {
+      line.push(id);
+      used += GAP + w;
+    } else {
+      lines.push([id]);
+      used = w;
+    }
   }
 
   const rects = new Map<string, Rect>();

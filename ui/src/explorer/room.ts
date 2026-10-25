@@ -103,7 +103,7 @@ export function buildRoom(model: ProjectModel, bloc: string): Room | null {
   // A part this room only starts or checks is not where the data ends.
   for (const id of [...exits]) {
     const between = floor.links.filter((l) => (l.from === bloc && l.to === id) || (l.from === id && l.to === bloc));
-    if (between.length > 0 && between.every((l) => l.style === "control")) exits.delete(id);
+    if (between.length > 0 && between.every((l) => !l.data)) exits.delete(id);
   }
   const doors = roomDoors(model, bloc, steps, owner, exits);
   const doorBlocs = new Set(doors.map((d) => d.bloc));
@@ -188,7 +188,7 @@ function roomDoors(model: ProjectModel, bloc: string, steps: JourneyStep[], owne
   // A move between two parts joined only by control (one starts or checks the other) carries no data: no door.
   const onlyControl = (p: string, q: string) => {
     const between = floor.links.filter((l) => (l.from === p && l.to === q) || (l.from === q && l.to === p));
-    return between.length > 0 && between.every((l) => l.style === "control");
+    return between.length > 0 && between.every((l) => !l.data);
   };
   steps.forEach((step, i) => {
     const before = i > 0 ? owner(steps[i - 1]!) : null;

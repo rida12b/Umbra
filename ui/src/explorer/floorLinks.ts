@@ -25,7 +25,7 @@ export function beltLinks(model: ProjectModel, rooms: string[], journey: Journey
         ? (flow.verbe ?? flow.quoi)
         : `${nameOf(flow.de)} ${flow.verbe ?? flow.quoi}`
       : (firstAction(model, journey, to) ?? "");
-    return { id: `belt:${from}>${to}`, from, to, verb, full: flow?.quoi ?? verb, style: "data" as const };
+    return { id: `belt:${from}>${to}`, from, to, verb, full: flow?.quoi ?? verb, style: "data" as const, control: false, data: true };
   });
 }
 
@@ -57,8 +57,11 @@ export function styledLinks(model: ProjectModel, position: (id: string) => numbe
     const verb = flow.verbe ?? "";
     const back = model.flux.some((f) => f.de === flow.vers && f.vers === flow.de) && position(flow.vers) < position(flow.de);
     // The model's own word first (v1.7 `nature`); the verb is only a guess for older models.
-    const control = flow.nature ? flow.nature === "controle" : CONTROL.test(verb);
-    const style: LinkStyle = back ? "reply" : control ? "control" : READ.test(verb) ? "lookup" : "data";
-    return [{ id, from: flow.de, to: flow.vers, verb, full: flow.quoi, style }];
+    const isControl = (f: (typeof model.flux)[number]) => (f.nature ? f.nature === "controle" : CONTROL.test(f.verbe ?? ""));
+    const same = model.flux.filter((f) => f.de === flow.de && f.vers === flow.vers);
+    const control = same.some(isControl);
+    const data = same.some((f) => !isControl(f));
+    const style: LinkStyle = back ? "reply" : isControl(flow) ? "control" : READ.test(verb) ? "lookup" : "data";
+    return [{ id, from: flow.de, to: flow.vers, verb, full: flow.quoi, style, control, data }];
   });
 }
