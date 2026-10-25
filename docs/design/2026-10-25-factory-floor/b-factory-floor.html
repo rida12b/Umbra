@@ -1,0 +1,1610 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Umbra · Plan d'usine</title>
+<style>
+:root{
+  --bg:#0e1116; --surface:#161a21; --surface2:#1d222b; --surface3:#252b35;
+  --border:#2c333e; --border2:#3a4250;
+  --text:#e8ebef; --muted:#a3adba; --faint:#7d8794;
+  --person:#34d399; --service:#60a5fa; --store:#f5b14c; --data:#f4b740;
+  --refus:#f87171; --control:#8b95a3; --code:#c4b5fd; --ok:#4ade80;
+  --hl:#facc15;
+  --panel-w:400px; --header-h:48px;
+  color-scheme: dark;
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--text);
+  font:14px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+button{font:inherit;color:inherit}
+.mono{font-family:ui-monospace,"Cascadia Code",Consolas,monospace;font-size:12px}
+header{height:var(--header-h);display:flex;align-items:center;gap:14px;padding:0 16px;
+  border-bottom:1px solid var(--border);background:#11151b;position:relative;z-index:5}
+.brand{font-weight:700;white-space:nowrap}
+.brand span{color:var(--muted);font-weight:400}
+#crumbs{display:flex;align-items:center;gap:6px;min-width:0;overflow:hidden;white-space:nowrap}
+#crumbs button{background:none;border:0;padding:4px 6px;border-radius:6px;color:var(--muted);cursor:pointer;
+  overflow:hidden;text-overflow:ellipsis;max-width:260px}
+#crumbs button:hover{background:var(--surface2);color:var(--text)}
+#crumbs button.cur{color:var(--text);font-weight:600;cursor:default;background:none}
+#crumbs .sep{color:var(--faint)}
+#backBtn{margin-left:auto;background:var(--surface2);border:1px solid var(--border);border-radius:8px;
+  padding:5px 10px;cursor:pointer;white-space:nowrap}
+#backBtn[hidden]{display:none}
+.app{display:flex;height:calc(100% - var(--header-h))}
+#canvasWrap{flex:1;min-width:0;position:relative;overflow:hidden}
+#canvas{height:100%;position:relative;overflow-y:auto;overflow-x:hidden}
+#panel{width:var(--panel-w);flex:none;border-left:1px solid var(--border);background:#12161c;overflow-y:auto;padding:18px 20px 40px}
+
+/* top band */
+#band{padding:16px 24px 6px}
+.qlabel{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--faint);font-weight:600}
+#pitch{margin:4px 0 10px;font-size:15.5px;line-height:1.5;max-width:920px}
+#keyRow{display:flex;flex-wrap:wrap;gap:6px 14px;align-items:center;font-size:12px;color:var(--muted);
+  padding:8px 0 4px;border-top:1px solid var(--border)}
+#keyRow .k{display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
+.sw{display:inline-block}
+.sw-person{width:12px;height:12px;border-radius:50%;border:2px solid var(--person)}
+.sw-service{width:16px;height:11px;border-radius:3px;border:1px solid var(--border2);border-left:4px solid var(--service)}
+.sw-store{width:12px;height:13px;border:2px solid var(--store);border-radius:50%/30%}
+.sw-tag{width:16px;height:10px;border:1px dashed var(--control);border-radius:3px}
+.sw-data{width:22px;height:5px;background:var(--data);border-radius:3px}
+.sw-reply{width:22px;border-top:2px dashed var(--data)}
+.sw-ctl{width:22px;border-top:1px solid var(--control)}
+.sw-refus{width:9px;height:9px;background:var(--refus)}
+.sw-code{width:16px;height:10px;border:1px dashed var(--code);border-radius:3px}
+
+/* stage */
+#stageWrap{padding:6px 16px 0}
+#stage{position:relative;transition:height .45s ease}
+#wires{position:absolute;inset:0;width:100%;height:100%;overflow:visible;pointer-events:none}
+.node{position:absolute;border-radius:12px;background:var(--surface);border:1px solid var(--border);
+  overflow:hidden;transition:opacity .3s ease, box-shadow .2s ease, border-color .2s ease}
+.node.gone{opacity:0;pointer-events:none}
+.node .inner{padding:10px 12px;height:100%;display:flex;flex-direction:column;gap:4px}
+.nm{font-weight:650;font-size:15px;line-height:1.25}
+.eb{color:var(--muted);font-size:12.5px;line-height:1.35}
+.kind{font-size:11px;color:var(--faint)}
+.badge{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:700;letter-spacing:.04em;
+  border-radius:999px;padding:2px 9px;white-space:nowrap}
+.b-in{background:var(--person);color:#06281b}
+.b-out{background:var(--store);color:#2c1a00}
+.lost{font-size:12px;color:var(--store);font-style:italic}
+
+.k-user{border:1px solid #23493b;background:#121d1a}
+.k-user .glyph{width:30px;height:30px;flex:none}
+.k-service{border-left:5px solid var(--service)}
+.k-store{border:2px solid var(--store);background:#1f1a10;border-radius:50% / 22px}
+.k-store .inner{padding:24px 16px 14px}
+.roomOpen::before{display:none !important}
+.k-store::before{content:"";position:absolute;left:-2px;right:-2px;top:-2px;height:44px;border:2px solid var(--store);
+  border-radius:50%;pointer-events:none}
+.room .enter{margin-top:auto;display:flex;align-items:center;justify-content:space-between;gap:8px}
+.cnt{font-size:12px;color:var(--muted)}
+.preview{display:flex;flex-wrap:wrap;align-items:center;gap:4px 4px;margin-top:6px;font-size:11.5px;color:var(--muted)}
+.pv{display:inline-flex;align-items:center;gap:4px;background:var(--surface2);border:1px solid #2f4b70;border-radius:6px;padding:2px 6px 2px 3px}
+.pv .num,.k-service .num{width:17px;height:17px;border-radius:50%;border:1.5px solid var(--data);color:var(--data);display:inline-flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;flex:none}
+.pvA{color:var(--data)}
+.lnk{background:none;border:0;color:var(--service);cursor:pointer;padding:2px 0;font-size:13px}
+.lnk:hover{text-decoration:underline}
+.clickable{cursor:pointer}
+.clickable:hover{border-color:var(--border2)}
+.k-user.clickable:hover{border-color:#2f6b55}
+.door{background:#13171d;border-style:dashed}
+.door .inner{padding:8px 10px;gap:6px}
+.door .dl{font-size:12px;color:var(--muted);line-height:1.35}
+.door .dl b{color:var(--text);font-weight:600}
+.door.k-store{border-radius:12px;background:#1a1610}
+.door.k-store::before{display:none}
+.chipline{display:flex;flex-wrap:wrap;gap:4px}
+.mchip{font-size:11.5px;border:1px solid var(--border2);border-radius:6px;padding:2px 6px;background:var(--surface2)}
+.node.lit{box-shadow:0 0 0 2px var(--hl),0 0 22px rgba(250,204,21,.25);border-color:var(--hl)}
+.side{border-style:solid}
+.machine{background:var(--surface2);border:1px solid #2f4b70;cursor:pointer}
+.machine.m-store{border-color:#6b5124}
+.machine:hover{border-color:var(--service)}
+.machine .num{width:22px;height:22px;border-radius:50%;border:2px solid var(--data);color:var(--data);
+  display:inline-flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;flex:none}
+.machine .top{display:flex;gap:8px;align-items:flex-start}
+.machine .nm{font-size:14px}
+.machine .io{margin-top:auto;display:flex;flex-direction:column;align-items:stretch;gap:3px;font-size:11px}
+.io span{border:1px dashed var(--code);color:var(--code);border-radius:5px;padding:1px 5px;white-space:nowrap;
+  overflow:hidden;text-overflow:ellipsis;max-width:100%}
+.io .out{text-align:right}
+.machine.sel{border-color:var(--service);box-shadow:0 0 0 2px var(--service)}
+.machine.done .num{background:var(--data);color:#231800}
+.wband{background:transparent;border:1px dashed var(--control);color:var(--muted);cursor:pointer}
+.wband .inner{flex-direction:row;align-items:center;gap:10px;flex-wrap:wrap;padding:8px 12px}
+.wband b{color:var(--text)}
+.tagc{font-size:10.5px;text-transform:uppercase;letter-spacing:.05em;border:1px solid var(--control);
+  border-radius:4px;padding:1px 6px;color:var(--control);white-space:nowrap}
+.chute{background:#1f1416;border:1px solid #5b2a2e;border-left:4px solid var(--refus)}
+.chute .inner{padding:7px 10px;gap:2px}
+.chute .code{color:var(--refus);font-weight:800;font-size:15px}
+.chute .eb,.note .eb{font-size:11.5px;display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden}
+.note{background:#1d1a12;border:1px dashed #6b5124}
+.note .code{color:var(--store);font-weight:700;font-size:12px}
+.roomTitle{position:absolute;font-size:12px;color:var(--muted);pointer-events:none;transition:opacity .3s}
+.wl{position:absolute;transform:translate(-50%,-50%);font-size:12px;background:var(--bg);color:var(--text);
+  padding:1px 7px;border-radius:6px;white-space:nowrap;pointer-events:none;transition:opacity .25s;border:1px solid var(--border)}
+.wl.ctl{color:var(--control)}
+.wl.reply{border-style:dashed;border-color:#6b5a2a;white-space:normal;max-width:380px;text-align:center}
+.wl.lit{border-color:var(--hl);color:var(--hl)}
+.wl small{display:block;color:var(--muted);font-size:11px}
+#token{position:absolute;left:0;top:0;z-index:4;pointer-events:none;transition:transform .55s cubic-bezier(.4,.1,.2,1),opacity .3s;
+  font-size:11px;font-weight:700;background:var(--data);color:#241900;border-radius:999px;padding:2px 8px;
+  box-shadow:0 0 14px rgba(244,183,64,.6);opacity:0;white-space:nowrap}
+.mtm{display:inline-block;font-size:10.5px;color:#fbbf24;border:1px solid #6b5a2a;border-radius:4px;padding:0 5px;
+  margin-left:4px;vertical-align:1px;white-space:nowrap;font-weight:500}
+
+/* strip */
+#strip{margin:14px 16px 20px;border:1px dashed var(--border2);border-radius:12px;padding:10px 14px}
+#strip .row{display:flex;flex-wrap:wrap;gap:10px;margin-top:8px}
+.tag{border:1px dashed var(--control);border-radius:8px;padding:6px 10px;background:#14181e;cursor:pointer;text-align:left;max-width:100%}
+.tag:hover{border-color:var(--muted)}
+.tag .eb{font-size:12px}
+#projBtn{border:1px dashed var(--code);border-radius:8px;padding:6px 10px;background:#17141f;cursor:pointer;text-align:left}
+
+/* plate */
+#plate{position:absolute;left:12px;right:12px;bottom:0;z-index:6;background:#151a22;border:1px solid var(--border2);
+  border-bottom:0;border-radius:14px 14px 0 0;box-shadow:0 -12px 40px rgba(0,0,0,.55);max-height:58%;overflow:auto;
+  transform:translateY(105%);transition:transform .35s ease;padding:14px 18px 18px}
+#plate{visibility:hidden}
+#plate.open{transform:translateY(0);visibility:visible}
+#canvas.plate-on #strip{margin-bottom:62vh}
+.plHead{display:flex;align-items:flex-start;gap:12px;margin-bottom:10px}
+.plHead h2{margin:0;font-size:18px}
+.plHead .x{margin-left:auto;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:3px 10px;cursor:pointer}
+.slots{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.slot{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:9px 11px;min-width:0}
+.slot.wide{grid-column:1 / -1}
+.slot h3{margin:0 0 5px;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--faint)}
+.slot ul{margin:0;padding-left:16px}
+.slot li{margin:2px 0}
+.codeBadge{display:inline-block;font-size:10.5px;color:var(--code);border:1px dashed var(--code);border-radius:4px;padding:0 5px;margin-bottom:5px}
+.cite{color:var(--code);overflow-wrap:anywhere}
+.ok{color:var(--ok);font-size:12px}
+table.rg{width:100%;border-collapse:collapse;font-size:12.5px}
+table.rg td,table.rg th{border-top:1px solid var(--border);padding:5px 6px;text-align:left;vertical-align:top}
+table.rg th{color:var(--faint);font-weight:600;font-size:11px;border-top:0}
+table.rg code{color:#fde68a;font-family:ui-monospace,Consolas,monospace;font-size:12px;word-break:break-word}
+.no{color:var(--refus);font-weight:600}
+.vu button{background:none;border:0;color:var(--service);cursor:pointer;text-align:left;padding:2px 0}
+.vu .other{color:var(--muted)}
+.vu .det{font-size:12px;color:var(--muted);margin:2px 0 6px 0}
+
+/* panel */
+#panel h1{font-size:20px;margin:2px 0 6px}
+#panel h2{font-size:14px;margin:18px 0 8px}
+.here{font-size:12px;color:var(--faint)}
+.card{border:1px solid var(--border);border-radius:10px;padding:10px 12px;background:var(--surface);margin-bottom:8px}
+.play{display:flex;gap:8px;flex-wrap:wrap;margin:8px 0}
+.btn{background:var(--surface2);border:1px solid var(--border2);border-radius:8px;padding:6px 12px;cursor:pointer}
+.btn:hover{border-color:var(--muted)}
+.btn.pri{background:#3a2d08;border-color:var(--data);color:#fde68a;font-weight:600}
+.btn[disabled]{opacity:.4;cursor:default}
+.chap{margin:14px 0 6px;font-size:12px;color:var(--faint);font-weight:600;text-transform:uppercase;letter-spacing:.04em}
+.st{display:flex;gap:10px;border:1px solid var(--border);border-left:3px solid var(--border);border-radius:8px;padding:8px 10px;
+  margin-bottom:6px;cursor:pointer;background:var(--surface)}
+.st:hover{border-color:var(--border2)}
+.st.on{border-left-color:var(--hl);background:#1f1d12}
+.st .n{width:22px;height:22px;border-radius:50%;border:2px solid var(--data);color:var(--data);display:inline-flex;
+  align-items:center;justify-content:center;font-size:12px;font-weight:700;flex:none}
+.st .a{font-weight:600}
+.st .s{color:var(--muted);font-size:13px}
+.st .f{font-size:11.5px;color:var(--code);word-break:break-all}
+.cas{border-left:3px solid var(--refus);padding:4px 10px;margin:4px 0 8px;font-size:12.5px;color:var(--muted)}
+.cas b{color:var(--text);font-weight:600}
+details{margin-top:14px}
+summary{cursor:pointer;color:var(--muted)}
+details ul{padding-left:18px;color:var(--muted);font-size:13px}
+.prog{font-size:12px;color:var(--muted)}
+#edgeHint{position:fixed;z-index:7;background:var(--hl);color:#221a00;font-weight:700;font-size:12px;border:0;
+  border-radius:999px;padding:4px 10px;cursor:pointer;display:none}
+@media (prefers-reduced-motion: reduce){
+  *{transition:none !important;animation:none !important}
+}
+@media (max-width: 900px){
+  html,body{height:auto}
+  .app{display:block;height:auto}
+  #canvasWrap{overflow:visible}
+  #canvas{overflow:visible;height:auto}
+  #panel{width:auto;border-left:0;border-top:1px solid var(--border)}
+  #band{padding:14px 16px 4px}
+  #pitch{font-size:14.5px}
+  #plate{position:fixed;left:0;right:0;max-height:78vh}
+  .slots{grid-template-columns:1fr}
+  .brand span{display:none}
+  #crumbs button{max-width:120px}
+}
+</style>
+</head>
+<body>
+<header>
+  <div class="brand">Umbra <span>/ watchdog</span></div>
+  <nav id="crumbs" aria-label="Où je suis"></nav>
+  <button id="backBtn" hidden>‹ Remonter <span class="kind">(Échap)</span></button>
+</header>
+<div class="app">
+ <div id="canvasWrap">
+  <main id="canvas">
+    <section id="band">
+      <div class="qlabel">Ce que fait ce projet, pour qui</div>
+      <p id="pitch"></p>
+      <p id="dataLine" class="eb" style="margin:-4px 0 10px"></p>
+      <div id="keyRow"></div>
+    </section>
+    <div id="stageWrap"><div id="stage"><svg id="wires" aria-hidden="true"></svg><div id="token">compte rendu</div></div></div>
+    <section id="strip"></section>
+  </main>
+  <section id="plate" aria-live="polite"></section>
+ </div>
+  <aside id="panel"></aside>
+</div>
+<button id="edgeHint"></button>
+
+<script type="application/json" id="model-data">{
+ "pitch": "Watchdog est un outil, encore en tout début de construction, pour les équipes qui font tourner des assistants d'intelligence artificielle : il doit surveiller ces assistants, repérer leurs dérives et aider à les arrêter. Pour l'instant, il sait seulement recevoir et garder en mémoire les comptes rendus que ces assistants lui envoient.",
+ "resume": "Watchdog s'adresse aux équipes techniques qui exploitent des agents d'IA en production. La vision complète prévoit la détection d'anomalies, une enquête faite par plusieurs agents, des propositions de correction et un arrêt d'urgence. Le code actuel est une petite application FastAPI (Phase 1) avec une seule route : POST /api/v1/events. Une requête passe d'abord par un middleware qui exige l'en-tête X-Tenant-ID. Pydantic valide ensuite le corps selon le schéma EventIn. L'événement est enfin ajouté, avec le tenant et l'heure de réception, à une liste Python en mémoire, puis renvoyé avec le code 201. Il n'y a encore ni base de données, ni appel à un modèle d'IA, ni JWT.",
+ "blocs": [
+  {
+   "id": "agent-surveille",
+   "nom": "Assistant d'IA surveillé",
+   "type": "user",
+   "role": "Un agent d'IA client, ou un script de test comme curl, qui envoie par HTTP un événement de télémétrie pour chaque appel à un modèle.",
+   "en_bref": "Envoie le compte rendu de chaque appel",
+   "importance": "coeur",
+   "zone": "utilise",
+   "entre": [
+    "La réponse avec l'événement enregistré",
+    "Un refus si l'envoi est incomplet"
+   ],
+   "sort": [
+    "Le compte rendu d'un appel au modèle",
+    "Le nom du client"
+   ],
+   "techno": "HTTP / JSON",
+   "code": [
+    {
+     "chemin": "README.md",
+     "element": "README.md"
+    }
+   ],
+   "indices": "README.md l.41-48 : exemple curl avec l'en-tête X-Tenant-ID ; VISION.md l.53 : définition de « Monitored Agent »."
+  },
+  {
+   "id": "operateur",
+   "nom": "Personne qui installe et lance",
+   "type": "user",
+   "role": "Le développeur qui installe le paquet, copie .env.example puis lance uvicorn à la main.",
+   "en_bref": "Installe et démarre le service à la main",
+   "importance": "secondaire",
+   "zone": "utilise",
+   "entre": [
+    "Les instructions d'installation"
+   ],
+   "sort": [
+    "Le service démarré"
+   ],
+   "techno": "pip, uvicorn",
+   "code": [
+    {
+     "chemin": "README.md",
+     "element": "README.md"
+    },
+    {
+     "chemin": ".env.example",
+     "element": ".env.example"
+    }
+   ],
+   "indices": "README.md l.31-39 : section « Quick start »."
+  },
+  {
+   "id": "api",
+   "nom": "Porte d'entrée du service",
+   "type": "backend",
+   "role": "L'application FastAPI : elle filtre chaque requête sur X-Tenant-ID, valide l'événement avec Pydantic et le confie au stockage.",
+   "en_bref": "Reçoit, contrôle et range les comptes rendus",
+   "importance": "coeur",
+   "zone": "recoit",
+   "entre": [
+    "Les comptes rendus envoyés",
+    "Le nom du client"
+   ],
+   "sort": [
+    "L'événement enregistré",
+    "Un refus si le nom du client manque",
+    "Un refus si les données sont invalides"
+   ],
+   "techno": "Python 3.13, FastAPI, Starlette, Pydantic v2, uvicorn",
+   "code": [
+    {
+     "chemin": "watchdog_ai/main.py",
+     "element": "watchdog_ai/main.py"
+    },
+    {
+     "chemin": "watchdog_ai/api",
+     "element": "dir:watchdog_ai/api"
+    },
+    {
+     "chemin": "watchdog_ai/ingestion",
+     "element": "dir:watchdog_ai/ingestion"
+    }
+   ],
+   "indices": "main.py l.14-21 crée l'app, ajoute le middleware et branche le routeur."
+  },
+  {
+   "id": "memoire",
+   "nom": "Mémoire temporaire des événements",
+   "type": "database",
+   "role": "Une liste Python au niveau du module (_events) qui garde les EventOut en mémoire. Tout est perdu au redémarrage. Elle doit être remplacée plus tard par PostgreSQL.",
+   "en_bref": "Garde les événements tant que le service tourne",
+   "importance": "coeur",
+   "zone": "range",
+   "entre": [
+    "Les événements validés, avec le nom du client"
+   ],
+   "sort": [
+    "L'événement enregistré",
+    "Les événements d'un client, mais pas encore exposés"
+   ],
+   "techno": "Liste Python en mémoire, PostgreSQL prévu",
+   "code": [
+    {
+     "chemin": "watchdog_ai/storage/events.py",
+     "element": "watchdog_ai/storage/events.py"
+    }
+   ],
+   "indices": "storage/events.py l.1-9 : « In-memory storage », TODO PostgreSQL + SQLAlchemy async."
+  },
+  {
+   "id": "docs",
+   "nom": "Documents de vision",
+   "type": "docs",
+   "role": "README et VISION.md décrivent les 8 couches visées, les scénarios S1-S13 et la feuille de route. La plupart ne sont pas encore codés.",
+   "en_bref": "Décrivent le produit visé et le planning",
+   "importance": "secondaire",
+   "zone": "traite",
+   "entre": [
+    "Les idées du porteur du projet"
+   ],
+   "sort": [
+    "Le plan du produit",
+    "Les étapes à venir"
+   ],
+   "techno": "Markdown",
+   "code": [
+    {
+     "chemin": "README.md",
+     "element": "README.md"
+    },
+    {
+     "chemin": "VISION.md",
+     "element": "VISION.md"
+    }
+   ],
+   "indices": "README.md l.71-79 : tableau des phases, Phase 1 « In progress »."
+  },
+  {
+   "id": "outillage",
+   "nom": "Outils de contrôle du code",
+   "type": "infra",
+   "role": "pyproject.toml déclare les dépendances, et les outils de développement pyright (mode strict) et ruff.",
+   "en_bref": "Vérifient le style et les types",
+   "importance": "secondaire",
+   "zone": "traite",
+   "entre": [
+    "Le code source"
+   ],
+   "sort": [
+    "Les erreurs de style ou de types"
+   ],
+   "techno": "setuptools, pyright, ruff",
+   "code": [
+    {
+     "chemin": "pyproject.toml",
+     "element": "pyproject.toml"
+    }
+   ],
+   "indices": "pyproject.toml l.17-39."
+  }
+ ],
+ "composants": [
+  {
+   "id": "app",
+   "nom": "Assemblage de l'application",
+   "en_bref": "Monte le service et branche ses morceaux",
+   "bloc": "api",
+   "role": "Crée l'instance FastAPI, installe TenantAuthMiddleware et inclut le routeur des événements.",
+   "responsabilites": [
+    "Créer l'app FastAPI (titre, version)",
+    "Ajouter le middleware de tenant",
+    "Brancher le routeur /api/v1"
+   ],
+   "expose": [
+    {
+     "quoi": "objet ASGI app (watchdog_ai.main:app)",
+     "fichier": "watchdog_ai/main.py",
+     "lignes": [
+      14,
+      21
+     ],
+     "verifie": true
+    }
+   ],
+   "utilise": [
+    "auth-tenant",
+    "route-events"
+   ],
+   "fichiers": [
+    "watchdog_ai/main.py"
+   ]
+  },
+  {
+   "id": "auth-tenant",
+   "nom": "Contrôle du nom du client",
+   "en_bref": "Refuse les requêtes sans nom de client",
+   "bloc": "api",
+   "role": "Middleware Starlette qui lit X-Tenant-ID sur toutes les requêtes. Si l'en-tête manque, il renvoie 401. Sinon, il place la valeur dans request.state.tenant_id.",
+   "responsabilites": [
+    "Exiger l'en-tête X-Tenant-ID sur toutes les requêtes, y compris /docs",
+    "Passer le tenant à la route via request.state"
+   ],
+   "expose": [
+    {
+     "quoi": "TenantAuthMiddleware.dispatch",
+     "fichier": "watchdog_ai/api/middleware/tenant_auth.py",
+     "lignes": [
+      25,
+      40
+     ],
+     "verifie": true
+    }
+   ],
+   "utilise": [],
+   "fichiers": [
+    "watchdog_ai/api/middleware/tenant_auth.py"
+   ]
+  },
+  {
+   "id": "route-events",
+   "nom": "Réception des comptes rendus",
+   "en_bref": "Point d'arrivée des comptes rendus d'appels",
+   "bloc": "api",
+   "role": "Route POST /api/v1/events : reçoit un EventIn validé, lit le tenant et appelle append_event, puis renvoie 201.",
+   "responsabilites": [
+    "Déclarer POST /api/v1/events",
+    "Lire tenant_id depuis request.state",
+    "Renvoyer EventOut avec le code 201"
+   ],
+   "expose": [
+    {
+     "quoi": "POST /api/v1/events (create_event)",
+     "fichier": "watchdog_ai/api/routes/events.py",
+     "lignes": [
+      13,
+      23
+     ],
+     "verifie": true
+    }
+   ],
+   "utilise": [
+    "schemas",
+    "stockage-events"
+   ],
+   "fichiers": [
+    "watchdog_ai/api/routes/events.py"
+   ]
+  },
+  {
+   "id": "schemas",
+   "nom": "Forme attendue d'un compte rendu",
+   "en_bref": "Décrit et vérifie les champs d'un événement",
+   "bloc": "api",
+   "role": "Modèles Pydantic : EventIn (identité, horaire, fournisseur, modèle, prompt, sortie, jetons, coût, statut, métadonnées) et EventOut (EventIn plus tenant_id et received_at).",
+   "responsabilites": [
+    "Imposer les champs obligatoires et leurs bornes (longueurs, valeurs ≥ 0)",
+    "Limiter status à success, error, timeout, content_filter ou rate_limit"
+   ],
+   "expose": [
+    {
+     "quoi": "EventIn",
+     "fichier": "watchdog_ai/ingestion/schemas.py",
+     "lignes": [
+      10,
+      36
+     ],
+     "verifie": true
+    },
+    {
+     "quoi": "EventOut",
+     "fichier": "watchdog_ai/ingestion/schemas.py",
+     "lignes": [
+      39,
+      41
+     ],
+     "verifie": true
+    }
+   ],
+   "utilise": [],
+   "fichiers": [
+    "watchdog_ai/ingestion/schemas.py"
+   ]
+  },
+  {
+   "id": "stockage-events",
+   "nom": "Rangement des événements",
+   "en_bref": "Ajoute et relit les événements par client",
+   "bloc": "memoire",
+   "role": "Fonctions qui ajoutent un EventOut à la liste _events et filtrent cette liste par tenant_id.",
+   "responsabilites": [
+    "Construire l'EventOut avec tenant_id et received_at (UTC)",
+    "Ajouter l'événement à la liste en mémoire",
+    "Lister les événements d'un tenant (fonction pas encore appelée)"
+   ],
+   "expose": [
+    {
+     "quoi": "append_event(event, tenant_id)",
+     "fichier": "watchdog_ai/storage/events.py",
+     "lignes": [
+      12,
+      20
+     ],
+     "verifie": true
+    },
+    {
+     "quoi": "list_events(tenant_id)",
+     "fichier": "watchdog_ai/storage/events.py",
+     "lignes": [
+      23,
+      25
+     ],
+     "verifie": true
+    }
+   ],
+   "utilise": [
+    "schemas",
+    "memoire"
+   ],
+   "fichiers": [
+    "watchdog_ai/storage/events.py"
+   ]
+  }
+ ],
+ "modules": {
+  "watchdog_ai/main.py": "Point d'entrée ASGI : crée l'app FastAPI, ajoute TenantAuthMiddleware et inclut le routeur des événements.",
+  "watchdog_ai/api/middleware/tenant_auth.py": "Middleware Starlette qui exige X-Tenant-ID (sinon 401) et le place dans request.state.tenant_id.",
+  "watchdog_ai/api/routes/events.py": "Routeur /api/v1 avec POST /events (create_event), qui stocke l'événement validé et renvoie 201.",
+  "watchdog_ai/ingestion/schemas.py": "Schémas Pydantic EventIn (télémétrie d'un appel LLM) et EventOut (EventIn plus tenant_id et received_at).",
+  "watchdog_ai/storage/events.py": "Stockage en mémoire (liste _events) avec append_event et list_events filtré par tenant.",
+  "pyproject.toml": "Manifeste du paquet : dépendances FastAPI, Pydantic et uvicorn, outils pyright strict et ruff.",
+  ".env.example": "Modèle de variables d'environnement : APP_ENV, APP_PORT et LOG_LEVEL, plus des sections DB, JWT, Azure OpenAI et Langfuse commentées. Le code ne les lit pas encore.",
+  "README.md": "Présentation du produit, démarrage rapide, architecture en 8 couches et état des phases.",
+  "VISION.md": "Vision complète : glossaire, architecture cible, scénarios S1-S13, stack, feuille de route et non-objectifs."
+ },
+ "dossiers": {
+  "watchdog_ai": "Paquet Python de l'application Watchdog.",
+  "watchdog_ai/api": "Couche HTTP : routes et middlewares.",
+  "watchdog_ai/api/middleware": "Middlewares transverses, pour l'instant l'authentification par tenant.",
+  "watchdog_ai/api/routes": "Routeurs FastAPI, pour l'instant l'ingestion des événements.",
+  "watchdog_ai/ingestion": "Contrats de données de la télémétrie entrante (schémas Pydantic).",
+  "watchdog_ai/storage": "Persistance des événements, en mémoire en attendant PostgreSQL."
+ },
+ "incertitudes": [
+  "Le produit décrit dans README et VISION n'existe pas encore dans le code. Ce qui manque : détection d'anomalies, agents Watcher, Investigator, Mitigator et Alerter (LangGraph), évaluation, kill switch, MCP, PostgreSQL/TimescaleDB/pgvector, JWT, Azure OpenAI, Mistral, Langfuse. Ces services extérieurs ne sont donc pas représentés comme blocs.",
+  "list_events n'est appelée nulle part : aucune route ne permet de relire les événements stockés.",
+  "Le stockage est une liste globale en mémoire, sans verrou ni persistance. Avec plusieurs workers uvicorn, chaque processus aurait sa propre liste. Ce comportement est déduit du code, pas testé.",
+  "L'exemple curl du README ne contient pas plusieurs champs obligatoires d'EventIn. Il devrait donc recevoir 422. C'est déduit du schéma, la requête n'a pas été exécutée.",
+  "Aucun fichier Docker, compose, CI ou test n'est présent dans cette copie. Le fichier LICENSE cité est absent."
+ ],
+ "parcours": [
+  {
+   "id": "demarrage",
+   "nom": "Installer et démarrer le service",
+   "declencheur": "Une personne suit le « Quick start » du README",
+   "depart": "Une personne veut faire tourner le service sur sa machine.",
+   "fin": "Le service écoute et attend les comptes rendus.",
+   "etapes": [
+    {
+     "texte": "Installation manuelle : git clone, pip install -e \".[dev]\", puis cp .env.example .env. Le code ne lit aucune variable d'environnement pour l'instant.",
+     "action": "Installe le projet",
+     "simple": "La personne récupère le projet, installe ce qu'il faut et copie le fichier de réglages.",
+     "composant": "app",
+     "touche": [
+      "operateur"
+     ],
+     "conditions": [
+      "Python 3.13 ou plus (requires-python)"
+     ],
+     "manuel": true,
+     "fichier": "README.md",
+     "lignes": [
+      33,
+      37
+     ],
+     "verifie": true
+    },
+    {
+     "texte": "Lancement manuel : uvicorn watchdog_ai.main:app --reload --port 8000.",
+     "action": "Lance le service",
+     "simple": "La personne lance le service à la main.",
+     "composant": "app",
+     "touche": [
+      "operateur",
+      "api"
+     ],
+     "conditions": [
+      "Le paquet est installé"
+     ],
+     "manuel": true,
+     "fichier": "README.md",
+     "lignes": [
+      38,
+      38
+     ],
+     "verifie": true
+    },
+    {
+     "texte": "À l'import de main.py : création de FastAPI(title=\"Watchdog\"), app.add_middleware(TenantAuthMiddleware), puis app.include_router(events_router). La liste _events démarre vide à l'import de storage/events.py.",
+     "action": "Monte le service",
+     "simple": "Le service se monte : il installe le contrôle du nom du client et branche le point d'arrivée des comptes rendus.",
+     "composant": "app",
+     "touche": [
+      "api",
+      "memoire"
+     ],
+     "conditions": [],
+     "manuel": false,
+     "fichier": "watchdog_ai/main.py",
+     "lignes": [
+      14,
+      21
+     ],
+     "verifie": true
+    }
+   ],
+   "resultat": "Un serveur HTTP sur le port 8000 qui expose POST /api/v1/events, avec un stockage vide.",
+   "branches": [
+    {
+     "quand": "Le service redémarre (par exemple avec --reload après une modification)",
+     "alors": "La liste _events est recréée vide : tous les événements reçus sont perdus.",
+     "fichier": "watchdog_ai/storage/events.py",
+     "lignes": [
+      9,
+      9
+     ],
+     "verifie": true
+    }
+   ]
+  },
+  {
+   "id": "envoi-evenement",
+   "nom": "Recevoir et garder le compte rendu d'un appel d'IA",
+   "declencheur": "Un agent surveillé envoie POST /api/v1/events",
+   "depart": "Un assistant d'IA envoie le compte rendu d'un de ses appels.",
+   "fin": "Le compte rendu est gardé en mémoire et renvoyé, complété, à l'expéditeur.",
+   "etapes": [
+    {
+     "texte": "TenantAuthMiddleware.dispatch lit request.headers['X-Tenant-ID']. Si l'en-tête est présent, il le copie dans request.state.tenant_id puis appelle call_next. Il s'exécute avant le routage et la validation du corps.",
+     "action": "Vérifie le nom du client",
+     "simple": "Le service vérifie d'abord que la demande indique le nom du client, et le note.",
+     "composant": "auth-tenant",
+     "touche": [
+      "agent-surveille",
+      "api"
+     ],
+     "conditions": [
+      "L'en-tête X-Tenant-ID est présent et non vide (sa valeur n'est pas vérifiée)"
+     ],
+     "manuel": false,
+     "fichier": "watchdog_ai/api/middleware/tenant_auth.py",
+     "lignes": [
+      28,
+      40
+     ],
+     "verifie": true
+    },
+    {
+     "texte": "FastAPI aiguille vers create_event, puis Pydantic valide le corps JSON selon EventIn. Champs obligatoires : event_id (UUID), agent_id, timestamp_start, latency_ms ≥ 0, provider, model, prompt, output, prompt_tokens, completion_tokens, total_tokens, cost_usd ≥ 0 et status parmi 5 valeurs. Champs facultatifs : schema_version='1.0' et metadata={}.",
+     "action": "Contrôle le compte rendu",
+     "simple": "Le service contrôle que le compte rendu contient bien tous les renseignements attendus, au bon format.",
+     "composant": "schemas",
+     "touche": [
+      "api"
+     ],
+     "conditions": [
+      "La requête a passé le contrôle du nom du client",
+      "Méthode POST sur /api/v1/events"
+     ],
+     "manuel": false,
+     "fichier": "watchdog_ai/ingestion/schemas.py",
+     "lignes": [
+      10,
+      36
+     ],
+     "verifie": true
+    },
+    {
+     "texte": "create_event lit tenant_id dans request.state et appelle append_event(event, tenant_id=tenant_id).",
+     "action": "Transmet au rangement",
+     "simple": "Le point d'arrivée reprend le nom du client et passe le compte rendu au rangement.",
+     "composant": "route-events",
+     "touche": [
+      "api"
+     ],
+     "conditions": [
+      "Le corps est valide"
+     ],
+     "manuel": false,
+     "fichier": "watchdog_ai/api/routes/events.py",
+     "lignes": [
+      16,
+      23
+     ],
+     "verifie": true
+    },
+    {
+     "texte": "append_event construit un EventOut (event.model_dump(), tenant_id, received_at=datetime.now(UTC)), l'ajoute à la liste _events en mémoire puis le renvoie.",
+     "action": "Garde le compte rendu",
+     "simple": "Le compte rendu reçoit le nom du client et l'heure d'arrivée, puis il est gardé en mémoire.",
+     "composant": "stockage-events",
+     "touche": [
+      "memoire"
+     ],
+     "conditions": [],
+     "manuel": false,
+     "fichier": "watchdog_ai/storage/events.py",
+     "lignes": [
+      12,
+      20
+     ],
+     "verifie": true
+    },
+    {
+     "texte": "FastAPI sérialise la valeur renvoyée selon response_model=EventOut et répond 201 Created. La réponse traverse ensuite le middleware.",
+     "action": "Confirme la réception",
+     "simple": "Le service répond à l'assistant que tout est bien reçu, et lui renvoie le compte rendu complété.",
+     "composant": "route-events",
+     "touche": [
+      "agent-surveille"
+     ],
+     "conditions": [],
+     "manuel": false,
+     "fichier": "watchdog_ai/api/routes/events.py",
+     "lignes": [
+      16,
+      20
+     ],
+     "verifie": true
+    }
+   ],
+   "resultat": "L'événement, avec tenant_id et received_at, est ajouté à la liste en mémoire. L'expéditeur reçoit 201 avec l'EventOut.",
+   "branches": [
+    {
+     "quand": "L'en-tête X-Tenant-ID manque ou est vide",
+     "alors": "Le middleware renvoie tout de suite 401 {\"detail\": \"Missing X-Tenant-ID header\"}. Le corps n'est pas lu et rien n'est stocké.",
+     "fichier": "watchdog_ai/api/middleware/tenant_auth.py",
+     "lignes": [
+      33,
+      38
+     ],
+     "verifie": true
+    },
+    {
+     "quand": "Le corps ne respecte pas EventIn (champ manquant, valeur négative, status inconnu...)",
+     "alors": "FastAPI renvoie 422 avec le détail des erreurs, et rien n'est stocké. L'exemple curl du README n'a pas event_id, timestamp_start, latency_ms ni provider : il reçoit donc 422.",
+     "fichier": "watchdog_ai/ingestion/schemas.py",
+     "lignes": [
+      13,
+      35
+     ],
+     "verifie": true
+    },
+    {
+     "quand": "Le même event_id est envoyé deux fois",
+     "alors": "Aucun contrôle de doublon : l'événement est ajouté une deuxième fois.",
+     "fichier": "watchdog_ai/storage/events.py",
+     "lignes": [
+      12,
+      20
+     ],
+     "verifie": true
+    }
+   ]
+  },
+  {
+   "id": "acces-sans-client",
+   "nom": "Toute requête sans nom de client est refusée",
+   "declencheur": "Une requête HTTP sur n'importe quelle adresse du service",
+   "depart": "Quelqu'un appelle le service, même juste pour lire sa documentation.",
+   "fin": "Sans nom de client, la personne reçoit un refus.",
+   "etapes": [
+    {
+     "texte": "Le middleware est global (app.add_middleware). Il s'applique donc à toutes les routes, y compris /docs, /openapi.json et les adresses inconnues.",
+     "action": "Filtre toutes les demandes",
+     "simple": "Le contrôle du nom du client vaut pour toutes les adresses du service.",
+     "composant": "app",
+     "touche": [
+      "api"
+     ],
+     "conditions": [],
+     "manuel": false,
+     "fichier": "watchdog_ai/main.py",
+     "lignes": [
+      20,
+      20
+     ],
+     "verifie": true
+    },
+    {
+     "texte": "dispatch renvoie un JSONResponse 401 au lieu de lever HTTPException. Le module explique qu'une exception levée dans un BaseHTTPMiddleware donnerait une erreur 500.",
+     "action": "Refuse sans nom de client",
+     "simple": "Le service répond poliment « nom du client manquant » au lieu de planter.",
+     "composant": "auth-tenant",
+     "touche": [
+      "agent-surveille"
+     ],
+     "conditions": [
+      "L'en-tête X-Tenant-ID est absent ou vide"
+     ],
+     "manuel": false,
+     "fichier": "watchdog_ai/api/middleware/tenant_auth.py",
+     "lignes": [
+      33,
+      38
+     ],
+     "verifie": true
+    }
+   ],
+   "resultat": "Aucune requête n'atteint le service sans X-Tenant-ID. N'importe quelle valeur suffit, car il n'y a ni JWT ni liste de tenants.",
+   "branches": [
+    {
+     "quand": "L'en-tête est présent mais l'adresse n'existe pas",
+     "alors": "La requête passe le middleware, puis FastAPI répond 404.",
+     "fichier": "watchdog_ai/api/middleware/tenant_auth.py",
+     "lignes": [
+      39,
+      40
+     ],
+     "verifie": true
+    }
+   ]
+  }
+ ],
+ "flux": [
+  {
+   "de": "operateur",
+   "vers": "api",
+   "quoi": "Lancement du serveur avec uvicorn watchdog_ai.main:app",
+   "verbe": "démarre"
+  },
+  {
+   "de": "agent-surveille",
+   "vers": "api",
+   "quoi": "POST /api/v1/events avec l'en-tête X-Tenant-ID et un corps JSON",
+   "verbe": "envoie ses comptes rendus à"
+  },
+  {
+   "de": "api",
+   "vers": "memoire",
+   "quoi": "EventOut (l'événement, plus tenant_id et received_at)",
+   "verbe": "range l'événement dans"
+  },
+  {
+   "de": "api",
+   "vers": "agent-surveille",
+   "quoi": "201 avec l'EventOut, 401 si l'en-tête manque, ou 422 si le corps est invalide",
+   "verbe": "répond à"
+  },
+  {
+   "de": "outillage",
+   "vers": "api",
+   "quoi": "Contrôle des types et du style",
+   "verbe": "vérifie"
+  }
+ ]
+}</script>
+<script>
+"use strict";
+/* ---------- data ---------- */
+const M = JSON.parse(document.getElementById('model-data').textContent);
+const idx = a => Object.fromEntries(a.map(x => [x.id, x]));
+const B = idx(M.blocs), C = idx(M.composants);
+const esc = s => String(s).replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+const blocOf = cid => (C[cid] ? C[cid].bloc : null);
+const isUser = id => !!B[id] && B[id].type === 'user';
+const distinctComps = p => new Set(p.etapes.map(e => e.composant)).size;
+/* main journey: the model has no "principal" field yet -> the journey with the most distinct components */
+const MAIN = M.parcours.slice().sort((a, b) => distinctComps(b) - distinctComps(a))[0];
+const STEPS = MAIN.etapes;
+const ENTRY = STEPS[0].touche.find(isUser);
+const FORWARD = [ENTRY];
+STEPS.forEach(s => { const b = blocOf(s.composant); if (b && !FORWARD.includes(b)) FORWARD.push(b); });
+const EXIT = FORWARD[FORWARD.length - 1];
+const ROOMS = FORWARD.slice(1);
+const fluxOf = (de, vers) => M.flux.find(f => f.de === de && f.vers === vers) || null;
+const RETURN = M.flux.find(f => f.vers === ENTRY && ROOMS.includes(f.de)) || null;
+const touched = new Set();
+M.parcours.forEach(p => p.etapes.forEach(e => { e.touche.forEach(t => touched.add(t)); const b = blocOf(e.composant); if (b) touched.add(b); }));
+const SIDE = M.blocs.filter(b => isUser(b.id) && b.id !== ENTRY && touched.has(b.id));
+const STRIP = M.blocs.filter(b => !touched.has(b.id));
+const isReturnStep = i => i > 0 && STEPS[i].touche.includes(ENTRY);
+const firstStep = {};
+STEPS.forEach((s, i) => { if (!(s.composant in firstStep)) firstStep[s.composant] = i; });
+function roomMachines(r) {
+  const all = M.composants.filter(c => c.bloc === r);
+  const on = all.filter(c => c.id in firstStep).sort((a, b) => firstStep[a.id] - firstStep[b.id]);
+  const off = all.filter(c => !(c.id in firstStep));
+  return { all, on, off };
+}
+const stepsIn = r => STEPS.filter(s => blocOf(s.composant) === r).length;
+/* branches of the main journey -> machine, by file */
+const BRANCHES = MAIN.branches.map((br, i) => {
+  const comp = M.composants.find(c => c.fichiers.includes(br.fichier));
+  const m = /\b(4\d\d)\b/.exec(br.alors);
+  return { i, br, comp: comp ? comp.id : null, code: m ? m[1] : null };
+}).filter(x => x.comp);
+const lostSentence = (B[EXIT].role.split(/(?<=\.)\s+/).find(s => /perdu/i.test(s)) || '');
+
+/* ---------- facts read in the Watchdog source, NOT in the model yet ---------- */
+const F_AUTH = 'watchdog_ai/api/middleware/tenant_auth.py', F_SCH = 'watchdog_ai/ingestion/schemas.py',
+      F_RT = 'watchdog_ai/api/routes/events.py', F_ST = 'watchdog_ai/storage/events.py', F_MAIN = 'watchdog_ai/main.py';
+const CODE = {
+  'auth-tenant': {
+    inTag: 'X-Tenant-ID', outTag: 'tenant_id · ou 401',
+    recoit: [{ t: "L'en-tête X-Tenant-ID de la demande", c: 'request.headers.get("X-Tenant-ID")', f: F_AUTH, l: '33' }],
+    rend: [{ t: 'Le nom du client, noté pour la suite', c: 'request.state.tenant_id = tenant_id', f: F_AUTH, l: '39' },
+           { t: 'Ou un refus 401 « Missing X-Tenant-ID header »', c: 'status_code=401', f: F_AUTH, l: '36-37' }],
+    reglages: [
+      { nom: "Nom de l'en-tête lu", c: '"X-Tenant-ID"', f: F_AUTH, l: '33' },
+      { nom: 'Code du refus', c: 'status_code=401', f: F_AUTH, l: '36' },
+      { nom: 'Message du refus', c: '{"detail": "Missing X-Tenant-ID header"}', f: F_AUTH, l: '37' },
+      { nom: 'Où le nom du client est noté', c: 'request.state.tenant_id', f: F_AUTH, l: '39' },
+      { nom: 'Portée : toutes les adresses, /docs compris', c: 'app.add_middleware(TenantAuthMiddleware)', f: F_MAIN, l: '20' }]
+  },
+  'schemas': {
+    inTag: 'corps JSON', outTag: 'EventIn · ou 422',
+    recoit: [{ t: 'Le corps JSON de la demande', c: 'class EventIn(BaseModel)', f: F_SCH, l: '10' }],
+    rend: [{ t: 'Le compte rendu contrôlé (EventIn)', c: 'EventIn', f: F_SCH, l: '10-36' },
+           { t: 'Ou un refus 422 (écrit dans le cas particulier du modèle, pas dans ce fichier)', c: '', f: F_SCH, l: '13-35', model: true }],
+    reglages: [
+      { nom: "Nom de l'agent : 1 à 128 caractères", c: 'agent_id: str = Field(min_length=1, max_length=128)', f: F_SCH, l: '15' },
+      { nom: 'Version du format par défaut', c: 'schema_version: str = "1.0"', f: F_SCH, l: '16' },
+      { nom: 'Durée en ms, jamais négative', c: 'latency_ms: int = Field(ge=0)', f: F_SCH, l: '20' },
+      { nom: 'Fournisseur : 1 à 64 caractères', c: 'provider: str = Field(min_length=1, max_length=64)', f: F_SCH, l: '23' },
+      { nom: 'Modèle : 1 à 128 caractères', c: 'model: str = Field(min_length=1, max_length=128)', f: F_SCH, l: '24' },
+      { nom: 'Jetons et coût, jamais négatifs', c: 'Field(ge=0)', f: F_SCH, l: '29-32' },
+      { nom: 'Statut : une des 5 valeurs', c: 'Literal["success", "error", "timeout", "content_filter", "rate_limit"]', f: F_SCH, l: '35' }]
+  },
+  'route-events': {
+    inTag: 'EventIn + tenant_id', outTag: 'EventOut · 201',
+    recoit: [{ t: 'Le compte rendu contrôlé et le nom du client', c: 'create_event(event: EventIn, request: Request)', f: F_RT, l: '21-22' }],
+    rend: [{ t: 'Le compte rendu complété, avec le code 201', c: 'response_model=EventOut, status_code=201', f: F_RT, l: '18-19' }],
+    reglages: [
+      { nom: "Début de l'adresse", c: 'prefix="/api/v1"', f: F_RT, l: '13' },
+      { nom: "Fin de l'adresse", c: '"/events"', f: F_RT, l: '17' },
+      { nom: 'Forme de la réponse', c: 'response_model=EventOut', f: F_RT, l: '18' },
+      { nom: 'Code de réponse', c: 'status_code=status.HTTP_201_CREATED', f: F_RT, l: '19' }]
+  },
+  'stockage-events': {
+    inTag: 'event + tenant_id', outTag: 'EventOut',
+    recoit: [{ t: 'Le compte rendu et le nom du client', c: 'append_event(event: EventIn, tenant_id: str)', f: F_ST, l: '12' }],
+    rend: [{ t: "Le compte rendu complété (nom du client, heure d'arrivée)", c: 'return event_out', f: F_ST, l: '14-20' }],
+    reglages: [
+      { nom: 'Où c\'est gardé : une liste en mémoire', c: '_events: list[EventOut] = []', f: F_ST, l: '9' },
+      { nom: "Heure d'arrivée, en temps universel", c: 'received_at=datetime.now(UTC)', f: F_ST, l: '17' },
+      { nom: 'Ajout simple, sans contrôle de doublon', c: '_events.append(event_out)', f: F_ST, l: '19' }]
+  },
+  'app': {
+    inTag: 'lancement uvicorn', outTag: 'app',
+    recoit: [{ t: 'Le lancement par la personne', c: 'uvicorn watchdog_ai.main:app --reload --port 8000', f: 'README.md', l: '38' }],
+    rend: [{ t: "L'application montée", c: 'app = FastAPI(...)', f: F_MAIN, l: '14-18' }],
+    reglages: [
+      { nom: 'Titre du service', c: 'title="Watchdog"', f: F_MAIN, l: '15' },
+      { nom: 'Version', c: 'version="0.1.0"', f: F_MAIN, l: '17' },
+      { nom: 'Contrôle installé', c: 'app.add_middleware(TenantAuthMiddleware)', f: F_MAIN, l: '20' },
+      { nom: 'Point d\'arrivée branché', c: 'app.include_router(events_router)', f: F_MAIN, l: '21' }]
+  }
+};
+const PROJECT_SETTINGS = [
+  { nom: 'APP_ENV', v: 'development', f: '.env.example', l: '2' },
+  { nom: 'APP_PORT', v: '8000', f: '.env.example', l: '3' },
+  { nom: 'LOG_LEVEL', v: 'INFO', f: '.env.example', l: '4' }];
+/* model texts shown as-is but flagged */
+const MTM = {
+  dataNames: 'même donnée, deux noms : « comptes rendus » et « événements »',
+  techReturn: 'texte du modèle, technique',
+  techBranch: 'texte du modèle, technique'
+};
+const mtm = t => `<span class="mtm" title="Texte du modèle, affiché tel quel">${esc(t)}</span>`;
+
+/* ---------- state ---------- */
+const S = { room: null, step: 0, plate: null, playing: false, openOther: {} };
+let timer = null;
+
+/* ---------- DOM ---------- */
+const $ = id => document.getElementById(id);
+const stage = $('stage'), svg = $('wires'), token = $('token'), canvas = $('canvas');
+const nodes = {};       // id -> element
+const cur = {};         // id -> current rect
+let target = {}, wiresSpec = [], labels = [];
+function mk(id, cls) { const d = document.createElement('div'); d.className = 'node ' + cls; d.dataset.id = id; stage.appendChild(d); nodes[id] = d; d.classList.add('gone'); return d; }
+FORWARD.forEach(b => mk('b:' + b, ''));
+SIDE.forEach(b => mk('b:' + b.id, ''));
+ROOMS.forEach(r => {
+  const rm = roomMachines(r);
+  rm.on.forEach(c => mk('m:' + c.id, 'machine' + (B[r].type === 'database' ? ' m-store' : '')));
+  rm.off.forEach(c => mk('w:' + c.id, 'wband'));
+});
+BRANCHES.forEach(x => mk('c:' + x.i, x.code ? 'chute' : 'note'));
+const roomTitle = document.createElement('div'); roomTitle.className = 'roomTitle'; stage.appendChild(roomTitle);
+
+const glyph = `<svg class="glyph" viewBox="0 0 30 30" aria-hidden="true"><circle cx="15" cy="9" r="5.5" fill="none" stroke="#34d399" stroke-width="2.2"/><path d="M4.5 27c0-6.5 4.7-10 10.5-10s10.5 3.5 10.5 10" fill="none" stroke="#34d399" stroke-width="2.2"/></svg>`;
+const kindWord = { user: 'Personne', backend: 'Service', database: 'Base de données', docs: 'Documents', infra: 'Outils' };
+const NUM = n => `<span class="num">${n}</span>`;
+const lines = (f, l) => `${esc(f)} l.${l[0]}${l[1] !== l[0] ? '-' + l[1] : ''}`;
+
+/* ---------- content of nodes per mode ---------- */
+function fillNodes() {
+  const r = S.room, ri = r ? FORWARD.indexOf(r) : -1;
+  const leftN = r ? FORWARD[ri - 1] : null, rightN = r ? FORWARD[ri + 1] || null : null;
+  FORWARD.forEach((b, i) => {
+    const el = nodes['b:' + b], bl = B[b];
+    const kcls = bl.type === 'user' ? 'k-user' : bl.type === 'database' ? 'k-store' : 'k-service';
+    let mode = 'floor';
+    if (r) mode = b === r ? 'open' : b === leftN ? 'doorL' : b === rightN ? 'doorR' : 'hidden';
+    el.className = 'node ' + kcls + (mode === 'floor' ? (i === 0 ? ' clickable' : ' room clickable') : mode.startsWith('door') ? ' door clickable' : mode === 'open' ? ' roomOpen' : '');
+    el.dataset.mode = mode;
+    if (mode === 'hidden') { el.classList.add('gone'); return; }
+    if (mode === 'open') {
+      el.innerHTML = ''; el.style.background = bl.type === 'database' ? 'rgba(31,26,16,.55)' : 'rgba(22,26,33,.6)';
+      el.style.borderRadius = '16px';
+      return;
+    }
+    el.style.background = ''; el.style.borderRadius = '';
+    if (mode === 'floor') {
+      if (i === 0) {
+        el.innerHTML = `<div class="inner"><span class="badge b-in" style="align-self:flex-start">▶ ENTRÉE</span><div style="display:flex;gap:10px;align-items:center">${glyph}<div class="nm">${esc(bl.nom)}</div></div><div class="eb">${esc(bl.en_bref)}</div><div class="kind">${kindWord[bl.type]} · ${esc(bl.techno)}</div></div>`;
+      } else {
+        const rm = roomMachines(b);
+        el.innerHTML = `<div class="inner">${b === EXIT ? '<span class="badge b-out" style="align-self:flex-start">SORTIE ■</span>' : ''}<div class="nm">${esc(bl.nom)}</div><div class="eb">${esc(bl.en_bref)}</div>${b === EXIT && lostSentence ? `<div class="lost">« ${esc(lostSentence)} »</div>` : ''}${b !== EXIT ? `<div class="preview">${rm.on.map(c => `<span class="pv">${NUM(firstStep[c.id] + 1)}${esc(c.nom)}</span>`).join('<span class="pvA">→</span>')}${rm.off.length ? `<div class="kind" style="width:100%">+ ${rm.off.map(c => esc(c.nom)).join(', ')} (câblage)</div>` : ''}</div>` : ''}<div class="enter"><span class="cnt">${rm.all.length} machine${rm.all.length > 1 ? 's' : ''} · ${stepsIn(b)} étape${stepsIn(b) > 1 ? 's' : ''} ici</span><button class="lnk" data-enter="${b}">Entrer ›</button></div></div>`;
+      }
+    } else {
+      const left = mode === 'doorL';
+      const fl = left ? fluxOf(b, r) : fluxOf(r, b);
+      const chips = STEPS.map((s, k) => ({ s, k })).filter(x => blocOf(x.s.composant) === b);
+      const chipHtml = b === ENTRY ? '' : chips.length === 1
+        ? `<div class="chipline"><span class="mchip">${chips[0].k + 1} · ${esc(C[chips[0].s.composant].nom)}</span></div>`
+        : `<div class="chipline"><span class="mchip">étapes ${chips.map(x => x.k + 1).join(', ')} là-bas</span></div>`;
+      el.innerHTML = `<div class="inner">${b === ENTRY ? `<div style="display:flex;gap:6px;align-items:center">${glyph}<span class="badge b-in">▶ ENTRÉE</span></div>` : ''}${b === EXIT ? '<span class="badge b-out" style="align-self:flex-start">SORTIE ■</span>' : ''}<div class="dl">${left ? 'depuis' : 'vers'} <b>${esc(bl.nom)}</b>${fl ? ' — ' + esc(fl.verbe) : ''}</div>${chipHtml}<button class="lnk" data-enter-door="${b}" style="text-align:left">${b === ENTRY ? 'Voir la fiche ›' : 'Entrer dans cette pièce ›'}</button></div>`;
+    }
+  });
+  SIDE.forEach(b => {
+    const el = nodes['b:' + b.id];
+    el.className = 'node k-user side clickable' + (r ? ' gone' : '');
+    const fl = M.flux.find(f => f.de === b.id);
+    el.innerHTML = `<div class="inner" style="flex-direction:row;gap:10px;align-items:center">${glyph}<div><div class="nm" style="font-size:14px">${esc(b.nom)}</div><div class="eb">${esc(b.en_bref)}</div></div></div>`;
+    el.title = fl ? fl.quoi : '';
+  });
+  ROOMS.forEach(rr => {
+    const rm = roomMachines(rr);
+    rm.on.forEach((c, k) => {
+      const el = nodes['m:' + c.id];
+      const show = rr === r;
+      el.classList.toggle('gone', !show);
+      const cf = CODE[c.id];
+      const nums = STEPS.map((s, j) => s.composant === c.id ? j + 1 : 0).filter(Boolean);
+      el.innerHTML = `<div class="inner"><div class="top">${NUM(nums[0])}<div class="nm">${esc(c.nom)}</div></div><div class="eb">${esc(c.en_bref)}</div>${nums.length > 1 ? `<div class="kind">aussi à l'étape ${nums.slice(1).join(', ')}</div>` : ''}${cf ? `<div class="io"><span title="Reçoit (lu dans le code)">→ reçoit ${esc(cf.inTag)}</span><span class="out" title="Rend (lu dans le code)">rend ${esc(cf.outTag)} →</span></div>` : ''}</div>`;
+    });
+    rm.off.forEach(c => {
+      const el = nodes['w:' + c.id];
+      el.classList.toggle('gone', rr !== r);
+      const fichier = c.fichiers[0] || '';
+      const plugs = c.utilise.filter(u => C[u]).map(u => C[u].nom);
+      el.innerHTML = `<div class="inner"><span class="tagc">${esc(offLabel(c))}</span><span><b>${esc(c.nom)}</b> — ${esc(c.en_bref)} · <span class="mono cite">${esc(fichier)}</span></span>${plugs.length ? `<span class="kind">branche : ${plugs.map(esc).join(', ')}</span>` : ''}</div>`;
+    });
+  });
+  BRANCHES.forEach(x => {
+    const el = nodes['c:' + x.i];
+    el.classList.toggle('gone', blocOf(x.comp) !== r);
+    el.innerHTML = x.code
+      ? `<div class="inner"><span class="code">■ refus ${x.code}</span><span class="eb">${esc(x.br.quand)}</span></div>`
+      : `<div class="inner"><span class="code">cas particulier</span><span class="eb">${esc(x.br.quand)} : ${esc(x.br.alors)}</span></div>`;
+  });
+  roomTitle.style.opacity = r ? 1 : 0;
+  if (r) roomTitle.innerHTML = `<b style="color:var(--text)">${esc(B[r].nom)}</b> — ${esc(B[r].en_bref)} <span class="kind">· pièce ouverte, la donnée va de gauche à droite</span>`;
+  markLit();
+}
+function offLabel(c) {
+  const where = M.parcours.filter(p => p !== MAIN && p.etapes.some(e => e.composant === c.id));
+  const atStart = where.some(p => p.etapes[0].manuel);
+  return atStart ? 'câblage, au démarrage' : 'hors du trajet principal';
+}
+
+/* ---------- layout ---------- */
+const R = (x, y, w, h) => ({ x, y, w, h });
+function orient() { return stage.clientWidth >= 700 ? 'h' : 'v'; }
+function layout() {
+  const W = stage.clientWidth, o = orient(), T = {}, Wr = [];
+  let floorFixed = null;
+  let H = 0;
+  const r = S.room;
+  if (!r) {
+    if (o === 'h') {
+      const ws = [180, 290, 230], gapMin = 90;
+      const sum = ws.reduce((a, b) => a + b, 0);
+      const gap = Math.max(gapMin, Math.min(170, (W - 16 - sum) / (FORWARD.length - 1)));
+      const scale = Math.min(1, (W - 16 - gap * (FORWARD.length - 1)) / sum);
+      let x = 8; const y = 124;
+      FORWARD.forEach((b, i) => { const w = ws[Math.min(i, 2)] * scale; const h = 190; T['b:' + b] = R(x, y, w, h); x += w + gap; });
+      const api = T['b:' + FORWARD[1]];
+      SIDE.forEach((b, k) => { T['b:' + b.id] = R(Math.min(api.x + api.w / 2 - 20 + k * 290, W - 290), 0, 280, 80); });
+      H = y + 190 + 100;
+    } else {
+      const g = 30; let y = 0;
+      T['b:' + FORWARD[0]] = R(g, y, (W - g) * (SIDE.length ? 0.56 : 1), 170);
+      SIDE.forEach(b => { T['b:' + b.id] = R(g + (W - g) * 0.6, y, (W - g) * 0.4, 170); });
+      y += 170 + 90;
+      FORWARD.slice(1).forEach(b => { T['b:' + b] = R(g, y, W - g, 190); y += 190 + 90; });
+      H = y - 90 + 16;
+      floorFixed = { x: g, y: H };
+      H += 64;
+    }
+    // wires on the floor
+    for (let i = 0; i < FORWARD.length - 1; i++) {
+      const a = FORWARD[i], b = FORWARD[i + 1], f = fluxOf(a, b);
+      let bF = null;
+      if (o === 'v' && i === 0) { const ra = T['b:' + a], rb = T['b:' + b]; bF = (ra.x + ra.w / 2 - rb.x) / rb.w; }
+      Wr.push({ a: ['b:' + a, o === 'h' ? 'r' : 'b'], b: ['b:' + b, o === 'h' ? 'l' : 't', bF], kind: 'data', label: f ? f.verbe : '',
+        sub: '« ' + B[a].sort[0] + ' »' });
+    }
+    if (RETURN) Wr.push({ a: ['b:' + RETURN.de, o === 'h' ? 'b' : 'l'], b: ['b:' + ENTRY, o === 'h' ? 'b' : 'l'], kind: 'reply', route: o === 'h' ? 'under' : 'gutter',
+      level: o === 'h' ? ['b:' + RETURN.de, 'b:' + ENTRY] : null, gx: 10, label: RETURN.verbe, sub: RETURN.quoi, mt: MTM.techReturn, fixed: o === 'v' ? floorFixed : null });
+    SIDE.forEach(b => { const f = M.flux.find(x => x.de === b.id); if (f) Wr.push({ a: ['b:' + b.id, 'b'], b: ['b:' + f.vers, 't', o === 'h' ? 0.62 : 0.8], kind: 'control', label: f.verbe }); });
+  } else {
+    const ri = FORWARD.indexOf(r), L = FORWARD[ri - 1], Rn = FORWARD[ri + 1] || null;
+    const rm = roomMachines(r), n = rm.on.length;
+    let roomFixed = null, vMx = 0;
+    const chuteOf = cid => BRANCHES.filter(x => x.comp === cid);
+    if (o === 'h') {
+      const dw = 128, pad = 8, gapD = 34;
+      const roomX = pad + dw + gapD, roomR = W - pad - (Rn ? dw + gapD : 12);
+      const roomW = roomR - roomX;
+      let y = 30;
+      rm.off.forEach(c => { T['w:' + c.id] = R(roomX + 16, y, roomW - 32, 64); y += 76; });
+      const gm = 46, mw = Math.min(260, (roomW - 32 - gm * (n - 1)) / n), mh = 160;
+      const rowW = mw * n + gm * (n - 1), mx0 = roomX + 16 + Math.max(0, (roomW - 32 - rowW) / 2) * (n === 1 ? 0 : 1);
+      const my = y + 28;
+      let maxB = my + mh;
+      rm.on.forEach((c, k) => {
+        const m = R(mx0 + k * (mw + gm), my, mw, mh); T['m:' + c.id] = m;
+        chuteOf(c.id).forEach((x, j) => { const cr = R(m.x + 8, my + mh + 40 + j * 84, Math.max(mw - 16, 150), x.code ? 92 : 110); T['c:' + x.i] = cr; maxB = Math.max(maxB, cr.y + cr.h); });
+      });
+      const retStep = STEPS.findIndex((s, i) => isReturnStep(i) && blocOf(s.composant) === r);
+      const roomH = maxB + (retStep >= 0 ? 92 : 26);
+      T['b:' + r] = R(roomX, 0, roomW, roomH);
+      const dh = 176, dy = my + mh / 2 - dh / 2;
+      T['b:' + L] = R(pad, dy, dw, dh);
+      if (Rn) T['b:' + Rn] = R(W - pad - dw, dy, dw, dh);
+      H = roomH + 20;
+    } else {
+      const g = 30, dh = 150;
+      let y = 0;
+      T['b:' + L] = R(g, y, W - g, dh); y += dh + 40;
+      const roomY = y; y += 64;
+      rm.off.forEach(c => { T['w:' + c.id] = R(g + 10, y, W - g - 20, 140); y += 152; });
+      const mw = (W - g - 20) * 0.6, mh = 176, cx = g + 10 + mw + 22, cw = W - 6 - cx;
+      y += 14;
+      rm.on.forEach((c, k) => {
+        T['m:' + c.id] = R(g + 10, y, mw, mh);
+        chuteOf(c.id).forEach((x, j) => { T['c:' + x.i] = R(cx, y + j * 70, cw, mh); });
+        y += mh + 60;
+      });
+      y -= 30;
+      T['b:' + r] = R(g, roomY, W - g, y - roomY);
+      y += 40;
+      if (Rn) { T['b:' + Rn] = R(g, y, W - g, dh); y += dh; }
+      roomFixed = { x: g, y: y + 16 };
+      H = y + 16 + 70;
+      vMx = g + 10 + mw / 2;
+    }
+    // wires in the room
+    const into = (id, side) => [id, side];
+    const fx = id => (o === 'v' && T[id] ? (vMx - T[id].x) / T[id].w : null);
+    const hS = o === 'h' ? 'r' : 'b', hT = o === 'h' ? 'l' : 't';
+    rm.on.forEach((c, k) => {
+      const prev = k === 0 ? 'b:' + L : 'm:' + rm.on[k - 1].id;
+      Wr.push({ a: [prev, hS, k === 0 ? fx(prev) : null], b: into('m:' + c.id, hT), kind: 'data', step: firstStep[c.id] + 1 });
+      chuteOf(c.id).forEach(x => Wr.push({ a: ['m:' + c.id, o === 'h' ? 'b' : 'r'], b: ['c:' + x.i, o === 'h' ? 't' : 'l'], kind: x.code ? 'refusal' : 'note' }));
+    });
+    if (Rn) {
+      const k = STEPS.findIndex(s => blocOf(s.composant) === Rn);
+      const src = k > 0 ? STEPS[k - 1].composant : rm.on[n - 1].id;
+      const f = fluxOf(r, Rn);
+      Wr.push({ a: ['m:' + src, hS], b: ['b:' + Rn, hT, fx('b:' + Rn)], kind: 'data', step: k + 1, label: String(k + 1), tiny: true });
+    }
+    STEPS.forEach((s, i) => {
+      if (isReturnStep(i) && blocOf(s.composant) === r && RETURN) {
+        Wr.push({ a: ['m:' + s.composant, o === 'h' ? 'b' : 'l', o === 'h' ? 0.7 : 0.5], b: ['b:' + L, o === 'h' ? 'b' : 'l'], kind: 'reply', route: o === 'h' ? 'under' : 'gutter',
+          level: o === 'h' ? Object.keys(T).filter(k => k.startsWith('c:') || k.startsWith('m:')) : null, gx: 10, step: i + 1, label: (i + 1) + ' · ' + RETURN.verbe + ' ' + B[ENTRY].nom, sub: RETURN.quoi, mt: MTM.techReturn, fixed: o === 'v' ? roomFixed : null });
+      }
+    });
+    if (o === 'h') rm.off.forEach(c => c.utilise.forEach(u => { if (T['m:' + u]) Wr.push({ a: ['w:' + c.id, 'bx', 'm:' + u], b: ['m:' + u, 't'], kind: 'control', label: 'câblage', small: true }); }));
+  }
+  return { T, Wr, H };
+}
+
+/* ---------- geometry ---------- */
+function anchor(rect, side, f, rects) {
+  if (side === 'bx') { const t = rects[f]; return [t.x + t.w / 2, rect.y + rect.h]; }
+  const p = f == null ? 0.5 : f;
+  if (side === 'r') return [rect.x + rect.w, rect.y + rect.h * p];
+  if (side === 'l') return [rect.x, rect.y + rect.h * p];
+  if (side === 't') return [rect.x + rect.w * p, rect.y];
+  return [rect.x + rect.w * p, rect.y + rect.h];
+}
+function routePts(w, rects) {
+  const A = rects[w.a[0]], Bt = rects[w.b[0]];
+  if (!A || !Bt) return null;
+  const a = anchor(A, w.a[1], w.a[2], rects), b = anchor(Bt, w.b[1], w.b[2], rects);
+  if (w.route === 'under') {
+    const yl = Math.max(...w.level.filter(k => rects[k]).map(k => rects[k].y + rects[k].h)) + 30;
+    return [a, [a[0], yl], [b[0], yl], b];
+  }
+  if (w.route === 'gutter') return [a, [w.gx, a[1]], [w.gx, b[1]], b];
+  const horiz = w.a[1] === 'r' || w.a[1] === 'l';
+  if (horiz) {
+    if (Math.abs(a[1] - b[1]) < 1.5) return [a, b];
+    const mx = (a[0] + b[0]) / 2; return [a, [mx, a[1]], [mx, b[1]], b];
+  }
+  if (Math.abs(a[0] - b[0]) < 1.5) return [a, b];
+  const my = (a[1] + b[1]) / 2; return [a, [a[0], my], [b[0], my], b];
+}
+const STYLE = {
+  data: { w: 5, c: 'var(--data)', dash: '', m: 'arD' },
+  reply: { w: 2, c: 'var(--data)', dash: '7 6', m: 'arD' },
+  control: { w: 1.3, c: 'var(--control)', dash: '', m: 'arC' },
+  refusal: { w: 2, c: 'var(--refus)', dash: '4 4', m: 'arR' },
+  note: { w: 1.5, c: 'var(--store)', dash: '3 4', m: '' }
+};
+const DEFS = `<defs>
+<marker id="arD" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#f4b740"/></marker>
+<marker id="arDl" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#facc15"/></marker>
+<marker id="arC" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#8b95a3"/></marker>
+<marker id="arR" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="5" markerHeight="5"><rect x="0" y="0" width="10" height="10" fill="#f87171"/></marker>
+</defs>`;
+function midOfLongest(pts) {
+  let best = 0, bi = 0;
+  for (let i = 0; i < pts.length - 1; i++) { const d = Math.hypot(pts[i + 1][0] - pts[i][0], pts[i + 1][1] - pts[i][1]); if (d > best) { best = d; bi = i; } }
+  const p = pts[bi], q = pts[bi + 1];
+  return { x: (p[0] + q[0]) / 2, y: (p[1] + q[1]) / 2, vertical: Math.abs(p[0] - q[0]) < 1 };
+}
+function drawWires(rects) {
+  let out = DEFS;
+  labels.forEach(l => l.remove()); labels = [];
+  wiresSpec.forEach(w => {
+    const pts = routePts(w, rects); if (!pts) return;
+    const st = STYLE[w.kind], lit = w.step && w.step === S.step;
+    const d = 'M' + pts.map(p => p[0].toFixed(1) + ' ' + p[1].toFixed(1)).join(' L');
+    if (w.kind === 'data') {
+      out += `<path d="${d}" fill="none" stroke="#3b2f12" stroke-width="${st.w + 4}" stroke-linejoin="round"/>`;
+      out += `<path d="${d}" fill="none" stroke="${lit ? '#facc15' : '#f4b740'}" stroke-width="${st.w}" stroke-linejoin="round" marker-end="url(#${lit ? 'arDl' : 'arD'})" opacity="${S.room && !lit ? .55 : 1}"/>`;
+      out += `<path class="belt" d="${d}" fill="none" stroke="#1b1405" stroke-width="2" stroke-dasharray="2 12" opacity=".75"/>`;
+    } else {
+      out += `<path d="${d}" fill="none" stroke="${lit ? '#facc15' : st.c}" stroke-width="${lit ? st.w + 1 : st.w}" stroke-dasharray="${st.dash}" stroke-linejoin="round" ${st.m ? `marker-end="url(#${st.m})"` : ''}/>`;
+    }
+    if (w.label) {
+      const m = midOfLongest(pts);
+      const cls = 'wl' + (w.kind === 'control' ? ' ctl' : '') + (w.kind === 'reply' ? ' reply' : '') + (lit ? ' lit' : '');
+      const add = (html, x, y, tf, extra) => { const el = document.createElement('div'); el.className = cls; el.innerHTML = html; el.style.left = x + 'px'; el.style.top = y + 'px'; el.style.transform = tf; if (extra) Object.assign(el.style, extra); stage.appendChild(el); labels.push(el); return el; };
+      const head = esc(w.label) + (w.mt ? mtm(w.mt) : '');
+      let segLen = 0;
+      for (let i = 0; i < pts.length - 1; i++) segLen = Math.max(segLen, Math.hypot(pts[i + 1][0] - pts[i][0], pts[i + 1][1] - pts[i][1]));
+      if (w.fixed) {
+        add(head + (w.sub ? `<small>${esc(w.sub)}</small>` : ''), w.fixed.x, w.fixed.y, 'none', { whiteSpace: 'normal', maxWidth: (stage.clientWidth - w.fixed.x) + 'px', textAlign: 'left' });
+      } else if (w.tiny) {
+        add(head, m.x, m.y - 16, 'translate(-50%,-50%)');
+      } else if (m.vertical) {
+        add(head + (w.sub ? `<small>${esc(w.sub)}</small>` : ''), m.x + 10, m.y, 'translate(0,-50%)', { whiteSpace: 'normal', maxWidth: Math.max(110, Math.min(240, stage.clientWidth * 0.42, stage.clientWidth - m.x - 20)) + 'px', textAlign: 'left' });
+      } else if (w.kind === 'reply') {
+        add(head + (w.sub ? `<small>${esc(w.sub)}</small>` : ''), m.x, m.y + 8, 'translate(-50%,0)');
+      } else if (w.kind === 'data') {
+        const mw = Math.max(100, segLen - 14) + 'px';
+        add(head, m.x, m.y - 10, 'translate(-50%,-100%)', { whiteSpace: 'normal', maxWidth: mw, textAlign: 'center' });
+        if (w.sub) add(`<small style="color:var(--muted)">${esc(w.sub)}</small>`, m.x, m.y + 10, 'translate(-50%,0)', { whiteSpace: 'normal', maxWidth: mw, textAlign: 'center', borderStyle: 'dashed' });
+      } else {
+        add(head, m.x, m.y, 'translate(-50%,-50%)');
+      }
+    }
+  });
+  svg.innerHTML = out;
+}
+function applyRects(rects) {
+  Object.keys(nodes).forEach(id => {
+    const r = rects[id]; if (!r) return; const el = nodes[id];
+    el.style.left = r.x + 'px'; el.style.top = r.y + 'px'; el.style.width = r.w + 'px'; el.style.height = r.h + 'px';
+  });
+  const rr = S.room && rects['b:' + S.room];
+  if (rr) { roomTitle.style.left = (rr.x + 16) + 'px'; roomTitle.style.top = (rr.y + 8) + 'px'; roomTitle.style.width = (rr.w - 32) + 'px'; }
+}
+let anim = null;
+function relayout(animate) {
+  const L = layout();
+  target = L.T; wiresSpec = L.Wr;
+  markLit();
+  Object.keys(nodes).forEach(id => { if (!target[id]) nodes[id].classList.add('gone'); });
+  stage.style.height = L.H + 'px';
+  const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if (anim) cancelAnimationFrame(anim);
+  const from = {}; Object.keys(target).forEach(id => { from[id] = cur[id] || target[id]; });
+  if (!animate || reduce) { Object.assign(cur, target); applyRects(cur); drawWires(cur); afterLayout(); return; }
+  const t0 = performance.now(), D = 480;
+  svg.style.opacity = .35;
+  const tick = now => {
+    const t = Math.min(1, (now - t0) / D), e = t < .5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+    const fr = {};
+    Object.keys(target).forEach(id => { const a = from[id], b = target[id]; fr[id] = R(a.x + (b.x - a.x) * e, a.y + (b.y - a.y) * e, a.w + (b.w - a.w) * e, a.h + (b.h - a.h) * e); });
+    applyRects(fr); drawWires(fr);
+    if (t < 1) anim = requestAnimationFrame(tick); else { Object.assign(cur, target); svg.style.opacity = 1; anim = null; afterLayout(); }
+  };
+  anim = requestAnimationFrame(tick);
+}
+function afterLayout() { placeToken(); edgeCheck(); }
+
+/* ---------- highlight & token ---------- */
+function stepTarget(s) {
+  if (!S.room || !s) return null;
+  const st = STEPS[s - 1], b = blocOf(st.composant);
+  if (b === S.room) return 'm:' + st.composant;
+  return target['b:' + b] ? 'b:' + b : null;
+}
+function markLit() {
+  Object.values(nodes).forEach(el => el.classList.remove('lit', 'sel', 'done'));
+  const t = stepTarget(S.step);
+  if (t && nodes[t]) nodes[t].classList.add('lit');
+  if (S.plate && S.plate.kind === 'comp' && nodes['m:' + S.plate.id]) nodes['m:' + S.plate.id].classList.add('sel');
+  if (S.step) STEPS.slice(0, S.step - 1).forEach(s => { const el = nodes['m:' + s.composant]; if (el && 'm:' + s.composant !== t) el.classList.add('done'); });
+}
+function placeToken() {
+  const t = stepTarget(S.step), r = t && cur[t];
+  if (!r) { token.style.opacity = 0; return; }
+  const w = token.offsetWidth || 90;
+  token.style.opacity = 1;
+  token.style.transform = `translate(${r.x + r.w / 2 - w / 2}px, ${r.y - 12}px)`;
+}
+
+/* ---------- edge indicator (fit rule check) ---------- */
+function edgeCheck() {
+  const hint = $('edgeHint');
+  if (getComputedStyle(canvas).overflowY !== 'auto') { hint.style.display = 'none'; return; }
+  const cr = canvas.getBoundingClientRect();
+  const vis = { l: Math.max(cr.left, 0), t: Math.max(cr.top, 0), r: Math.min(cr.right, innerWidth), b: Math.min(cr.bottom, innerHeight) };
+  if (vis.b - vis.t < 140) { hint.style.display = 'none'; return; }
+  let right = 0, below = 0;
+  Object.keys(target).forEach(id => {
+    const el = nodes[id]; if (!el || el.classList.contains('gone')) return;
+    const r = el.getBoundingClientRect();
+    if (r.right > vis.r + 1) right++; else if (r.top > vis.b - 20) below++;
+  });
+  const n = right + below;
+  if (!n) { hint.style.display = 'none'; return; }
+  hint.textContent = n + ' hors champ ' + (right ? '→' : '↓');
+  hint.style.display = 'block';
+  hint.style.left = (vis.r - hint.offsetWidth - 14) + 'px';
+  hint.style.top = (vis.b - hint.offsetHeight - 12) + 'px';
+}
+$('edgeHint').addEventListener('click', () => {
+  const ids = Object.keys(target).filter(id => nodes[id] && !nodes[id].classList.contains('gone'));
+  const cr = canvas.getBoundingClientRect(), vb = Math.min(cr.bottom, innerHeight);
+  const firstOut = ids.map(id => nodes[id]).find(el => el.getBoundingClientRect().top > vb - 20);
+  if (firstOut) firstOut.scrollIntoView({ behavior: 'smooth', block: 'center' });
+});
+canvas.addEventListener('scroll', edgeCheck);
+
+/* ---------- panel ---------- */
+const stepFile = s => `<div class="f mono">${lines(s.fichier, s.lignes)}</div>`;
+function chapters() {
+  const out = []; let curC = null;
+  STEPS.forEach((s, i) => {
+    const name = isReturnStep(i) ? "Retour à l'expéditeur" : `Dans « ${B[blocOf(s.composant)].nom} »`;
+    if (!curC || curC.name !== name) { curC = { name, steps: [] }; out.push(curC); }
+    curC.steps.push(i);
+  });
+  return out;
+}
+function renderPanel() {
+  const p = $('panel');
+  let h = '';
+  const nSteps = STEPS.length;
+  if (!S.room) {
+    h += `<div class="here">Vous êtes ici</div><h1>L'usine (vue d'ensemble)</h1>
+      <div class="eb">Les grandes pièces du projet, posées sur le tapis que suit la donnée : elle entre à gauche, ressort à droite. Pour voir l'intérieur d'une pièce, cliquez sur « Entrer ».</div>
+      <h2>Le trajet sur le tapis</h2>
+      <div class="card"><div class="nm" style="font-size:14px">${esc(MAIN.nom)}</div>
+        <div class="eb" style="margin-top:4px"><b style="color:var(--person)">Départ :</b> ${esc(MAIN.depart)}<br><b style="color:var(--store)">Arrivée :</b> ${esc(MAIN.fin)}</div>
+        <div class="prog" style="margin-top:6px">${nSteps} étapes · ${MAIN.branches.length} cas particuliers</div>
+        <div class="play"><button class="btn pri" data-act="play">▶ Suivre un compte rendu</button></div>
+        <div class="kind">Choisi car il passe par le plus de composants : le modèle n'a pas encore de champ « principal ».</div></div>
+      <h2>Les pièces</h2>`;
+    ROOMS.forEach(r => { const rm = roomMachines(r); h += `<div class="card"><div class="nm" style="font-size:14px">${esc(B[r].nom)}</div><div class="eb">${esc(B[r].en_bref)}</div><div style="display:flex;justify-content:space-between;margin-top:4px"><span class="cnt">${rm.all.length} machine${rm.all.length > 1 ? 's' : ''} · ${stepsIn(r)} étape${stepsIn(r) > 1 ? 's' : ''} ici</span><button class="lnk" data-enter="${r}">Entrer ›</button></div></div>`; });
+    h += `<h2>Autres trajets <span class="kind">(un seul trajet à la fois sur le tapis)</span></h2>`;
+    M.parcours.filter(x => x !== MAIN).forEach(x => {
+      const open = !!S.openOther[x.id];
+      h += `<div class="card"><button class="lnk" data-other="${x.id}" style="color:var(--text);font-weight:600;text-align:left">${open ? '▾' : '▸'} ${esc(x.nom)}</button><div class="eb">${esc(x.depart)}</div>`;
+      if (open) h += x.etapes.map((s, i) => `<div class="st" style="cursor:default"><span class="n">${i + 1}</span><div><div class="a">${esc(s.action)}</div><div class="s">${esc(s.simple)}</div><div class="kind">machine : ${esc(C[s.composant] ? C[s.composant].nom : s.composant)}</div>${stepFile(s)}</div></div>`).join('');
+      h += `</div>`;
+    });
+  } else {
+    const r = S.room;
+    h += `<div class="here">Vous êtes dans la pièce</div><h1>${esc(B[r].nom)}</h1><div class="eb">${esc(B[r].en_bref)}</div>
+      <h2>${esc(MAIN.nom)}</h2>
+      <div class="play"><button class="btn" data-act="prev" ${S.step <= 1 ? 'disabled' : ''}>‹ Précédent</button>
+      <button class="btn pri" data-act="toggle">${S.playing ? '❚❚ Pause' : '▶ Lecture'}</button>
+      <button class="btn" data-act="next" ${S.step >= nSteps ? 'disabled' : ''}>Suivant ›</button></div>
+      <div class="prog">${S.step ? `Étape ${S.step} sur ${nSteps}` : `${nSteps} étapes · cliquez une étape ou « Suivant »`} · touches ← →</div>`;
+    chapters().forEach(ch => {
+      h += `<div class="chap">${esc(ch.name)}</div>`;
+      ch.steps.forEach(i => {
+        const s = STEPS[i];
+        h += `<div class="st ${S.step === i + 1 ? 'on' : ''}" data-step="${i + 1}"><span class="n">${i + 1}</span><div><div class="a">${esc(s.action)}</div><div class="s">${esc(s.simple)}</div>${stepFile(s)}</div></div>`;
+        BRANCHES.filter(x => x.comp === s.composant && firstStep[s.composant] === i).forEach(x => {
+          h += `<div class="cas" style="border-left-color:${x.code ? 'var(--refus)' : 'var(--store)'}"><b>Si</b> ${esc(x.br.quand)}<br><b>alors</b> ${esc(x.br.alors)} ${x.code ? mtm(MTM.techBranch) : ''}<div class="mono cite">${lines(x.br.fichier, x.br.lignes)}</div></div>`;
+        });
+      });
+    });
+  }
+  h += `<h2>Réglages</h2><button class="btn" data-act="project">Réglages du projet ›</button>`;
+  h += `<details><summary>Ce que Claude n'a pas pu vérifier (${M.incertitudes.length})</summary><ul>${M.incertitudes.map(t => `<li>${esc(t)}</li>`).join('')}</ul></details>`;
+  p.innerHTML = h;
+  const on = p.querySelector('.st.on'); if (on && S.playing) on.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+}
+
+/* ---------- plate ---------- */
+const citeL = (f, l) => `<span class="mono cite">${esc(f)}:${esc(l)}</span>`;
+function vuDans(cid) {
+  const items = [];
+  M.parcours.forEach(p => p.etapes.forEach((s, i) => { if (s.composant === cid) items.push({ p, s, i }); }));
+  if (!items.length) return '<span class="kind">Aucun trajet ne passe ici.</span>';
+  return '<div class="vu">' + items.map(({ p, s, i }) => p === MAIN
+    ? `<div><button data-goto="${i + 1}">▶ Étape ${i + 1} · ${esc(s.action)}</button> <span class="kind">${esc(p.nom)}</span></div>`
+    : `<div class="other">Étape ${i + 1} · ${esc(s.action)} <span class="kind">— ${esc(p.nom)}</span><div class="det">${esc(s.simple)} ${citeL(s.fichier, s.lignes.join('-'))}</div></div>`).join('') + '</div>';
+}
+const factList = arr => `<span class="codeBadge">pas encore dans le modèle — lu dans le code</span><ul>${arr.map(x => `<li>${esc(x.t)}${x.c ? `<br><code class="mono" style="color:#fde68a">${esc(x.c)}</code>` : ''} ${citeL(x.f, x.l)}${x.model ? ' <span class="kind">(source : cas particulier du modèle)</span>' : ''}</li>`).join('')}</ul>`;
+function plateComp(c) {
+  const cf = CODE[c.id];
+  return `<div class="plHead"><div><div class="here">Machine de « ${esc(B[c.bloc].nom)} »</div><h2>${esc(c.nom)}</h2></div><button class="x" data-act="closePlate">Fermer ✕</button></div>
+  <div class="slots">
+    <div class="slot"><h3>Fait</h3><div>${esc(c.en_bref)}</div><div class="eb" style="margin-top:4px">${esc(c.role)}</div></div>
+    <div class="slot"><h3>Reçoit</h3>${cf ? factList(cf.recoit) : '<span class="kind">Rien dans le modèle ni lu dans le code.</span>'}</div>
+    <div class="slot"><h3>Rend</h3>${cf ? factList(cf.rend) : '<span class="kind">Rien dans le modèle ni lu dans le code.</span>'}</div>
+    <div class="slot wide"><h3>Réglages</h3>${cf ? `<span class="codeBadge">pas encore dans le modèle — lu dans le code</span><table class="rg"><tr><th>Ce que ça règle</th><th>Dans le code</th><th>Où</th></tr>${cf.reglages.map(g => `<tr><td>${esc(g.nom)}</td><td><code>${esc(g.c)}</code></td><td>${citeL(g.f, g.l)}</td></tr>`).join('')}</table>` : ''}</div>
+    <div class="slot"><h3>Où</h3><ul>${c.expose.map(x => `<li><span class="mono">${esc(x.quoi)}</span><br>${citeL(x.fichier, x.lignes.join('-'))} ${x.verifie ? '<span class="ok">✓ vérifié</span>' : ''}</li>`).join('')}</ul></div>
+    <div class="slot" style="grid-column:span 2"><h3>Vu dans</h3>${vuDans(c.id)}</div>
+  </div>`;
+}
+function plateBloc(b) {
+  return `<div class="plHead"><div><div class="here">${kindWord[b.type] || b.type}${STRIP.includes(b) ? ' · autour du projet, ne tourne pas' : ''}</div><h2>${esc(b.nom)}</h2></div><button class="x" data-act="closePlate">Fermer ✕</button></div>
+  <div class="slots">
+    <div class="slot"><h3>Fait</h3><div>${esc(b.en_bref)}</div><div class="eb" style="margin-top:4px">${esc(b.role)}</div></div>
+    <div class="slot"><h3>Reçoit</h3><ul>${b.entre.map(t => `<li>${esc(t)}</li>`).join('')}</ul></div>
+    <div class="slot"><h3>Rend</h3><ul>${b.sort.map(t => `<li>${esc(t)}</li>`).join('')}</ul></div>
+    <div class="slot"><h3>Où</h3><ul>${b.code.map(x => `<li><span class="mono cite">${esc(x.chemin)}</span></li>`).join('')}</ul><div class="kind">${esc(b.indices)}</div></div>
+    <div class="slot" style="grid-column:span 2"><h3>Liens</h3><ul>${M.flux.filter(f => f.de === b.id || f.vers === b.id).map(f => `<li>${esc(B[f.de].nom)} <b>${esc(f.verbe)}</b> ${esc(B[f.vers].nom)} <span class="kind">— ${esc(f.quoi)}</span></li>`).join('') || '<li class="kind">aucun</li>'}</ul></div>
+  </div>`;
+}
+function plateProject() {
+  return `<div class="plHead"><div><div class="here">Tout le projet</div><h2>Réglages du projet</h2></div><button class="x" data-act="closePlate">Fermer ✕</button></div>
+  <div class="slots">
+    <div class="slot wide"><h3>Fichier de réglages</h3><span class="codeBadge">pas encore dans le modèle — lu dans le code</span>
+      <table class="rg"><tr><th>Réglage</th><th>Valeur</th><th>Où</th><th>Lu par le code ?</th></tr>
+      ${PROJECT_SETTINGS.map(s => `<tr><td><code>${esc(s.nom)}</code></td><td><code>${esc(s.v)}</code></td><td>${citeL(s.f, s.l)}</td><td class="no">non lu par le code</td></tr>`).join('')}</table>
+      <div class="eb" style="margin-top:6px">Aucun résultat pour <span class="mono">environ</span>, <span class="mono">getenv</span> ou <span class="mono">BaseSettings</span> dans les fichiers Python : changer ces valeurs ne change rien aujourd'hui.</div>
+      <div class="eb" style="margin-top:4px">Ce que dit le modèle : « ${esc(M.modules['.env.example'])} »</div></div>
+    <div class="slot"><h3>Port réel</h3><div><code class="mono" style="color:#fde68a">uvicorn watchdog_ai.main:app --reload --port 8000</code></div><div>${citeL('README.md', '38')}</div><div class="kind">Le port vient de la commande de lancement, pas de APP_PORT.</div></div>
+  </div>`;
+}
+function renderPlate() {
+  const pl = $('plate');
+  if (!S.plate) { pl.classList.remove('open'); canvas.classList.remove('plate-on'); return; }
+  pl.innerHTML = S.plate.kind === 'comp' ? plateComp(C[S.plate.id]) : S.plate.kind === 'bloc' ? plateBloc(B[S.plate.id]) : plateProject();
+  pl.scrollTop = 0;
+  canvas.classList.add('plate-on');
+  requestAnimationFrame(() => pl.classList.add('open'));
+  const el = S.plate.kind === 'comp' && (nodes['m:' + S.plate.id] || nodes['w:' + S.plate.id]);
+  if (el && !el.classList.contains('gone')) {
+    if (canvas.scrollHeight > canvas.clientHeight + 4) canvas.scrollTop += el.getBoundingClientRect().top - canvas.getBoundingClientRect().top - 60;
+    else window.scrollBy(0, el.getBoundingClientRect().top - 70);
+  }
+}
+
+/* ---------- static parts ---------- */
+function renderStatic() {
+  $('pitch').textContent = M.pitch;
+  $('dataLine').innerHTML = `<b style="color:var(--data)">La donnée sur le tapis :</b> « ${esc(B[ENTRY].sort[0])} ». Le modèle l'appelle aussi « ${esc(B[EXIT].entre[0])} » ${mtm(MTM.dataNames)} · dans le code : <span class="mono cite">EventIn</span> puis <span class="mono cite">EventOut</span> <span class="codeBadge" style="margin:0">pas encore dans le modèle — lu dans le code</span> ${citeL(F_SCH, '10, 39')}`;
+  const present = new Set(M.blocs.map(b => b.type));
+  const k = [];
+  if (present.has('user')) k.push('<span class="k"><span class="sw sw-person"></span>Personne</span>');
+  if (present.has('backend')) k.push('<span class="k"><span class="sw sw-service"></span>Service (pièce)</span>');
+  if (present.has('database')) k.push('<span class="k"><span class="sw sw-store"></span>Base de données</span>');
+  if (STRIP.length) k.push('<span class="k"><span class="sw sw-tag"></span>Autour du projet</span>');
+  k.push('<span class="k"><span class="sw sw-data"></span>Donnée (tapis)</span>', '<span class="k"><span class="sw sw-reply"></span>Réponse</span>',
+    '<span class="k"><span class="sw sw-ctl"></span>Contrôle, pas de donnée</span>', '<span class="k"><span class="sw sw-refus"></span>Refus</span>',
+    '<span class="k"><span class="sw sw-code"></span>Lu dans le code, pas encore dans le modèle</span>');
+  $('keyRow').innerHTML = k.join('');
+  $('strip').innerHTML = `<div class="qlabel">Autour du projet (ne tourne pas)</div><div class="row">${STRIP.map(b => {
+    const fl = M.flux.filter(f => f.de === b.id).map(f => `${f.verbe} « ${B[f.vers].nom} » — contrôle, pas de donnée`);
+    return `<button class="tag" data-bloc="${b.id}"><div style="font-weight:600">${esc(b.nom)}</div><div class="eb">${esc(b.en_bref)}</div>${fl.map(t => `<div class="kind">${esc(t)}</div>`).join('')}</button>`;
+  }).join('')}<button id="projBtn" data-act="project"><div style="font-weight:600">Réglages du projet</div><div class="eb">.env.example et port réel</div></button></div>`;
+}
+
+/* ---------- navigation ---------- */
+function renderCrumbs() {
+  const c = []; c.push({ t: "L'usine", go: 'floor', cur: !S.room });
+  if (S.room) c.push({ t: B[S.room].nom, go: 'room', cur: !(S.plate && S.plate.kind === 'comp') });
+  if (S.plate && S.plate.kind === 'comp') c.push({ t: C[S.plate.id].nom, cur: true });
+  $('crumbs').innerHTML = c.map((x, i) => `${i ? '<span class="sep">›</span>' : ''}<button class="${x.cur ? 'cur' : ''}" ${x.go && !x.cur ? `data-crumb="${x.go}"` : ''}>${esc(x.t)}</button>`).join('');
+  $('backBtn').hidden = !S.room && !S.plate;
+}
+function render(animate) { fillNodes(); relayout(animate); renderPanel(); renderPlate(); renderCrumbs(); }
+function enterRoom(r) { stop(); if (!ROOMS.includes(r)) { S.plate = { kind: 'bloc', id: r }; render(false); return; } S.room = r; S.plate = null; S.step = 0; render(true); canvas.scrollTop = 0; }
+function goFloor() { stop(); S.room = null; S.step = 0; S.plate = null; render(true); }
+function goStep(n) {
+  n = Math.max(1, Math.min(STEPS.length, n));
+  S.step = n;
+  if (!S.room) { S.room = blocOf(STEPS[n - 1].composant); render(true); return; }
+  fillNodes(); drawWires(cur); placeToken(); renderPanel(); renderCrumbs();
+}
+function stop() { S.playing = false; if (timer) { clearInterval(timer); timer = null; } }
+function togglePlay() {
+  if (S.playing) { stop(); renderPanel(); return; }
+  S.playing = true; S.plate = null; renderPlate();
+  if (!S.step || S.step >= STEPS.length) goStep(1); else renderPanel();
+  timer = setInterval(() => { if (S.step >= STEPS.length) { stop(); renderPanel(); return; } goStep(S.step + 1); }, 2600);
+}
+function up() {
+  if (S.plate) { S.plate = null; fillNodes(); renderPlate(); renderCrumbs(); return; }
+  if (S.room) goFloor();
+}
+document.addEventListener('click', e => {
+  const t = e.target.closest('[data-enter],[data-enter-door],[data-act],[data-step],[data-goto],[data-crumb],[data-bloc],[data-other],.node');
+  if (!t) return;
+  if (t.dataset.enter) return enterRoom(t.dataset.enter);
+  if (t.dataset.enterDoor) return enterRoom(t.dataset.enterDoor);
+  if (t.dataset.other) { S.openOther[t.dataset.other] = !S.openOther[t.dataset.other]; return renderPanel(); }
+  const a = t.dataset.act;
+  if (a === 'play') { S.room = blocOf(STEPS[0].composant); S.plate = null; render(true); setTimeout(togglePlay, 500); return; }
+  if (a === 'toggle') return togglePlay();
+  if (a === 'prev') { stop(); return goStep((S.step || 2) - 1); }
+  if (a === 'next') { stop(); return goStep((S.step || 0) + 1); }
+  if (a === 'closePlate') return up();
+  if (a === 'project') { stop(); S.plate = { kind: 'project' }; renderPlate(); renderCrumbs(); return; }
+  if (t.dataset.step) { stop(); return goStep(+t.dataset.step); }
+  if (t.dataset.goto) { stop(); S.plate = null; renderPlate(); return goStep(+t.dataset.goto); }
+  if (t.dataset.crumb) { if (t.dataset.crumb === 'floor') return goFloor(); S.plate = null; fillNodes(); renderPlate(); renderCrumbs(); return; }
+  if (t.dataset.bloc) { stop(); S.plate = { kind: 'bloc', id: t.dataset.bloc }; renderPlate(); renderCrumbs(); return; }
+  if (t.classList.contains('node')) {
+    const id = t.dataset.id, kind = id.slice(0, 2), key = id.slice(2);
+    if (kind === 'm:' || kind === 'w:') { stop(); S.plate = { kind: 'comp', id: key }; fillNodes(); renderPlate(); renderCrumbs(); renderPanel(); return; }
+    if (kind === 'b:') {
+      const mode = t.dataset.mode;
+      if (mode === 'floor' && ROOMS.includes(key)) return enterRoom(key);
+      if (mode === 'doorL' || mode === 'doorR') return enterRoom(key);
+      if (mode !== 'open') { stop(); S.plate = { kind: 'bloc', id: key }; renderPlate(); renderCrumbs(); }
+    }
+  }
+});
+$('backBtn').addEventListener('click', up);
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') up();
+  else if (S.room && e.key === 'ArrowRight') { stop(); goStep((S.step || 0) + 1); }
+  else if (S.room && e.key === 'ArrowLeft') { stop(); goStep((S.step || 2) - 1); }
+});
+let rz = null;
+window.addEventListener('resize', () => { clearTimeout(rz); rz = setTimeout(() => { fillNodes(); relayout(false); }, 80); });
+renderStatic();
+render(false);
+</script>
+</body>
+</html>

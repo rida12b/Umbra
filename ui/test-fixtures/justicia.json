@@ -1,0 +1,1895 @@
+{
+ "pitch": "JusticIA est un assistant en ligne gratuit : un particulier en France décrit son problème en mots simples, et il reçoit une explication de ses droits, les articles de loi qui s'appliquent et un plan d'action par étapes.",
+ "resume": "JusticIA aide les particuliers en France à comprendre leurs droits. Ils décrivent leur situation dans un chat, et l'assistant répond avec un résumé, les articles de loi cités, un plan d'action et des questions de suivi. Le produit a deux parties : un site web en SvelteKit, qui garde les conversations dans le navigateur, et une API FastAPI. L'API cherche les articles proches dans une base ChromaDB d'environ 800 000 articles, transformés en vecteurs par un modèle CamemBERT local. Elle lance ensuite un agent LangGraph qui appelle Kimi K2.5 (chez Nebius), avec Gemini en secours. Le chemin d'une question est le suivant : le site envoie la question à /chat/stream, l'API renvoie au fil de l'eau les étapes de recherche, les sources puis le texte de la réponse, et termine par les informations tirées de la réponse (plan, domaine, suggestions).",
+ "blocs": [
+  {
+   "id": "user",
+   "nom": "Particulier qui cherche ses droits",
+   "type": "user",
+   "role": "Personne qui décrit sa situation juridique dans le chat et lit l'analyse.",
+   "en_bref": "Pose sa question juridique",
+   "importance": "coeur",
+   "zone": "utilise",
+   "entre": [
+    "Analyse de sa situation",
+    "Articles de loi trouvés",
+    "Questions de suivi"
+   ],
+   "sort": [
+    "Question en langage courant",
+    "Clics sur les sources et les suggestions"
+   ],
+   "techno": "Navigateur web",
+   "code": [],
+   "indices": "Page d'accueil « Connaissez vos droits. Agissez. » dans frontend/src/components/landing/HeroSection.svelte"
+  },
+  {
+   "id": "site",
+   "nom": "Site web de l'assistant",
+   "type": "frontend",
+   "role": "Application SvelteKit qui montre l'accueil, la liste des conversations et le chat, et qui lit la réponse envoyée au fil de l'eau.",
+   "en_bref": "Accueil, conversations et affichage des réponses",
+   "importance": "coeur",
+   "zone": "recoit",
+   "entre": [
+    "Question tapée",
+    "Réponse envoyée au fil de l'eau",
+    "Texte complet d'un article"
+   ],
+   "sort": [
+    "Question envoyée au serveur",
+    "Demande d'un article",
+    "Analyse affichée"
+   ],
+   "techno": "SvelteKit 5, Svelte runes, Tailwind v4, marked, DOMPurify",
+   "code": [
+    {
+     "chemin": "frontend/src",
+     "element": "dir:frontend/src"
+    }
+   ],
+   "indices": "frontend/package.json, frontend/src/routes/+page.svelte"
+  },
+  {
+   "id": "memoire-nav",
+   "nom": "Mémoire du navigateur",
+   "type": "storage",
+   "role": "Stockage local du navigateur (localStorage, clé justicia-conversations-v2) : au plus 50 conversations de 50 messages chacune.",
+   "en_bref": "Garde les conversations sur l'appareil",
+   "importance": "secondaire",
+   "zone": "range",
+   "entre": [
+    "Conversations et messages"
+   ],
+   "sort": [
+    "Conversations rechargées à l'ouverture"
+   ],
+   "techno": "localStorage",
+   "code": [
+    {
+     "chemin": "frontend/src/lib/utils/persistence.ts",
+     "element": "frontend/src/lib/utils/persistence.ts"
+    }
+   ],
+   "indices": "V2_KEY et MAX_CONVERSATIONS dans persistence.ts"
+  },
+  {
+   "id": "api",
+   "nom": "Serveur de l'assistant",
+   "type": "backend",
+   "role": "API FastAPI. Elle expose /chat, /chat/stream, /articles/search, /documents/* et /health, limite le nombre de demandes par adresse IP, applique les règles CORS et garde l'historique des sessions en mémoire.",
+   "en_bref": "Reçoit les questions et renvoie les réponses",
+   "importance": "coeur",
+   "zone": "recoit",
+   "entre": [
+    "Questions des visiteurs",
+    "Recherches d'articles",
+    "Demandes de courrier"
+   ],
+   "sort": [
+    "Réponse envoyée au fil de l'eau",
+    "Articles trouvés",
+    "Courrier en PDF"
+   ],
+   "techno": "FastAPI, uvicorn, slowapi, Pydantic",
+   "code": [
+    {
+     "chemin": "backend/app/main.py",
+     "element": "backend/app/main.py"
+    },
+    {
+     "chemin": "backend/app/routers",
+     "element": "dir:backend/app/routers"
+    },
+    {
+     "chemin": "backend/app/core",
+     "element": "dir:backend/app/core"
+    }
+   ],
+   "indices": "app.include_router dans backend/app/main.py:50-53"
+  },
+  {
+   "id": "agent",
+   "nom": "Moteur de raisonnement juridique",
+   "type": "backend",
+   "role": "Agent LangGraph de type ReAct. Il fait appeler au modèle de langage l'outil de recherche d'articles jusqu'à trois fois, puis lui fait rédiger la réponse structurée. Si l'agent ne produit rien, une réponse directe avec les sources déjà trouvées prend le relais.",
+   "en_bref": "Cherche dans la loi puis rédige",
+   "importance": "coeur",
+   "zone": "traite",
+   "entre": [
+    "Question et historique",
+    "Articles trouvés"
+   ],
+   "sort": [
+    "Réponse structurée en titres"
+   ],
+   "techno": "LangGraph, LangChain",
+   "code": [
+    {
+     "chemin": "backend/app/services/agent.py",
+     "element": "backend/app/services/agent.py"
+    },
+    {
+     "chemin": "backend/app/services/tools.py",
+     "element": "backend/app/services/tools.py"
+    }
+   ],
+   "indices": "SYSTEM_PROMPT et get_graph dans agent.py"
+  },
+  {
+   "id": "analyse",
+   "nom": "Lecture de la réponse",
+   "type": "backend",
+   "role": "Règles simples (expressions régulières et mots-clés) qui tirent de la réponse le plan d'action, les articles cités, le domaine du droit, le type de courrier possible et les questions de suivi.",
+   "en_bref": "Tire plan, domaine et suggestions",
+   "importance": "coeur",
+   "zone": "traite",
+   "entre": [
+    "Texte de la réponse"
+   ],
+   "sort": [
+    "Plan d'action",
+    "Domaine du droit",
+    "Questions de suivi"
+   ],
+   "techno": "Python re",
+   "code": [
+    {
+     "chemin": "backend/app/services/legal.py",
+     "element": "backend/app/services/legal.py"
+    }
+   ],
+   "indices": "extract_action_plan, detect_legal_domain, generate_follow_ups"
+  },
+  {
+   "id": "courriers",
+   "nom": "Fabrique de courriers",
+   "type": "backend",
+   "role": "Remplit des modèles HTML Jinja2 (mise en demeure, contestation de PV, lettre type) et les convertit en PDF avec WeasyPrint.",
+   "en_bref": "Produit des lettres types en PDF",
+   "importance": "secondaire",
+   "zone": "traite",
+   "entre": [
+    "Noms, adresses, faits, montant"
+   ],
+   "sort": [
+    "Courrier en PDF ou en page web"
+   ],
+   "techno": "Jinja2, WeasyPrint",
+   "code": [
+    {
+     "chemin": "backend/app/services/documents.py",
+     "element": "backend/app/services/documents.py"
+    },
+    {
+     "chemin": "backend/app/routers/documents.py",
+     "element": "backend/app/routers/documents.py"
+    }
+   ],
+   "indices": "Le site n'appelle plus ces routes (recherche « documents/ » sans résultat dans frontend/src)"
+  },
+  {
+   "id": "base-lois",
+   "nom": "Base des articles de loi",
+   "type": "database",
+   "role": "Base vectorielle ChromaDB intégrée au serveur (dossier chroma_db, collection justicia_laws). Elle garde le texte de chaque article, sa référence, son code et son vecteur.",
+   "en_bref": "Garde les articles et leurs vecteurs",
+   "importance": "coeur",
+   "zone": "range",
+   "entre": [
+    "Articles transformés en vecteurs"
+   ],
+   "sort": [
+    "Articles les plus proches d'une question"
+   ],
+   "techno": "ChromaDB PersistentClient",
+   "code": [
+    {
+     "chemin": "backend/app/core/dependencies.py",
+     "element": "backend/app/core/dependencies.py"
+    }
+   ],
+   "indices": "chroma_persist_dir et chroma_collection dans config.py"
+  },
+  {
+   "id": "modele-vecteurs",
+   "nom": "Modèle de sens du texte",
+   "type": "ml_model",
+   "role": "Modèle sentence-camembert-base, spécialisé en français. Il tourne sur le serveur, se charge au premier appel et sert à comparer les questions aux articles.",
+   "en_bref": "Transforme un texte en vecteur",
+   "importance": "coeur",
+   "zone": "traite",
+   "entre": [
+    "Texte d'une question ou d'un article"
+   ],
+   "sort": [
+    "Vecteur numérique"
+   ],
+   "techno": "sentence-transformers, dangvantuan/sentence-camembert-base",
+   "code": [
+    {
+     "chemin": "backend/app/core/dependencies.py",
+     "element": "backend/app/core/dependencies.py"
+    }
+   ],
+   "indices": "get_embed_model et embed_query"
+  },
+  {
+   "id": "llm-kimi",
+   "nom": "Modèle de langage principal",
+   "type": "external",
+   "role": "Modèle Kimi K2.5, appelé chez Nebius par une interface compatible OpenAI. Il sert seulement si NEBIUS_API_KEY est renseignée.",
+   "en_bref": "Rédige la réponse, décide des recherches",
+   "importance": "coeur",
+   "zone": "exterieur",
+   "entre": [
+    "Consignes, historique, articles"
+   ],
+   "sort": [
+    "Demandes de recherche ou réponse finale"
+   ],
+   "techno": "Nebius Token Factory, langchain_openai",
+   "code": [
+    {
+     "chemin": "backend/app/services/agent.py",
+     "element": "backend/app/services/agent.py"
+    }
+   ],
+   "indices": "primary_model et primary_base_url dans config.py"
+  },
+  {
+   "id": "llm-gemini",
+   "nom": "Modèle de langage de secours",
+   "type": "external",
+   "role": "Modèle Gemini 2.5 Flash de Google. Il sert de secours à Kimi, de modèle unique si seule GEMINI_API_KEY est renseignée, et de modèle préféré pour la réponse directe de secours.",
+   "en_bref": "Prend le relais en cas d'échec",
+   "importance": "secondaire",
+   "zone": "exterieur",
+   "entre": [
+    "Consignes, historique, articles"
+   ],
+   "sort": [
+    "Réponse rédigée"
+   ],
+   "techno": "Google AI Studio, langchain_google_genai",
+   "code": [
+    {
+     "chemin": "backend/app/services/agent.py",
+     "element": "backend/app/services/agent.py"
+    }
+   ],
+   "indices": "with_fallbacks et _get_raw_llm"
+  },
+  {
+   "id": "hf-dataset",
+   "nom": "Jeu public de textes de loi",
+   "type": "external",
+   "role": "Jeu de données COLD French Law (harvard-lil/cold-french-law), lu en flux depuis HuggingFace lors du remplissage de la base.",
+   "en_bref": "Source des articles de loi français",
+   "importance": "secondaire",
+   "zone": "exterieur",
+   "entre": [
+    "Demande de lecture"
+   ],
+   "sort": [
+    "Articles de loi bruts"
+   ],
+   "techno": "HuggingFace datasets",
+   "code": [
+    {
+     "chemin": "backend/scripts/ingest.py",
+     "element": "backend/scripts/ingest.py"
+    }
+   ],
+   "indices": "load_dataset(\"harvard-lil/cold-french-law\")"
+  },
+  {
+   "id": "ingestion",
+   "nom": "Outil de remplissage de la base",
+   "type": "cli",
+   "role": "Script lancé à la main. Il lit le jeu de lois, filtre les articles (ou les garde tous), les transforme en vecteurs par lots de 128 et les écrit dans ChromaDB. Il peut reprendre un remplissage interrompu.",
+   "en_bref": "Charge les lois dans la base",
+   "importance": "secondaire",
+   "zone": "traite",
+   "entre": [
+    "Commande lancée par une personne",
+    "Articles bruts"
+   ],
+   "sort": [
+    "Articles et vecteurs dans la base"
+   ],
+   "techno": "Python, datasets, sentence-transformers, chromadb, tqdm",
+   "code": [
+    {
+     "chemin": "backend/scripts/ingest.py",
+     "element": "backend/scripts/ingest.py"
+    }
+   ],
+   "indices": "Usage décrit en tête de ingest.py"
+  },
+  {
+   "id": "outillage",
+   "nom": "Outils de l'atelier",
+   "type": "infra",
+   "role": "Dockerfile du serveur et crochets de l'assistant de code Claude, qui formatent les fichiers et bloquent les commandes destructrices.",
+   "en_bref": "Conteneur, formatage et garde-fous",
+   "importance": "secondaire",
+   "zone": "traite",
+   "entre": [
+    "Code source"
+   ],
+   "sort": [
+    "Image de conteneur",
+    "Fichiers formatés"
+   ],
+   "techno": "Docker, ruff, prettier",
+   "code": [
+    {
+     "chemin": "backend/Dockerfile",
+     "element": "backend/Dockerfile"
+    },
+    {
+     "chemin": "backend/.claude/hooks",
+     "element": "dir:backend/.claude/hooks"
+    }
+   ],
+   "indices": "CMD uvicorn dans le Dockerfile"
+  },
+  {
+   "id": "docs",
+   "nom": "Carnet de bord du projet",
+   "type": "docs",
+   "role": "CONTEXT.md : journal des versions, décisions d'architecture, résultats de tests et prochaines étapes.",
+   "en_bref": "État, décisions et problèmes connus",
+   "importance": "secondaire",
+   "zone": "range",
+   "entre": [],
+   "sort": [
+    "Contexte pour les développeurs"
+   ],
+   "techno": "Markdown",
+   "code": [
+    {
+     "chemin": "CONTEXT.md",
+     "element": "CONTEXT.md"
+    },
+    {
+     "chemin": "frontend/README.md",
+     "element": "frontend/README.md"
+    }
+   ],
+   "indices": "CONTEXT.md"
+  }
+ ],
+ "composants": [
+  {
+   "id": "ui-pages",
+   "nom": "Pages et navigation",
+   "en_bref": "Accueil, liste des conversations, en-tête",
+   "bloc": "site",
+   "role": "La page unique montre l'accueil tant qu'il n'y a aucune conversation, puis la barre latérale et le chat actif. Elle crée, choisit et supprime les conversations.",
+   "responsabilites": [
+    "Afficher l'accueil et les cas fréquents",
+    "Créer une conversation et préremplir un exemple",
+    "Donner le titre de la conversation au premier message",
+    "Afficher la barre latérale (fixe sur ordinateur, superposée sur mobile)",
+    "Gérer le thème clair ou sombre et la file de notifications"
+   ],
+   "expose": [
+    {
+     "quoi": "startChat / handleFirstMessage (page /)",
+     "fichier": "frontend/src/routes/+page.svelte",
+     "lignes": [
+      16,
+      47
+     ],
+     "verifie": true
+    },
+    {
+     "quoi": "Layout global (thème, ToastQueue)",
+     "fichier": "frontend/src/routes/+layout.svelte",
+     "lignes": [
+      1,
+      19
+     ],
+     "verifie": true
+    }
+   ],
+   "utilise": [
+    "ui-etat",
+    "ui-chat"
+   ],
+   "fichiers": [
+    "frontend/src/routes/+page.svelte",
+    "frontend/src/routes/+layout.svelte",
+    "frontend/src/routes/+error.svelte"
+   ]
+  },
+  {
+   "id": "ui-chat",
+   "nom": "Fenêtre de discussion",
+   "en_bref": "Saisie, envoi, affichage de l'analyse",
+   "bloc": "site",
+   "role": "Gère l'envoi d'une question, suit les étapes de recherche, remplit la carte d'analyse au fil des morceaux reçus, montre les sources et les suggestions, et permet d'arrêter ou de relancer.",
+   "responsabilites": [
+    "Créer le message de l'utilisateur et le message de réponse en attente",
+    "Traiter chaque évènement reçu (étapes, sources, texte, informations finales, erreur)",
+    "Afficher la réponse en markdown nettoyé",
+    "Ouvrir le texte complet d'un article",
+    "Proposer les questions de suivi et le bouton Réessayer"
+   ],
+   "expose": [
+    {
+     "quoi": "handleSend / callbacks / handleStop / retryLastMessage",
+     "fichier": "frontend/src/components/chat/ChatShell.svelte",
+     "lignes": [
+      47,
+      186
+     ],
+     "verifie": true
+    },
+    {
+     "quoi": "AnalysisCard (erreur, réflexion, analyse, sources, suggestions)",
+     "fichier": "frontend/src/components/analysis/AnalysisCard.svelte",
+     "lignes": [
+      46,
+      120
+     ],
+     "verifie": true
+    },
+    {
+     "quoi": "viewFullArticle",
+     "fichier": "frontend/src/components/analysis/SourcesSection.svelte",
+     "lignes": [
+      23,
+      55
+     ],
+     "verifie": true
+    }
+   ],
+   "utilise": [
+    "ui-api",
+    "ui-etat"
+   ],
+   "fichiers": [
+    "frontend/src/lib/utils/markdown.ts"
+   ]
+  },
+  {
+   "id": "ui-api",
+   "nom": "Client du serveur",
+   "en_bref": "Parle au serveur depuis le site",
+   "bloc": "site",
+   "role": "Fonctions qui appellent l'API : flux SSE pour le chat (délai de 60 s, une seule requête active, annulation) et fetch avec deux nouveaux essais pour les autres appels. L'adresse vient de VITE_API_URL.",
+   "responsabilites": [
+    "Construire l'adresse du serveur",
+    "Lire et découper le flux d'évènements",
+    "Traduire les erreurs (429, délai dépassé, réseau)",
+    "Relancer les appels simples en cas d'erreur 5xx ou de coupure réseau"
+   ],
+   "expose": [
+    {
+     "quoi": "sendMessage / handleSSEEvent",
+     "fichier": "frontend/src/lib/api/chat.ts",
+     "lignes": [
+      7,
+      120
+     ],
+     "verifie": true
+    },
+    {
+     "quoi": "apiFetch / apiStreamUrl",
+     "fichier": "frontend/src/lib/api/client.ts",
+     "lignes": [
+      1,
+      47
+     ],
+     "verifie": true
+    },
+    {
+     "quoi": "searchArticles",
+     "fichier": "frontend/src/lib/api/articles.ts",
+     "lignes": [
+      10,
+      22
+     ],
+     "verifie": true
+    }
+   ],
+   "utilise": [
+    "api-chat",
+    "recherche"
+   ],
+   "fichiers": []
+  },
+  {
+   "id": "ui-etat",
+   "nom": "État des conversations",
+   "en_bref": "Garde et sauve les conversations",
+   "bloc": "site",
+   "role": "Stores Svelte : les conversations, la conversation active, les messages et l'identifiant de session. Chaque changement est sauvé dans localStorage, avec migration depuis l'ancien format v1.",
+   "responsabilites": [
+    "Créer, activer, supprimer et modifier les conversations",
+    "Faire passer les opérations du chat vers la conversation active",
+    "Sauver et recharger depuis le navigateur"
+   ],
+   "expose": [
+    {
+     "quoi": "conversationsStore (create, setActive, delete, updateConversation)",
+     "fichier": "frontend/src/lib/stores/conversations.svelte.ts",
+     "lignes": [
+      7,
+      84
+     ],
+     "verifie": true
+    },
+    {
+     "quoi": "chatStore (messages, sessionId, isStreaming, addMessage, updateMessage)",
+     "fichier": "frontend/src/lib/stores/chat.svelte.ts",
+     "lignes": [
+      6,
+      79
+     ],
+     "verifie": true
+    },
+    {
+     "quoi": "loadConversations / saveConversations",
+     "fichier": "frontend/src/lib/utils/persistence.ts",
+     "lignes": [
+      56,
+      82
+     ],
+     "verifie": true
+    }
+   ],
+   "utilise": [
+    "memoire-nav"
+   ],
+   "fichiers": [
+    "frontend/src/lib/utils/persistence.ts"
+   ]
+  },
+  {
+   "id": "api-socle",
+   "nom": "Socle du serveur",
+   "en_bref": "Démarrage, réglages, limites de débit",
+   "bloc": "api",
+   "role": "Crée l'application FastAPI, branche les routeurs, CORS et la limite de débit par IP (60/min par défaut, 10/min pour le chat, 30/min pour les articles), et lit les réglages depuis .env.",
+   "responsabilites": [
+    "Monter les routeurs",
+    "Limiter le débit par adresse IP",
+    "Lire les réglages (clés des modèles, chemin Chroma, CORS_ORIGINS)"
+   ],
+   "expose": [
+    {
+     "quoi": "app FastAPI et include_router",
+     "fichier": "backend/app/main.py",
+     "lignes": [
+      31,
+      53
+     ],
+     "verifie": true
+    },
+    {
+     "quoi": "Settings",
+     "fichier": "backend/app/core/config.py",
+     "lignes": [
+      6,
+      52
+     ],
+     "verifie": true
+    },
+    {
+     "quoi": "limiter, CHAT_LIMIT, ARTICLES_LIMIT",
+     "fichier": "backend/app/core/rate_limit.py",
+     "lignes": [
+      11,
+      17
+     ],
+     "verifie": true
+    },
+    {
+     "quoi": "GET /health",
+     "fichier": "backend/app/routers/health.py",
+     "lignes": [
+      10,
+      18
+     ],
+     "verifie": true
+    }
+   ],
+   "utilise": [
+    "base-lois"
+   ],
+   "fichiers": [
+    "backend/app/main.py",
+    "backend/app/core/config.py",
+    "backend/app/core/rate_limit.py",
+    "backend/app/routers/health.py"
+   ]
+  },
+  {
+   "id": "api-chat",
+   "nom": "Point d'entrée des questions",
+   "en_bref": "Reçoit la question, orchestre, diffuse",
+   "bloc": "api",
+   "role": "Routes /chat (réponse en une fois) et /chat/stream (SSE). Elles cherchent les sources, lancent l'agent, filtrent le raisonnement intermédiaire, se replient si la réponse est vide, ajoutent les informations tirées de la réponse et mettent à jour la session en mémoire (_sessions).",
+   "responsabilites": [
+    "Valider le message (1 à 2000 caractères, espaces retirés)",
+    "Retrouver l'historique de la session (20 derniers messages)",
+    "Diffuser les étapes, les sources et le texte",
+    "Ne garder que le texte du dernier appel au modèle sans recherche",
+    "Se replier sur une réponse directe si l'agent ne rend rien"
+   ],
+   "expose": [
+    {
+     "quoi": "POST /chat",
+     "fichier": "backend/app/routers/chat.py",
+     "lignes": [
+      31,
+      100
+     ],
+     "verifie": true
+    },
+    {
+     "quoi": "POST /chat/stream",
+     "fichier": "backend/app/routers/chat.py",
+     "lignes": [
+      103,
+      269
+     ],
+     "verifie": true
+    },
+    {
+     "quoi": "ChatRequest",
+     "fichier": "backend/app/models/query.py",
+     "lignes": [
+      4,
+      22
+     ],
+     "verifie": true
+    }
+   ],
+   "utilise": [
+    "agent-react",
+    "recherche",
+    "analyse-reponse"
+   ],
+   "fichiers": [
+    "backend/app/routers/chat.py",
+    "backend/app/models/query.py",
+    "backend/app/models/response.py"
+   ]
+  },
+  {
+   "id": "agent-react",
+   "nom": "Agent juridique",
+   "en_bref": "Fait chercher puis rédiger le modèle",
+   "bloc": "agent",
+   "role": "Graphe LangGraph à deux nœuds : agent, qui appelle le modèle avec les outils, et tools, qui exécute la recherche. Il boucle tant que le modèle demande une recherche. Il contient les consignes (format en titres, citations, avertissement) et choisit le modèle selon les clés disponibles.",
+   "responsabilites": [
+    "Choisir Kimi avec Gemini en secours, ou Gemini seul",
+    "Boucler entre le modèle et l'outil de recherche",
+    "Construire les messages (consignes, historique, question)",
+    "Produire une réponse directe sans outils en secours"
+   ],
+   "expose": [
+    {
+     "quoi": "get_graph",
+     "fichier": "backend/app/services/agent.py",
+     "lignes": [
+      247,
+      268
+     ],
+     "verifie": true
+    },
+    {
+     "quoi": "build_initial_messages",
+     "fichier": "backend/app/services/agent.py",
+     "lignes": [
+      271,
+      288
+     ],
+     "verifie": true
+    },
+    {
+     "quoi": "direct_rag_answer",
+     "fichier": "backend/app/services/agent.py",
+     "lignes": [
+      181,
+      218
+     ],
+     "verifie": true
+    },
+    {
+     "quoi": "_get_llm (choix des modèles)",
+     "fichier": "backend/app/services/agent.py",
+     "lignes": [
+      93,
+      147
+     ],
+     "verifie": true
+    }
+   ],
+   "utilise": [
+    "recherche",
+    "llm-kimi",
+    "llm-gemini"
+   ],
+   "fichiers": [
+    "backend/app/services/agent.py"
+   ]
+  },
+  {
+   "id": "recherche",
+   "nom": "Recherche d'articles de loi",
+   "en_bref": "Trouve les articles proches d'une question",
+   "bloc": "api",
+   "role": "Transforme un texte en vecteur avec CamemBERT, interroge ChromaDB, convertit la distance en score et filtre par seuil. Elle sert l'outil de l'agent (12 résultats, seuil 0,3, 600 caractères), les sources affichées (au plus 10, seuil 0,35) et la route /articles/search (seuil 0,25, texte entier).",
+   "responsabilites": [
+    "Charger une seule fois le modèle de vecteurs et le client Chroma",
+    "Chercher pour l'agent",
+    "Chercher les sources à afficher",
+    "Renvoyer le texte complet d'un article"
+   ],
+   "expose": [
+    {
+     "quoi": "search_legal_articles (outil de l'agent)",
+     "fichier": "backend/app/services/tools.py",
+     "lignes": [
+      16,
+      70
+     ],
+     "verifie": true
+    },
+    {
+     "quoi": "retrieve_sources_for_response",
+     "fichier": "backend/app/services/tools.py",
+     "lignes": [
+      77,
+      129
+     ],
+     "verifie": true
+    },
+    {
+     "quoi": "GET /articles/search",
+     "fichier": "backend/app/routers/articles.py",
+     "lignes": [
+      21,
+      61
+     ],
+     "verifie": true
+    },
+    {
+     "quoi": "get_collection / embed_query",
+     "fichier": "backend/app/core/dependencies.py",
+     "lignes": [
+      33,
+      55
+     ],
+     "verifie": true
+    }
+   ],
+   "utilise": [
+    "base-lois",
+    "modele-vecteurs"
+   ],
+   "fichiers": [
+    "backend/app/services/tools.py",
+    "backend/app/core/dependencies.py",
+    "backend/app/routers/articles.py"
+   ]
+  },
+  {
+   "id": "analyse-reponse",
+   "nom": "Lecture de la réponse",
+   "en_bref": "Tire plan, domaine et suggestions",
+   "bloc": "analyse",
+   "role": "Fonctions sans appel externe, qui lisent le texte final : étapes du plan, type de courrier, références d'articles normalisées, domaine dominant par mots-clés, deux ou trois questions de suivi.",
+   "responsabilites": [
+    "Repérer le plan d'action",
+    "Repérer le type de courrier conseillé",
+    "Lister et normaliser les articles cités",
+    "Deviner le domaine du droit",
+    "Proposer des questions de suivi"
+   ],
+   "expose": [
+    {
+     "quoi": "extract_action_plan",
+     "fichier": "backend/app/services/legal.py",
+     "lignes": [
+      6,
+      75
+     ],
+     "verifie": true
+    },
+    {
+     "quoi": "can_generate_document",
+     "fichier": "backend/app/services/legal.py",
+     "lignes": [
+      78,
+      96
+     ],
+     "verifie": true
+    },
+    {
+     "quoi": "detect_legal_domain / generate_follow_ups / extract_legal_references",
+     "fichier": "backend/app/services/legal.py",
+     "lignes": [
+      225,
+      333
+     ],
+     "verifie": true
+    }
+   ],
+   "utilise": [],
+   "fichiers": [
+    "backend/app/services/legal.py"
+   ]
+  },
+  {
+   "id": "courriers-pdf",
+   "nom": "Courriers types",
+   "en_bref": "Lettres juridiques en PDF ou en page web",
+   "bloc": "courriers",
+   "role": "Routes /documents qui listent les modèles, rendent un modèle en HTML ou le convertissent en PDF à télécharger.",
+   "responsabilites": [
+    "Lister les modèles du dossier templates",
+    "Vérifier le type demandé",
+    "Remplir le modèle avec la date du jour",
+    "Produire le PDF si WeasyPrint est installé"
+   ],
+   "expose": [
+    {
+     "quoi": "POST /documents/generate",
+     "fichier": "backend/app/routers/documents.py",
+     "lignes": [
+      19,
+      45
+     ],
+     "verifie": true
+    },
+    {
+     "quoi": "POST /documents/preview",
+     "fichier": "backend/app/routers/documents.py",
+     "lignes": [
+      48,
+      67
+     ],
+     "verifie": true
+    },
+    {
+     "quoi": "GET /documents/templates",
+     "fichier": "backend/app/routers/documents.py",
+     "lignes": [
+      70,
+      73
+     ],
+     "verifie": true
+    },
+    {
+     "quoi": "DocumentService",
+     "fichier": "backend/app/services/documents.py",
+     "lignes": [
+      29,
+      97
+     ],
+     "verifie": true
+    }
+   ],
+   "utilise": [],
+   "fichiers": [
+    "backend/app/routers/documents.py",
+    "backend/app/services/documents.py"
+   ]
+  },
+  {
+   "id": "remplissage",
+   "nom": "Remplissage de la base",
+   "en_bref": "Charge les lois dans la base",
+   "bloc": "ingestion",
+   "role": "Commande en ligne qui lit le jeu COLD, filtre par code et mots-clés (ou --all), calcule un identifiant stable, saute les articles déjà présents (--resume), puis transforme en vecteurs et écrit par lots.",
+   "responsabilites": [
+    "Lire les options de la commande",
+    "Filtrer les articles",
+    "Éviter les doublons",
+    "Écrire les vecteurs dans ChromaDB"
+   ],
+   "expose": [
+    {
+     "quoi": "main (options --all, --codes, --max-articles, --resume)",
+     "fichier": "backend/scripts/ingest.py",
+     "lignes": [
+      349,
+      381
+     ],
+     "verifie": true
+    },
+    {
+     "quoi": "ingest",
+     "fichier": "backend/scripts/ingest.py",
+     "lignes": [
+      188,
+      302
+     ],
+     "verifie": true
+    },
+    {
+     "quoi": "_embed_and_upsert",
+     "fichier": "backend/scripts/ingest.py",
+     "lignes": [
+      305,
+      346
+     ],
+     "verifie": true
+    }
+   ],
+   "utilise": [
+    "hf-dataset",
+    "modele-vecteurs",
+    "base-lois"
+   ],
+   "fichiers": [
+    "backend/scripts/ingest.py"
+   ]
+  },
+  {
+   "id": "atelier",
+   "nom": "Outils de développement",
+   "en_bref": "Conteneur et garde-fous de l'atelier",
+   "bloc": "outillage",
+   "role": "Image Docker du serveur (Python 3.13 et bibliothèques système pour WeasyPrint) et crochets de Claude Code : formatage automatique et blocage des commandes git ou rm dangereuses.",
+   "responsabilites": [
+    "Construire l'image du serveur",
+    "Formater les fichiers modifiés",
+    "Bloquer les commandes destructrices"
+   ],
+   "expose": [
+    {
+     "quoi": "CMD uvicorn app.main:app",
+     "fichier": "backend/Dockerfile",
+     "lignes": [
+      1,
+      21
+     ],
+     "verifie": true
+    },
+    {
+     "quoi": "Crochet après écriture : ruff ou prettier",
+     "fichier": "backend/.claude/hooks/auto-format.py",
+     "lignes": [
+      23,
+      48
+     ],
+     "verifie": true
+    },
+    {
+     "quoi": "Crochet avant commande : blocage",
+     "fichier": "backend/.claude/hooks/block-dangerous.py",
+     "lignes": [
+      12,
+      63
+     ],
+     "verifie": true
+    }
+   ],
+   "utilise": [],
+   "fichiers": [
+    "backend/Dockerfile"
+   ]
+  }
+ ],
+ "modules": {
+  "backend/app/main.py": "Crée l'application FastAPI et branche CORS, la limite de débit slowapi et les quatre routeurs.",
+  "backend/app/core/config.py": "Réglages Pydantic lus depuis .env : clés et modèles Nebius et Gemini, ChromaDB, modèle de vecteurs, paramètres de recherche, CORS.",
+  "backend/app/core/dependencies.py": "Instances uniques, chargées au premier appel, du client ChromaDB et du modèle CamemBERT, plus embed_query.",
+  "backend/app/core/rate_limit.py": "Limiteur slowapi par IP : 60/min par défaut, 10/min pour le chat, 30/min pour les articles.",
+  "backend/app/models/query.py": "Schémas d'entrée ChatRequest (message validé) et DocumentRequest (champs du courrier).",
+  "backend/app/models/response.py": "Schémas de sortie LegalSource, ChatResponse, DocumentResponse et HealthResponse.",
+  "backend/app/routers/chat.py": "Routes /chat et /chat/stream : sources, agent, filtrage du flux, repli, informations finales, sessions en mémoire.",
+  "backend/app/routers/articles.py": "Route GET /articles/search, qui renvoie le texte complet des articles les plus proches.",
+  "backend/app/routers/documents.py": "Routes /documents/generate (PDF), /documents/preview (HTML) et /documents/templates.",
+  "backend/app/routers/health.py": "Route GET /health, qui renvoie l'état et le nombre d'articles dans ChromaDB.",
+  "backend/app/services/agent.py": "Consignes du modèle, choix Kimi ou Gemini, graphe LangGraph ReAct et réponse directe de secours.",
+  "backend/app/services/tools.py": "Outil search_legal_articles de l'agent et retrieve_sources_for_response pour les sources affichées.",
+  "backend/app/services/legal.py": "Extraction par règles du plan d'action, du type de courrier, des références d'articles, du domaine et des questions de suivi.",
+  "backend/app/services/documents.py": "DocumentService : rend les modèles Jinja2 en HTML ou en PDF (WeasyPrint si disponible).",
+  "backend/app/templates/mise_en_demeure.html": "Modèle HTML de lettre de mise en demeure.",
+  "backend/app/templates/contestation_pv.html": "Modèle HTML de contestation de procès-verbal.",
+  "backend/app/templates/lettre_type.html": "Modèle HTML de courrier recommandé générique.",
+  "backend/scripts/ingest.py": "Commande de remplissage de ChromaDB depuis le jeu COLD French Law, avec filtrage, dédoublonnage et reprise.",
+  "backend/Dockerfile": "Image Python 3.13 avec les bibliothèques de WeasyPrint, qui lance uvicorn sur le port 8000.",
+  "backend/.claude/hooks/auto-format.py": "Crochet Claude Code qui formate avec ruff ou prettier après chaque écriture de fichier.",
+  "backend/.claude/hooks/block-dangerous.py": "Crochet Claude Code qui bloque rm -rf, les push forcés ou vers main, reset --hard et clean -f.",
+  "frontend/src/routes/+page.svelte": "Page unique : accueil sans conversation, sinon barre latérale et chat actif ; crée, choisit, supprime et titre les conversations.",
+  "frontend/src/routes/+layout.svelte": "Mise en page globale : styles, initialisation du thème et file de notifications.",
+  "frontend/src/routes/+error.svelte": "Page d'erreur personnalisée des routes.",
+  "frontend/src/hooks.client.ts": "Gestionnaire global des erreurs JavaScript côté navigateur.",
+  "frontend/src/lib/api/client.ts": "Adresse de l'API (VITE_API_URL) et apiFetch avec nouveaux essais et attente croissante.",
+  "frontend/src/lib/api/chat.ts": "sendMessage : POST /chat/stream, lecture du flux SSE, distribution des évènements, gestion des délais et des erreurs.",
+  "frontend/src/lib/api/articles.ts": "searchArticles : appel GET /articles/search.",
+  "frontend/src/lib/api/health.ts": "checkHealth : appel de /health (exporté mais non utilisé par les composants trouvés).",
+  "frontend/src/lib/stores/conversations.svelte.ts": "Store des conversations : création, activation, suppression, mise à jour et sauvegarde locale.",
+  "frontend/src/lib/stores/chat.svelte.ts": "Store du chat qui fait passer messages et sessionId vers la conversation active et sauve à la fin d'une réponse.",
+  "frontend/src/lib/stores/toast.svelte.ts": "File d'au plus 3 notifications, avec disparition automatique et action facultative.",
+  "frontend/src/lib/stores/theme.svelte.ts": "Store du thème clair ou sombre.",
+  "frontend/src/lib/utils/persistence.ts": "Lecture et écriture des conversations dans localStorage (v2) et migration depuis v1.",
+  "frontend/src/lib/utils/markdown.ts": "Conversion markdown vers HTML nettoyé par DOMPurify, plus une fonction de retrait de sections (non utilisée par les composants trouvés).",
+  "frontend/src/lib/types/chat.ts": "Types ChatMessage, LegalSource, ThinkingStep et Conversation.",
+  "frontend/src/lib/types/api.ts": "Types des évènements SSE, des informations finales et des callbacks du flux.",
+  "frontend/src/lib/constants/use-cases.ts": "Cas d'usage fréquents affichés sur l'accueil, avec leur exemple de question.",
+  "frontend/src/lib/constants/suggestions.ts": "Suggestions de questions pour un chat vide.",
+  "frontend/src/components/chat/ChatShell.svelte": "Chef d'orchestre du chat : envoi, callbacks du flux, arrêt, relance, annulation au changement de conversation.",
+  "frontend/src/components/chat/ChatInput.svelte": "Zone de saisie avec envoi sur Entrée, bouton Arrêter et avertissement juridique.",
+  "frontend/src/components/chat/MessageList.svelte": "Liste défilante qui affiche une bulle par question et une carte d'analyse par réponse.",
+  "frontend/src/components/chat/ChatArea.svelte": "En-tête de la conversation (titre, menu mobile) autour de ChatShell.",
+  "frontend/src/components/analysis/AnalysisCard.svelte": "Carte de réponse : erreur, étapes de réflexion, analyse en markdown, sources, suggestions, copie.",
+  "frontend/src/components/analysis/SourcesSection.svelte": "Badges et grille des sources, avec ouverture du texte complet par /articles/search.",
+  "frontend/src/components/analysis/FollowUpSuggestions.svelte": "Boutons de questions de suivi qui renvoient directement une question.",
+  "frontend/src/components/analysis/ThinkingIndicator.svelte": "Affichage probable des étapes de recherche en cours (fichier non ouvert).",
+  "frontend/src/components/analysis/ActionPlan.svelte": "Composant de plan d'action, importé par aucun autre composant (recherche sans résultat).",
+  "frontend/src/components/sidebar/AppShell.svelte": "Mise en page avec barre latérale fixe sur ordinateur et superposée sur mobile.",
+  "frontend/src/components/landing/HeroSection.svelte": "Haut de l'accueil avec les boutons « Poser ma question » et « Essayer gratuitement ».",
+  "frontend/src/components/landing/UseCaseGrid.svelte": "Grille des cas fréquents qui démarre une conversation avec un exemple."
+ },
+ "dossiers": {
+  "backend": "Serveur Python de l'assistant : API, services, script de remplissage et image Docker.",
+  "backend/app": "Code de l'application FastAPI.",
+  "backend/app/core": "Réglages, instances partagées (ChromaDB, modèle de vecteurs) et limite de débit.",
+  "backend/app/models": "Schémas Pydantic des requêtes et des réponses.",
+  "backend/app/routers": "Routes HTTP : chat, articles, documents, santé.",
+  "backend/app/services": "Logique métier : agent, outil de recherche, analyse des réponses, courriers.",
+  "backend/scripts": "Commande de remplissage de la base de lois.",
+  "backend/.claude/hooks": "Crochets de l'assistant de code (formatage et garde-fous).",
+  "frontend": "Site web SvelteKit de l'assistant.",
+  "frontend/src/lib/api": "Appels au serveur.",
+  "frontend/src/lib/stores": "États partagés réactifs (conversations, chat, thème, notifications).",
+  "frontend/src/lib/types": "Types TypeScript partagés.",
+  "frontend/src/lib/utils": "Utilitaires (markdown, sauvegarde locale).",
+  "frontend/src/lib/constants": "Contenus fixes (cas d'usage, suggestions).",
+  "frontend/src/icons": "Icônes SVG en composants Svelte."
+ },
+ "incertitudes": [
+  "Le vrai fichier .env est absent : on ne sait pas quelles clés de modèle sont renseignées en production, donc ni le modèle réellement utilisé ni si le secours Gemini est actif.",
+  "Le déploiement n'est pas décrit dans le code : aucun fichier compose, et CONTEXT.md parle d'un déploiement en cours (VPS et Vercel). Le Dockerfile ne fournit pas la base ChromaDB, qu'il faut monter ou remplir à part (probablement exclue par .dockerignore, fichier non ouvert).",
+  "Les sessions côté serveur sont un dictionnaire en mémoire : elles sont perdues au redémarrage et ne sont pas partagées entre plusieurs processus. Le thread_id passé au graphe ne sauve rien, car aucun checkpointer n'est configuré.",
+  "La route /articles/search cherche par sens à partir de la référence de l'article : rien ne garantit que l'article renvoyé est exactement celui cité.",
+  "La limite de 3 recherches par réponse n'existe que dans les consignes du modèle ; le code fixe seulement recursion_limit=20.",
+  "SourceCard.svelte, ThinkingIndicator.svelte, hooks.client.ts et le store de thème n'ont pas été ouverts ; leur rôle est déduit de leur nom et de leurs usages.",
+  "La fabrique de courriers PDF n'est plus appelée par le site (recherche sans résultat). Les informations « courrier possible » sont calculées mais pas affichées par les composants lus.",
+  "La variable RAG_TOP_K de .env.example ne correspond à aucun réglage de config.py : elle est ignorée (extra=ignore).",
+  "La version déclarée dans main.py (0.2.0) ne correspond pas à celle de CONTEXT.md (v0.5.0)."
+ ],
+ "parcours": [
+  {
+   "id": "poser-question",
+   "nom": "Poser une question juridique et recevoir l'analyse",
+   "declencheur": "L'utilisateur envoie un message dans le chat (touche Entrée, bouton Envoyer ou clic sur une question de suivi).",
+   "depart": "Une personne décrit son problème juridique et l'envoie.",
+   "fin": "Elle voit une analyse rédigée, les articles de loi trouvés et des questions de suivi, et la conversation reste sur son appareil.",
+   "etapes": [
+    {
+     "texte": "Sur l'accueil (aucune conversation), startChat crée une conversation. Si la personne a cliqué sur un exemple, celui-ci est mis dans pendingInitialMessage et devient le titre. L'exemple est seulement placé dans la zone de saisie (ChatShell, $effect l.27-31) : il n'est pas envoyé.",
+     "action": "Ouvre une conversation",
+     "simple": "La personne ouvre une nouvelle conversation, parfois avec un exemple déjà écrit.",
+     "composant": "ui-pages",
+     "touche": [
+      "user",
+      "memoire-nav"
+     ],
+     "conditions": [
+      "Seulement si aucune conversation n'existe encore, ou si la personne clique sur « nouvelle conversation »"
+     ],
+     "manuel": true,
+     "fichier": "frontend/src/routes/+page.svelte",
+     "lignes": [
+      16,
+      27
+     ],
+     "verifie": true
+    },
+    {
+     "texte": "ChatInput.handleSend retire les espaces autour du texte et appelle onSend, sur Entrée sans Maj ou sur clic, puis vide la zone. Rien ne se passe si le texte est vide ou si une réponse est en cours.",
+     "action": "Envoie la question",
+     "simple": "La personne tape sa situation et l'envoie.",
+     "composant": "ui-chat",
+     "touche": [
+      "user"
+     ],
+     "conditions": [
+      "Texte non vide",
+      "Aucune réponse en cours de réception"
+     ],
+     "manuel": true,
+     "fichier": "frontend/src/components/chat/ChatInput.svelte",
+     "lignes": [
+      23,
+      35
+     ],
+     "verifie": true
+    },
+    {
+     "texte": "ChatShell.handleSend ajoute le message de l'utilisateur. Au premier message, il appelle onFirstMessage, qui donne à la conversation les 60 premiers caractères comme titre si elle porte encore le titre par défaut. Il ajoute ensuite un message de réponse vide (isThinking) et passe isStreaming à true. Chaque changement est sauvé dans localStorage par conversationsStore.updateConversation.",
+     "action": "Prépare la réponse vide",
+     "simple": "Le site affiche la question et une carte « analyse en cours », et sauve la conversation sur l'appareil.",
+     "composant": "ui-chat",
+     "touche": [
+      "memoire-nav"
+     ],
+     "conditions": [],
+     "manuel": false,
+     "fichier": "frontend/src/components/chat/ChatShell.svelte",
+     "lignes": [
+      47,
+      78
+     ],
+     "verifie": true
+    },
+    {
+     "texte": "sendMessage annule la requête précédente encore active, puis envoie POST {VITE_API_URL|http://localhost:8000}/chat/stream avec {message, session_id}. Un délai de 60 s est armé et levé dès que les en-têtes de la réponse arrivent.",
+     "action": "Envoie au serveur",
+     "simple": "Le site envoie la question au serveur, avec le numéro de la conversation.",
+     "composant": "ui-api",
+     "touche": [
+      "api"
+     ],
+     "conditions": [
+      "Le serveur doit autoriser l'origine du site (CORS_ORIGINS, par défaut http://localhost:5173)",
+      "Pas encore de session_id au premier échange : il vaut null"
+     ],
+     "manuel": false,
+     "fichier": "frontend/src/lib/api/chat.ts",
+     "lignes": [
+      12,
+      43
+     ],
+     "verifie": true
+    },
+    {
+     "texte": "FastAPI vérifie la limite de 10 requêtes par minute et par IP (slowapi), puis valide ChatRequest : message de 1 à 2000 caractères, espaces retirés. chat_stream prend session_id, ou en crée un avec uuid4, et lit l'historique dans _sessions, en mémoire.",
+     "action": "Vérifie et retrouve l'historique",
+     "simple": "Le serveur vérifie la demande et retrouve les échanges précédents de la conversation.",
+     "composant": "api-chat",
+     "touche": [],
+     "conditions": [
+      "Au plus 10 demandes par minute depuis la même adresse",
+      "L'historique n'existe que si le serveur n'a pas redémarré depuis"
+     ],
+     "manuel": false,
+     "fichier": "backend/app/routers/chat.py",
+     "lignes": [
+      103,
+      126
+     ],
+     "verifie": true
+    },
+    {
+     "texte": "Dans le générateur event_stream, le serveur envoie d'abord un évènement thinking (« Recherche des articles de loi pertinents... »), puis lance retrieve_sources_for_response dans un thread (asyncio.to_thread). Cette fonction appelle embed_query, qui charge sentence-camembert-base au premier appel, puis collection.query avec n_results=rag_display_top_k (30). Elle garde les articles dont le score est au moins 0,35, dix au plus, avec un extrait de 500 caractères. Le serveur envoie ensuite thinking_done (nombre d'articles) et sources.",
+     "action": "Cherche les sources à montrer",
+     "simple": "Le serveur cherche dans la base de lois les articles les plus proches de la question et les envoie aussitôt au site.",
+     "composant": "recherche",
+     "touche": [
+      "modele-vecteurs",
+      "base-lois",
+      "site"
+     ],
+     "conditions": [
+      "La base ChromaDB doit avoir été remplie au préalable (parcours remplir-base)",
+      "Premier appel plus lent : chargement du modèle de vecteurs"
+     ],
+     "manuel": false,
+     "fichier": "backend/app/routers/chat.py",
+     "lignes": [
+      131,
+      146
+     ],
+     "verifie": true
+    },
+    {
+     "texte": "Le serveur envoie thinking (« Analyse par l'agent juridique... »), compile le graphe (get_graph : nœuds agent et tools, compilé une seule fois) et construit les messages : SYSTEM_PROMPT, puis l'historique, puis la question.",
+     "action": "Prépare l'agent",
+     "simple": "Le serveur prépare le moteur de raisonnement avec les consignes, les échanges passés et la question.",
+     "composant": "agent-react",
+     "touche": [],
+     "conditions": [],
+     "manuel": false,
+     "fichier": "backend/app/services/agent.py",
+     "lignes": [
+      247,
+      288
+     ],
+     "verifie": true
+    },
+    {
+     "texte": "graph.astream_events (v2, recursion_limit 20, thread_id = session) fait tourner la boucle ReAct. Le nœud agent appelle le modèle avec l'outil attaché. Ce modèle est Kimi K2.5 chez Nebius avec Gemini en secours (with_fallbacks) si les deux clés existent, Kimi seul, ou Gemini seul. Tant que le modèle demande une recherche, _should_continue envoie vers tools, puis le graphe revient au nœud agent.",
+     "action": "Fait raisonner le modèle",
+     "simple": "Le moteur demande au modèle de langage s'il doit chercher d'autres articles ou s'il peut rédiger.",
+     "composant": "agent-react",
+     "touche": [
+      "llm-kimi",
+      "llm-gemini"
+     ],
+     "conditions": [
+      "NEBIUS_API_KEY ou GEMINI_API_KEY doit être renseignée, sinon RuntimeError",
+      "Gemini ne sert de secours que si GEMINI_API_KEY est renseignée"
+     ],
+     "manuel": false,
+     "fichier": "backend/app/services/agent.py",
+     "lignes": [
+      93,
+      147
+     ],
+     "verifie": true
+    },
+    {
+     "texte": "À chaque demande de recherche, en boucle : on_tool_start envoie thinking (« Recherche : <requête> ») et vide le tampon. L'outil search_legal_articles transforme la requête en vecteur, interroge Chroma (12 résultats), garde les scores d'au moins 0,3 et renvoie les références avec 600 caractères de texte. on_tool_end envoie thinking_done avec le nombre d'articles. Les consignes demandent au plus 3 recherches, mais le code ne fixe que recursion_limit=20.",
+     "action": "Cherche dans la loi",
+     "simple": "Pour chaque recherche voulue par le modèle, le serveur cherche à nouveau dans la base de lois et montre l'étape à la personne.",
+     "composant": "recherche",
+     "touche": [
+      "modele-vecteurs",
+      "base-lois",
+      "site"
+     ],
+     "conditions": [
+      "Seulement si le modèle demande une recherche ; la boucle se répète pour chaque demande"
+     ],
+     "manuel": false,
+     "fichier": "backend/app/services/tools.py",
+     "lignes": [
+      16,
+      70
+     ],
+     "verifie": true
+    },
+    {
+     "texte": "Les morceaux de texte du modèle (on_chat_model_stream) sont mis en tampon. À on_chat_model_end, si l'appel contenait des demandes d'outil, le tampon est jeté (raisonnement intermédiaire). Sinon, chaque morceau est envoyé comme évènement token et ajouté à full_response. Ce qui reste dans le tampon est envoyé à la fin de la boucle.",
+     "action": "Diffuse la réponse finale",
+     "simple": "Le serveur ne transmet que le texte de la réponse finale, morceau par morceau, et cache les réflexions intermédiaires.",
+     "composant": "api-chat",
+     "touche": [
+      "site"
+     ],
+     "conditions": [],
+     "manuel": false,
+     "fichier": "backend/app/routers/chat.py",
+     "lignes": [
+      158,
+      219
+     ],
+     "verifie": true
+    },
+    {
+     "texte": "Si full_response est vide, le serveur envoie thinking (« Génération alternative en cours... ») et appelle direct_rag_answer. Cette fonction utilise _get_raw_llm (Gemini en priorité, sinon Kimi, sans outils) avec SYSTEM_PROMPT et les sources déjà trouvées. Le texte obtenu part en un seul token. S'il est vide aussi, un message fixe « Je n'ai pas pu générer une réponse complète... » est envoyé.",
+     "action": "Rédige en secours",
+     "simple": "Si le moteur n'a rien rédigé, un second modèle écrit directement la réponse à partir des articles déjà trouvés.",
+     "composant": "agent-react",
+     "touche": [
+      "llm-gemini",
+      "llm-kimi",
+      "site"
+     ],
+     "conditions": [
+      "Seulement si l'agent n'a produit aucun texte"
+     ],
+     "manuel": false,
+     "fichier": "backend/app/routers/chat.py",
+     "lignes": [
+      221,
+      239
+     ],
+     "verifie": true
+    },
+    {
+     "texte": "Le serveur tire de la réponse extract_action_plan, can_generate_document et extract_legal_references, ainsi que detect_legal_domain (sur la question et la réponse) et generate_follow_ups. Il envoie l'évènement metadata (avec session_id), puis data: [DONE]. Cette étape a lieu aussi après une erreur.",
+     "action": "Tire plan et suggestions",
+     "simple": "Le serveur relit la réponse pour en tirer le plan d'action, le domaine du droit et des questions de suivi, puis signale la fin.",
+     "composant": "analyse-reponse",
+     "touche": [
+      "site"
+     ],
+     "conditions": [],
+     "manuel": false,
+     "fichier": "backend/app/routers/chat.py",
+     "lignes": [
+      245,
+      254
+     ],
+     "verifie": true
+    },
+    {
+     "texte": "Si full_response n'est pas vide, la question et la réponse sont ajoutées à l'historique, et _sessions[session_id] garde les 20 derniers messages en mémoire du processus.",
+     "action": "Mémorise l'échange",
+     "simple": "Le serveur garde en mémoire cet échange pour comprendre les questions suivantes.",
+     "composant": "api-chat",
+     "touche": [],
+     "conditions": [
+      "Une réponse non vide a été produite",
+      "Perdu au redémarrage du serveur"
+     ],
+     "manuel": false,
+     "fichier": "backend/app/routers/chat.py",
+     "lignes": [
+      256,
+      260
+     ],
+     "verifie": true
+    },
+    {
+     "texte": "Côté site, la boucle reader.read découpe les lignes « data: ». Elle s'arrête sur [DONE] et passe chaque évènement JSON à handleSSEEvent, qui appelle les callbacks de ChatShell : onThinking/onThinkingDone pour les étapes, onSources, onToken pour ajouter le texte, onMetadata pour le plan, les suggestions, le sessionId et le domaine de la conversation.",
+     "action": "Met à jour la carte",
+     "simple": "Le site lit chaque morceau reçu et met à jour la carte : étapes de recherche, sources, texte, puis suggestions et thème de la conversation.",
+     "composant": "ui-chat",
+     "touche": [
+      "memoire-nav"
+     ],
+     "conditions": [],
+     "manuel": false,
+     "fichier": "frontend/src/lib/api/chat.ts",
+     "lignes": [
+      51,
+      120
+     ],
+     "verifie": true
+    },
+    {
+     "texte": "AnalysisCard affiche, selon l'état, l'erreur, l'indicateur de réflexion (ThinkingIndicator) ou l'analyse. L'analyse est rendue par renderMarkdown (marked puis DOMPurify), suivie de SourcesSection et, une fois la réception finie, de FollowUpSuggestions. Un clic sur une suggestion appelle directement handleSend.",
+     "action": "Affiche l'analyse",
+     "simple": "La personne lit l'analyse, peut ouvrir les sources et cliquer une question de suivi pour continuer.",
+     "composant": "ui-chat",
+     "touche": [
+      "user"
+     ],
+     "conditions": [
+      "Les suggestions ne s'affichent qu'une fois la réponse entièrement reçue"
+     ],
+     "manuel": false,
+     "fichier": "frontend/src/components/analysis/AnalysisCard.svelte",
+     "lignes": [
+      59,
+      113
+     ],
+     "verifie": true
+    },
+    {
+     "texte": "Quand la promesse se termine, ChatShell remet isStreaming à false. Le setter de chatStore appelle alors persist, qui sauve messages et sessionId. saveConversations écrit dans localStorage (50 conversations, 50 messages chacune au plus).",
+     "action": "Sauve la conversation",
+     "simple": "La conversation complète est enregistrée sur l'appareil de la personne.",
+     "composant": "ui-etat",
+     "touche": [
+      "memoire-nav"
+     ],
+     "conditions": [
+      "Le navigateur doit permettre le stockage local (sinon l'erreur est ignorée)"
+     ],
+     "manuel": false,
+     "fichier": "frontend/src/lib/stores/chat.svelte.ts",
+     "lignes": [
+      9,
+      44
+     ],
+     "verifie": true
+    }
+   ],
+   "resultat": "Une analyse structurée (résumé, droits avec articles cités, plan d'action, document conseillé, avertissement) s'affiche avec jusqu'à 10 sources et 3 questions de suivi. Le domaine du droit est noté sur la conversation, et le tout est sauvé dans le navigateur.",
+   "branches": [
+    {
+     "quand": "Plus de 10 demandes par minute depuis la même adresse (réponse 429)",
+     "alors": "Le site affiche « Vous envoyez trop de messages. Attendez une minute avant de réessayer. » sur la carte et dans une notification avec Réessayer.",
+     "fichier": "frontend/src/lib/api/chat.ts",
+     "lignes": [
+      36,
+      43
+     ],
+     "verifie": true
+    },
+    {
+     "quand": "Le serveur ne répond pas dans les 60 s, ou il est injoignable",
+     "alors": "Message « Le serveur met trop de temps à répondre » ou « Impossible de joindre le serveur », puis carte d'erreur avec Réessayer.",
+     "fichier": "frontend/src/lib/api/chat.ts",
+     "lignes": [
+      75,
+      88
+     ],
+     "verifie": true
+    },
+    {
+     "quand": "Exception côté serveur pendant la recherche ou l'agent (par exemple aucune clé de modèle)",
+     "alors": "Un évènement error part avec le message de l'exception. Les informations finales et [DONE] sont quand même envoyés. Le site marque le message en erreur et propose Réessayer.",
+     "fichier": "backend/app/routers/chat.py",
+     "lignes": [
+      241,
+      254
+     ],
+     "verifie": true
+    },
+    {
+     "quand": "Aucun article au-dessus du seuil",
+     "alors": "La liste des sources est vide ; l'outil de l'agent répond « Aucun article... » et le modèle rédige quand même.",
+     "fichier": "backend/app/services/tools.py",
+     "lignes": [
+      39,
+      65
+     ],
+     "verifie": true
+    },
+    {
+     "quand": "La personne clique sur Arrêter ou change de conversation",
+     "alors": "La requête est annulée sans message d'erreur, et isStreaming repasse à false.",
+     "fichier": "frontend/src/components/chat/ChatShell.svelte",
+     "lignes": [
+      33,
+      41
+     ],
+     "verifie": true
+    },
+    {
+     "quand": "La personne clique sur Réessayer",
+     "alors": "La réponse en erreur est retirée et la dernière question est renvoyée.",
+     "fichier": "frontend/src/components/chat/ChatShell.svelte",
+     "lignes": [
+      175,
+      186
+     ],
+     "verifie": true
+    }
+   ]
+  },
+  {
+   "id": "voir-article",
+   "nom": "Lire le texte complet d'un article cité",
+   "declencheur": "Clic sur une source puis sur « voir l'article complet » dans la carte d'analyse.",
+   "depart": "La personne veut lire en entier un article de loi cité dans la réponse.",
+   "fin": "Le texte complet de l'article s'ouvre sous les sources.",
+   "etapes": [
+    {
+     "texte": "SourcesSection montre trois badges et « +N ». Un clic ouvre la grille des SourceCard, dont onViewFull appelle viewFullArticle(source).",
+     "action": "Choisit un article",
+     "simple": "La personne déplie la liste des sources et choisit un article.",
+     "composant": "ui-chat",
+     "touche": [
+      "user"
+     ],
+     "conditions": [
+      "La réponse contient au moins une source"
+     ],
+     "manuel": true,
+     "fichier": "frontend/src/components/analysis/SourcesSection.svelte",
+     "lignes": [
+      66,
+      106
+     ],
+     "verifie": true
+    },
+    {
+     "texte": "viewFullArticle referme le panneau si c'est le même article. Sinon il affiche le chargement et appelle searchArticles(source.article, 1), qui fait GET /articles/search?q=<référence>&limit=1 par apiFetch (jusqu'à 2 nouveaux essais, attente de 1 s puis 2 s, en cas d'erreur 5xx ou réseau).",
+     "action": "Demande le texte",
+     "simple": "Le site demande au serveur le texte complet de cet article.",
+     "composant": "ui-api",
+     "touche": [
+      "api"
+     ],
+     "conditions": [],
+     "manuel": false,
+     "fichier": "frontend/src/components/analysis/SourcesSection.svelte",
+     "lignes": [
+      23,
+      31
+     ],
+     "verifie": true
+    },
+    {
+     "texte": "search_articles (au plus 30 requêtes par minute et par IP, q d'au moins 2 caractères, limit de 1 à 20) transforme q en vecteur, interroge Chroma, garde les scores d'au moins 0,25 et renvoie article, code et texte entier.",
+     "action": "Retrouve l'article",
+     "simple": "Le serveur cherche dans la base l'article le plus proche de cette référence et renvoie son texte entier.",
+     "composant": "recherche",
+     "touche": [
+      "modele-vecteurs",
+      "base-lois"
+     ],
+     "conditions": [
+      "Au plus 30 demandes par minute depuis la même adresse"
+     ],
+     "manuel": false,
+     "fichier": "backend/app/routers/articles.py",
+     "lignes": [
+      21,
+      61
+     ],
+     "verifie": true
+    },
+    {
+     "texte": "Le panneau articleViewer affiche la référence, le code et le texte reçus.",
+     "action": "Affiche l'article",
+     "simple": "Le texte de l'article s'affiche dans un encadré qu'on peut fermer.",
+     "composant": "ui-chat",
+     "touche": [
+      "user"
+     ],
+     "conditions": [],
+     "manuel": false,
+     "fichier": "frontend/src/components/analysis/SourcesSection.svelte",
+     "lignes": [
+      117,
+      144
+     ],
+     "verifie": true
+    }
+   ],
+   "resultat": "La personne lit le texte complet de l'article (ou l'extrait si la recherche échoue).",
+   "branches": [
+    {
+     "quand": "Aucun résultat, ou erreur de l'appel",
+     "alors": "Le panneau montre l'extrait de 500 caractères déjà reçu avec la source.",
+     "fichier": "frontend/src/components/analysis/SourcesSection.svelte",
+     "lignes": [
+      32,
+      51
+     ],
+     "verifie": true
+    },
+    {
+     "quand": "Le meilleur score est sous 0,25",
+     "alors": "Le serveur renvoie une liste vide, et le site se replie sur l'extrait.",
+     "fichier": "backend/app/routers/articles.py",
+     "lignes": [
+      47,
+      50
+     ],
+     "verifie": true
+    }
+   ]
+  },
+  {
+   "id": "remplir-base",
+   "nom": "Remplir la base des articles de loi",
+   "declencheur": "Un développeur lance à la main « python -m scripts.ingest » depuis le dossier backend.",
+   "depart": "Une personne de l'équipe lance le chargement des lois françaises.",
+   "fin": "La base contient les articles et leurs vecteurs, prête pour les recherches.",
+   "etapes": [
+    {
+     "texte": "main lit les options --all, --codes, --max-articles et --resume, puis appelle ingest.",
+     "action": "Lance le chargement",
+     "simple": "La personne lance la commande de chargement avec ses options.",
+     "composant": "remplissage",
+     "touche": [],
+     "conditions": [
+      "Lancé à la main depuis le dossier backend, avec les dépendances installées"
+     ],
+     "manuel": true,
+     "fichier": "backend/scripts/ingest.py",
+     "lignes": [
+      349,
+      381
+     ],
+     "verifie": true
+    },
+    {
+     "texte": "ingest ouvre en flux harvard-lil/cold-french-law (split train) sur HuggingFace, charge le SentenceTransformer de settings.embedding_model et ouvre ChromaDB (chroma_persist_dir, chroma_collection).",
+     "action": "Ouvre sources et base",
+     "simple": "L'outil ouvre le jeu public de lois, le modèle de sens et la base.",
+     "composant": "remplissage",
+     "touche": [
+      "hf-dataset",
+      "modele-vecteurs",
+      "base-lois"
+     ],
+     "conditions": [
+      "Accès internet à HuggingFace"
+     ],
+     "manuel": false,
+     "fichier": "backend/scripts/ingest.py",
+     "lignes": [
+      199,
+      209
+     ],
+     "verifie": true
+    },
+    {
+     "texte": "Avec --resume, _load_existing_ids lit tous les identifiants déjà présents dans la collection.",
+     "action": "Note l'existant",
+     "simple": "En reprise, l'outil note les articles déjà chargés pour ne pas les refaire.",
+     "composant": "remplissage",
+     "touche": [
+      "base-lois"
+     ],
+     "conditions": [
+      "Option --resume"
+     ],
+     "manuel": false,
+     "fichier": "backend/scripts/ingest.py",
+     "lignes": [
+      211,
+      218
+     ],
+     "verifie": true
+    },
+    {
+     "texte": "Pour chaque article du flux : il est ignoré s'il fait moins de 30 caractères ou, sans --all, si should_include_article le refuse (code parmi les 6 visés et mot-clé présent). make_doc_id calcule un sha256 de code, article et 200 premiers caractères. L'article est sauté s'il est déjà présent, sinon ajouté au lot.",
+     "action": "Trie chaque article",
+     "simple": "Pour chaque article, l'outil écarte les textes trop courts ou hors sujet et ceux déjà chargés.",
+     "composant": "remplissage",
+     "touche": [],
+     "conditions": [
+      "Le filtre par domaine ne s'applique que sans --all"
+     ],
+     "manuel": false,
+     "fichier": "backend/scripts/ingest.py",
+     "lignes": [
+      234,
+      267
+     ],
+     "verifie": true
+    },
+    {
+     "texte": "Dès que le lot atteint 128 articles, _embed_and_upsert retire les doublons, calcule les vecteurs normalisés et appelle collection.upsert (ids, documents, metadatas article/code/source, embeddings). L'outil s'arrête si --max-articles est atteint.",
+     "action": "Écrit par paquets",
+     "simple": "Par paquets de 128, l'outil transforme les articles en vecteurs et les écrit dans la base.",
+     "composant": "remplissage",
+     "touche": [
+      "modele-vecteurs",
+      "base-lois"
+     ],
+     "conditions": [
+      "Répété à chaque paquet plein"
+     ],
+     "manuel": false,
+     "fichier": "backend/scripts/ingest.py",
+     "lignes": [
+      269,
+      286
+     ],
+     "verifie": true
+    },
+    {
+     "texte": "Le dernier lot incomplet est écrit, puis collection.count() est affiché dans le journal.",
+     "action": "Termine et compte",
+     "simple": "L'outil écrit le dernier paquet et affiche le nombre total d'articles.",
+     "composant": "remplissage",
+     "touche": [
+      "base-lois"
+     ],
+     "conditions": [],
+     "manuel": false,
+     "fichier": "backend/scripts/ingest.py",
+     "lignes": [
+      288,
+      302
+     ],
+     "verifie": true
+    }
+   ],
+   "resultat": "La collection ChromaDB justicia_laws contient les articles (environ 818 873 selon CONTEXT.md en mode --all), que le chat et la recherche d'articles utilisent ensuite.",
+   "branches": [
+    {
+     "quand": "Les identifiants existants ne peuvent pas être lus en reprise",
+     "alors": "Un avertissement est journalisé et le chargement repart de zéro (upsert, donc sans doublon).",
+     "fichier": "backend/scripts/ingest.py",
+     "lignes": [
+      183,
+      185
+     ],
+     "verifie": true
+    },
+    {
+     "quand": "Le lot ne contient que des doublons",
+     "alors": "Rien n'est écrit pour ce lot.",
+     "fichier": "backend/scripts/ingest.py",
+     "lignes": [
+      323,
+      324
+     ],
+     "verifie": true
+    }
+   ]
+  },
+  {
+   "id": "courrier-pdf",
+   "nom": "Produire un courrier juridique type en PDF",
+   "declencheur": "Appel direct de POST /documents/generate (le site actuel ne l'appelle plus).",
+   "depart": "Un programme demande au serveur une lettre type remplie, par exemple une mise en demeure.",
+   "fin": "Un fichier PDF prêt à envoyer est renvoyé en téléchargement.",
+   "etapes": [
+    {
+     "texte": "generate_document reçoit un DocumentRequest (document_type, expéditeur, destinataire, objet, faits, montant, délai de 8 jours par défaut, références). _get_doc_service crée DocumentService une seule fois.",
+     "action": "Reçoit la demande",
+     "simple": "Le serveur reçoit les informations du courrier à rédiger.",
+     "composant": "courriers-pdf",
+     "touche": [],
+     "conditions": [
+      "Appel direct de l'API : aucun écran du site ne le déclenche"
+     ],
+     "manuel": true,
+     "fichier": "backend/app/routers/documents.py",
+     "lignes": [
+      11,
+      22
+     ],
+     "verifie": true
+    },
+    {
+     "texte": "list_templates liste les fichiers *.html de app/templates (contestation_pv, lettre_type, mise_en_demeure). Un type inconnu renvoie 400.",
+     "action": "Vérifie le modèle",
+     "simple": "Le serveur vérifie que le modèle de lettre demandé existe.",
+     "composant": "courriers-pdf",
+     "touche": [],
+     "conditions": [],
+     "manuel": false,
+     "fichier": "backend/app/routers/documents.py",
+     "lignes": [
+      23,
+      28
+     ],
+     "verifie": true
+    },
+    {
+     "texte": "generate_pdf remplit le modèle Jinja2 (échappement automatique, date du jour, ville « [Votre ville] ») et le convertit en PDF avec WeasyPrint.",
+     "action": "Fabrique le PDF",
+     "simple": "Le serveur remplit la lettre et la transforme en PDF.",
+     "composant": "courriers-pdf",
+     "touche": [],
+     "conditions": [
+      "WeasyPrint et les bibliothèques système GTK/Pango doivent être installés (c'est le cas dans l'image Docker)"
+     ],
+     "manuel": false,
+     "fichier": "backend/app/services/documents.py",
+     "lignes": [
+      36,
+      70
+     ],
+     "verifie": true
+    },
+    {
+     "texte": "La réponse application/pdf porte l'en-tête Content-Disposition attachment; filename=<type>_<nom>.pdf.",
+     "action": "Renvoie le PDF",
+     "simple": "Le PDF est renvoyé en téléchargement.",
+     "composant": "courriers-pdf",
+     "touche": [],
+     "conditions": [],
+     "manuel": false,
+     "fichier": "backend/app/routers/documents.py",
+     "lignes": [
+      38,
+      45
+     ],
+     "verifie": true
+    }
+   ],
+   "resultat": "Un PDF de mise en demeure, de contestation de PV ou de lettre type, rempli avec les informations fournies.",
+   "branches": [
+    {
+     "quand": "Type de document inconnu",
+     "alors": "Erreur 400 avec la liste des modèles disponibles.",
+     "fichier": "backend/app/routers/documents.py",
+     "lignes": [
+      24,
+      28
+     ],
+     "verifie": true
+    },
+    {
+     "quand": "WeasyPrint absent ou échec de conversion",
+     "alors": "Erreur 500 « PDF generation failed » ; on peut utiliser /documents/preview pour obtenir la page web à imprimer.",
+     "fichier": "backend/app/routers/documents.py",
+     "lignes": [
+      30,
+      36
+     ],
+     "verifie": true
+    }
+   ]
+  }
+ ],
+ "flux": [
+  {
+   "de": "user",
+   "vers": "site",
+   "quoi": "Question décrite en langage courant",
+   "verbe": "écrit sa question sur"
+  },
+  {
+   "de": "site",
+   "vers": "memoire-nav",
+   "quoi": "Conversations et messages",
+   "verbe": "enregistre dans"
+  },
+  {
+   "de": "site",
+   "vers": "api",
+   "quoi": "POST /chat/stream (message, session_id) et GET /articles/search",
+   "verbe": "envoie les demandes à"
+  },
+  {
+   "de": "api",
+   "vers": "site",
+   "quoi": "Évènements SSE : thinking, sources, token, metadata, error",
+   "verbe": "renvoie au fil de l'eau à"
+  },
+  {
+   "de": "api",
+   "vers": "modele-vecteurs",
+   "quoi": "Texte de la question",
+   "verbe": "fait traduire par"
+  },
+  {
+   "de": "api",
+   "vers": "base-lois",
+   "quoi": "Recherche des articles les plus proches",
+   "verbe": "cherche dans"
+  },
+  {
+   "de": "api",
+   "vers": "agent",
+   "quoi": "Question, historique de la session",
+   "verbe": "confie la question à"
+  },
+  {
+   "de": "agent",
+   "vers": "llm-kimi",
+   "quoi": "Consignes, historique, résultats de recherche",
+   "verbe": "demande la réponse à"
+  },
+  {
+   "de": "agent",
+   "vers": "llm-gemini",
+   "quoi": "Même demande en secours, ou réponse directe avec sources",
+   "verbe": "se replie sur"
+  },
+  {
+   "de": "agent",
+   "vers": "base-lois",
+   "quoi": "Recherches lancées par le modèle (jusqu'à 3 demandées)",
+   "verbe": "cherche dans"
+  },
+  {
+   "de": "api",
+   "vers": "analyse",
+   "quoi": "Texte final de la réponse",
+   "verbe": "fait analyser par"
+  },
+  {
+   "de": "api",
+   "vers": "courriers",
+   "quoi": "Données du courrier",
+   "verbe": "fait rédiger par"
+  },
+  {
+   "de": "ingestion",
+   "vers": "hf-dataset",
+   "quoi": "Lecture en flux des articles",
+   "verbe": "télécharge depuis"
+  },
+  {
+   "de": "ingestion",
+   "vers": "modele-vecteurs",
+   "quoi": "Lots de 128 articles",
+   "verbe": "fait traduire par"
+  },
+  {
+   "de": "ingestion",
+   "vers": "base-lois",
+   "quoi": "Articles, références et vecteurs",
+   "verbe": "remplit"
+  }
+ ]
+}

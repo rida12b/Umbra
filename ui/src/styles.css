@@ -26,6 +26,11 @@
   --u-danger: #b3261e;
   --u-code: #f1f3f6;
   --u-dot: rgba(28, 32, 39, 0.07);
+  /* The kind of a part on the factory floor: a stripe and an icon, never the lit colour. */
+  --u-kind-person: #2f7d4a;
+  --u-kind-room: #2f5fb3;
+  --u-kind-store: #1f7a72;
+  --u-kind-outside: #5b6472;
   color-scheme: light;
 }
 
@@ -47,6 +52,10 @@
   --u-danger: #f2a39b;
   --u-code: #16191e;
   --u-dot: rgba(255, 255, 255, 0.045);
+  --u-kind-person: #7fb98a;
+  --u-kind-room: #7aa2f7;
+  --u-kind-store: #5eb8b0;
+  --u-kind-outside: #9aa3b2;
   color-scheme: dark;
 }
 
@@ -69,6 +78,10 @@
   --color-ok: var(--u-ok);
   --color-danger: var(--u-danger);
   --color-code: var(--u-code);
+  --color-kind-person: var(--u-kind-person);
+  --color-kind-room: var(--u-kind-room);
+  --color-kind-store: var(--u-kind-store);
+  --color-kind-outside: var(--u-kind-outside);
 }
 
 @layer base {

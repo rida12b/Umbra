@@ -125,7 +125,7 @@ export interface ArchBlock {
   role: string;
   en_bref?: string; // a few plain words for the diagram (models studied before v1.4 have none)
   importance?: "coeur" | "secondaire" | "ancien"; // v1.5: the home shows the core only
-  zone?: "utilise" | "recoit" | "traite" | "range" | "exterieur" | ""; // v1.6: its column on the map
+  zone?: "utilise" | "recoit" | "traite" | "range" | "exterieur" | ""; // v1.6, no longer drawn: the factory floor places parts by the data (ADR-0006)
   entre?: string[]; // v1.6: what comes in, in plain words
   sort?: string[]; // v1.6: what goes out
   techno: string;

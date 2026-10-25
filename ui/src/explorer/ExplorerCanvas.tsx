@@ -3,23 +3,20 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { placeArchitecture, textWidth, type Placed } from "../arch/archLayout";
 import type { Theme } from "../theme";
 import { StateMessage } from "../ui";
-import { ZONE_TITLE, ZONES, type Box, type Level } from "./levels";
+import type { Box, Level } from "./levels";
 import {
   ArrowEdge,
   ArrowHeads,
   BOX_HEIGHT,
   BOX_WIDTH,
   BoxNode,
-  ZoneNode,
   type ArrowFlowEdge,
   type BoxFlowNode,
   type Look,
-  type ZoneFlowNode,
 } from "./mapParts";
-import { placeRows, ROW_TITLE_WIDTH, type RowLabel } from "./rowLayout";
 import type { StepOnMap } from "./track";
 
-const nodeTypes = { box: BoxNode, zone: ZoneNode };
+const nodeTypes = { box: BoxNode };
 const edgeTypes = { arrow: ArrowEdge };
 const READABLE_ZOOM = 0.75; // below this, the boxes' words are too small to read
 const LARGEST_FIT = 1.1; // a small level is not blown up past this
@@ -42,13 +39,11 @@ interface Props {
   onEnter: (box: Box) => void;
 }
 
-type AnyNode = BoxFlowNode | ZoneFlowNode;
-
 /**
  * The whole level on screen when it fits at a readable size; otherwise its full width, from the top,
  * read by scrolling down (like a page). Never blown up past LARGEST_FIT.
  */
-function frame(flow: ReactFlowInstance<AnyNode, ArrowFlowEdge>, size: { width: number; height: number }, screen: HTMLElement | null): boolean {
+function frame(flow: ReactFlowInstance<BoxFlowNode, ArrowFlowEdge>, size: { width: number; height: number }, screen: HTMLElement | null): boolean {
   const width = screen?.clientWidth ?? 1000;
   const height = screen?.clientHeight ?? 700;
   const across = (width - 2 * MARGIN - CONTROLS) / Math.max(size.width, 1); // the zoom buttons sit top right
@@ -62,18 +57,18 @@ function frame(flow: ReactFlowInstance<AnyNode, ArrowFlowEdge>, size: { width: n
   return size.height * zoom + MARGIN > height; // the bottom of the map is out of sight
 }
 
-/** One level of the explorer: boxes in their zones, arrows between them, the played step moving. */
+/** One level below the floor: boxes placed by ELK, arrows between them, the played step moving. */
 export function ExplorerCanvas({ level, theme, selected, play, onSelect, onEnter }: Props) {
-  const [layout, setLayout] = useState<{ shape: string; key: string; placed: Drawing } | null>(null);
+  const [layout, setLayout] = useState<{ shape: string; key: string; placed: Placed } | null>(null);
   const [failed, setFailed] = useState(false);
   const [hovered, setHovered] = useState<string | null>(null);
   const screen = useRef<HTMLDivElement>(null);
   const [below, setBelow] = useState(false); // part of the map is under the screen: say so
-  const flowRef = useRef<ReactFlowInstance<AnyNode, ArrowFlowEdge> | null>(null);
+  const flowRef = useRef<ReactFlowInstance<BoxFlowNode, ArrowFlowEdge> | null>(null);
   const [framed, setFramed] = useState(0); // counts framings: the step is followed after the first one
   // A live refresh rebuilds the level; only a change of its boxes or arrows is laid out again.
   const shape = useMemo(
-    () => JSON.stringify([level.key, level.boxes.map((b) => [b.id, b.zone]), level.links.map((l) => [l.id, l.verb, l.full])]),
+    () => JSON.stringify([level.key, level.boxes.map((b) => b.id), level.links.map((l) => [l.id, l.verb, l.full])]),
     [level],
   );
   // The previous drawing of the same level stays on screen (and its zoom) until the new one arrives.
@@ -105,19 +100,11 @@ export function ExplorerCanvas({ level, theme, selected, play, onSelect, onEnter
     let current = true;
     setFailed(false);
     const arrows = level.links.map((link) => ({ key: link.id, source: link.from, target: link.to }));
-    const drawing: Promise<Drawing> = level.zoned
-      ? Promise.resolve(
-          placeRows(
-            level.boxes.map((box) => ({ id: box.id, row: box.zone ? ZONES.indexOf(box.zone) : 0 })),
-            arrows,
-            { width: BOX_WIDTH, height: BOX_HEIGHT },
-          ),
-        )
-      : placeArchitecture(
-          level.boxes.map((box) => ({ id: box.id, width: BOX_WIDTH, height: BOX_HEIGHT })),
-          // Room for each arrow's words between the columns, so they never sit on a box.
-          arrows.map((arrow, i) => ({ ...arrow, labels: [{ width: textWidth(wordsOf(level.links[i]), 8) + 24, height: 26 }] })),
-        );
+    const drawing: Promise<Placed> = placeArchitecture(
+      level.boxes.map((box) => ({ id: box.id, width: BOX_WIDTH, height: BOX_HEIGHT })),
+      // Room for each arrow's words between the columns, so they never sit on a box.
+      arrows.map((arrow, i) => ({ ...arrow, labels: [{ width: textWidth(wordsOf(level.links[i]), 8) + 24, height: 26 }] })),
+    );
     drawing
       .then((found) => current && setLayout({ shape, key: level.key, placed: found }))
       .catch(() => current && setFailed(true));
@@ -128,32 +115,14 @@ export function ExplorerCanvas({ level, theme, selected, play, onSelect, onEnter
 
   const lookOf = (box: Box): Look => (play ? (play.step.boxes.includes(box.id) ? "lit" : play.boxes.has(box.id) ? "normal" : "dim") : "normal");
 
-  const nodes: AnyNode[] = useMemo(() => {
+  const nodes: BoxFlowNode[] = useMemo(() => {
     if (!placed) return [];
-    const boxes: AnyNode[] = level.boxes.flatMap((box) => {
+    return level.boxes.flatMap((box) => {
       const position = placed.boxes.get(box.id);
       if (!position) return [];
-      const data = { box, look: lookOf(box), selected: box.id === selected, vertical: level.zoned, onSelect, onEnter };
+      const data = { box, look: lookOf(box), selected: box.id === selected, onSelect, onEnter };
       return [{ id: box.id, type: "box" as const, position, data }];
     });
-    if (!level.zoned) return boxes;
-    // Each zone's title, left of its row.
-    const zones: AnyNode[] = (placed.rows ?? []).flatMap(({ row, y, height }) => {
-      const zone = ZONES[row];
-      if (!zone) return [];
-      return [
-        {
-          id: `zone:${zone}`,
-          type: "zone" as const,
-          position: { x: 0, y },
-          data: { title: ZONE_TITLE[zone], width: ROW_TITLE_WIDTH - 24, height },
-          selectable: false,
-          draggable: false,
-          focusable: false,
-        },
-      ];
-    });
-    return [...zones, ...boxes];
   }, [placed, level, selected, play, onSelect, onEnter]); // lookOf reads `play`
 
   const edges: ArrowFlowEdge[] = useMemo(() => {
@@ -168,14 +137,14 @@ export function ExplorerCanvas({ level, theme, selected, play, onSelect, onEnter
       const touched = focus !== null && (link.from === focus || link.to === focus);
       const always = level.links.length <= FEW_LINKS && !play; // few arrows: their words never crowd
       const label = moving || touched || always ? wordsOf(link) : null;
-      const data = { points: route.points, label, labelAt: placed.labels?.get(link.id) ?? null, look, moving };
+      const data = { points: route.points, label, look, moving };
       return [{ id: link.id, type: "arrow" as const, source: link.from, target: link.to, data }];
     });
     // A played step between two boxes the level has no arrow for: drawn for the time of the step.
     const step = play?.step;
     const [from, to] = step?.boxes ?? [];
     if (step?.arrow && !step.link && from && to)
-      arrows.push({ id: "step", type: "arrow", source: from, target: to, data: { points: null, label: step.words, labelAt: null, look: "lit", moving: true } });
+      arrows.push({ id: "step", type: "arrow", source: from, target: to, data: { points: null, label: step.words, look: "lit", moving: true } });
     return arrows;
   }, [placed, level, hovered, selected, play]);
 
@@ -221,8 +190,6 @@ export function ExplorerCanvas({ level, theme, selected, play, onSelect, onEnter
   );
 }
 
-/** A drawing of a level: ELK's, or the rows of a zoned level with their titles and the arrows' words placed. */
-type Drawing = Placed & { labels?: Map<string, RowLabel>; rows?: { row: number; y: number; height: number }[] };
 
 /** An arrow's words: its verb, or (models without verbs) its description, cut. */
 function wordsOf(link: { verb: string; full: string } | undefined): string {

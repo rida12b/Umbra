@@ -36,11 +36,13 @@ MODEL = {
         {"id": "web", "nom": "Site web", "type": "frontend", "role": "Envoie la commande.", "code": ["web"]},
         {"id": "api", "nom": "API commandes", "type": "backend", "role": "Valide et enregistre.", "code": ["api/app"]},
         {"id": "db", "nom": "Base PostgreSQL", "type": "database", "role": "Garde les commandes.", "code": []},
+        {"id": "docs", "nom": "Guide du projet", "type": "docs", "role": "Explique comment lancer la boutique.", "code": []},
     ],
     "flux": [
         {"de": "user", "vers": "web", "quoi": "clic sur Commander"},
         {"de": "web", "vers": "api", "quoi": "POST /orders"},
         {"de": "api", "vers": "db", "quoi": "INSERT commande"},
+        {"de": "docs", "vers": "api", "quoi": "décrit l'API", "verbe": "décrit"},
     ],
     "composants": [
         {"id": "orders", "nom": "Commandes", "bloc": "api", "role": "Crée les commandes.",

@@ -1,6 +1,6 @@
 import type { Journey, ProjectModel } from "../api";
 import { stepActors, stepLabel } from "../arch/story";
-import { zoneOf, type Level, type Target } from "./levels";
+import type { Level, Target } from "./levels";
 
 /** Where one step of a journey shows on the current level. */
 export interface StepOnMap {
@@ -19,19 +19,12 @@ export function trackJourney(model: ProjectModel, journey: Journey, level: Level
   const boxOf = (kind: Target["kind"], id?: string) =>
     level.boxes.find((b) => b.target.kind === kind && (id === undefined || ("id" in b.target && b.target.id === id)))?.id ?? null;
   const componentBlock = new Map(model.composants.map((c) => [c.id, c.bloc]));
-  // A grouped part shows as the group of its zone.
-  const groupOf = (blockId: string) => {
-    const block = model.blocs.find((b) => b.id === blockId);
-    return block ? (level.boxes.find((b) => b.target.kind === "around" && b.zone === zoneOf(block))?.id ?? null) : null;
-  };
   const atThisLevel = (blockId: string, componentId: string | null): string | null =>
     (componentId ? boxOf("component", componentId) : null) ?? // inside the part being looked at
-    boxOf("block", blockId) ??
-    boxOf("system") ??
-    groupOf(blockId);
+    boxOf("block", blockId);
 
   const last = journey.etapes.length - 1;
-  const zoneOfBlock = new Map(model.blocs.map((b) => [b.id, zoneOf(b)]));
+  const person = new Set(model.blocs.filter((b) => b.type === "user" || b.type === "device").map((b) => b.id));
   return journey.etapes.map((step, index) => {
     const [doer, target] = stepActors(model, step);
     // The step's component belongs to one of the two (the target when the step is done by hand).
@@ -42,7 +35,7 @@ export function trackJourney(model: ProjectModel, journey: Journey, level: Level
     const boxes = [...new Set([from, to, ...also].filter((id): id is string => id !== null))];
     // Mid-path, a step that « reaches » the person who asked is working on their request (checking
     // it, reading their history): the answer only travels back to them at the end.
-    const arrow = !(target && zoneOfBlock.get(target.id) === "utilise" && !step.manuel && index < last);
+    const arrow = !(target && person.has(target.id) && !step.manuel && index < last);
     const link =
       arrow && from && to && from !== to
         ? (level.links.find((l) => l.from === from && l.to === to)?.id ?? null) // an answer going back gets its own arrow
