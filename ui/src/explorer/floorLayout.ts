@@ -74,8 +74,12 @@ export function placeFloor(floor: Floor, available: number, machines: Record<str
     if (!col) continue;
     // Above: a person, or a part that sends to its room (the mockup's installer who starts it, V8). Below: what the room
     // calls (a service, a store), so a second belt line is not pushed down by everything the first one uses.
-    const sends = floor.links.some((l) => l.from === item.id && l.to === item.attach);
-    const side = item.role === "side" && (item.shape === "person" || sends) ? above : below;
+    // A part starts the exchange when it controls its room (start-up), or sends to it with nothing coming back: a called
+    // service that also answers (« répond à ») is still called, so it stays below.
+    const toRoom = floor.links.filter((l) => l.from === item.id && l.to === item.attach);
+    const answered = floor.links.some((l) => l.from === item.attach && l.to === item.id);
+    const starts = toRoom.some((l) => l.style === "control") || (toRoom.length > 0 && !answered);
+    const side = item.role === "side" && (item.shape === "person" || starts) ? above : below;
     side.set(col, [...(side.get(col) ?? []), item.id]);
   }
 
@@ -134,7 +138,9 @@ export function placeFloor(floor: Floor, available: number, machines: Record<str
     if (sameLine(link.from, link.to)) return [{ link, points: [{ x: a.x + a.w, y }, { x: b.x, y }], label: { x: (a.x + a.w + b.x) / 2, y: y - 30 } }];
     // Like a line of text: out to the right, down, back left between the lines, into the next line's first room.
     const gap = gapBelow.get(link.from) ?? a.y + a.h + LINE_GAP / 2;
-    const lane = a.x + a.w + 20;
+    // Right of the room and of what hangs below it (a 280 px tag is wider than a store): the lane never crosses a card.
+    const hung = (below.get(link.from) ?? []).map((id) => rects.get(id)!).filter(Boolean);
+    const lane = Math.max(a.x + a.w, ...hung.map((r) => r.x + r.w)) + 20;
     const into = b.y + b.h / 2;
     const points = [{ x: a.x + a.w, y }, { x: lane, y }, { x: lane, y: gap }, { x: -18, y: gap }, { x: -18, y: into }, { x: b.x, y: into }];
     return [{ link, points, label: { x: Math.min(lane, available) / 2, y: gap - 14 } }];
