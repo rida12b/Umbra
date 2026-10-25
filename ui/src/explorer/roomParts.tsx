@@ -94,7 +94,7 @@ export function ChuteCard({ chute, rect }: { chute: Chute; rect: Rect }) {
   );
 }
 
-export function HungTag({ name, steps, rect, onSelect, id }: { name: string; steps: number[]; rect: Rect; id: string; onSelect: (id: string) => void }) {
+export function HungTag({ name, verb, steps, rect, onSelect, id }: { name: string; verb: string | null; steps: number[]; rect: Rect; id: string; onSelect: (id: string) => void }) {
   return (
     <button
       type="button"
@@ -110,7 +110,7 @@ export function HungTag({ name, steps, rect, onSelect, id }: { name: string; ste
       <Search size={13} className="mt-0.5 shrink-0 text-kind-outside" aria-hidden="true" />
       <span className="min-w-0">
         <span className="line-clamp-1 font-medium text-ink">{name}</span>
-        <span className="block truncate text-faint">{steps.length > 1 ? "étapes" : "étape"} {steps.join(", ")} · va y chercher</span>
+        <span className="block truncate text-faint">{steps.length > 1 ? "étapes" : "étape"} {steps.join(", ")} · {verb || "va y chercher"}</span>
       </span>
     </button>
   );

@@ -8,7 +8,7 @@ import { placeRoom, type Rect } from "./roomLayout.ts";
 const load = (name: string): ProjectModel =>
   JSON.parse(readFileSync(new URL(`../../test-fixtures/${name}.json`, import.meta.url), "utf-8")) as ProjectModel;
 const overlap = (a: Rect, b: Rect) => a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
-const rooms = [["watchdog", "api"], ["watchdog", "memoire"], ["watchdog-v17", "api"], ["watchdog-v17", "memoire"], ["justicia", "site"], ["justicia", "api"], ["justicia", "courriers"], ["justicia", "outillage"]] as const;
+const rooms = [["watchdog", "api"], ["watchdog", "memoire"], ["watchdog-v17", "api"], ["watchdog-v17", "memoire"], ["fastapi-template", "web"], ["fastapi-template", "api"], ["justicia", "site"], ["justicia", "api"], ["justicia", "courriers"], ["justicia", "outillage"]] as const;
 
 for (const [name, bloc] of rooms)
   for (const width of [460, 790, 990, 1400])

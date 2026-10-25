@@ -56,7 +56,9 @@ export function styledLinks(model: ProjectModel, position: (id: string) => numbe
     seen.add(id);
     const verb = flow.verbe ?? "";
     const back = model.flux.some((f) => f.de === flow.vers && f.vers === flow.de) && position(flow.vers) < position(flow.de);
-    const style: LinkStyle = back ? "reply" : READ.test(verb) ? "lookup" : CONTROL.test(verb) ? "control" : "data";
+    // The model's own word first (v1.7 `nature`); the verb is only a guess for older models.
+    const control = flow.nature ? flow.nature === "controle" : CONTROL.test(verb);
+    const style: LinkStyle = back ? "reply" : control ? "control" : READ.test(verb) ? "lookup" : "data";
     return [{ id, from: flow.de, to: flow.vers, verb, full: flow.quoi, style }];
   });
 }

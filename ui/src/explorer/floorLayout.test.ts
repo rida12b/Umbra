@@ -9,8 +9,8 @@ const load = (name: string): ProjectModel =>
   JSON.parse(readFileSync(new URL(`../../test-fixtures/${name}.json`, import.meta.url), "utf-8")) as ProjectModel;
 const overlap = (a: Rect, b: Rect) => a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
 
-for (const name of ["watchdog", "justicia"])
-  for (const width of [1040, 880, 1400])
+for (const name of ["watchdog", "justicia", "fastapi-template"])
+  for (const width of [974, 880, 1400])
     test(`${name} at ${width} px: every part placed, nothing overlaps, no sideways scroll`, () => {
       const floor = buildFloor(load(name));
       const plan = placeFloor(floor, width);
@@ -77,4 +77,16 @@ test("every room after ENTRÉE has a drawn belt segment coming in, with its word
         assert.ok(incoming && incoming.label && incoming.link.verb, `${name}@${width}: nothing feeds ${id}`);
       }
     }
+});
+
+test("what a room calls hangs below it, a person who starts it above; a store keeps its own height (an unrelated project)", () => {
+  const floor = buildFloor(load("fastapi-template"));
+  const plan = placeFloor(floor, 974, { web: 3, api: 6 });
+  const api = plan.rects.get("api")!;
+  for (const called of ["sentry", "smtp"]) assert.ok(plan.rects.get(called)!.y > api.y + api.h, `${called} is not below the server`);
+  const db = plan.rects.get("db")!;
+  assert.ok(db.h <= 190, `store stretched to ${db.h}`);
+  assert.equal(db.y + db.h / 2, api.y + api.h / 2); // centred on the belt
+  const toStore = plan.belt.find((r) => r.link.to === "db")!;
+  assert.equal(toStore.points.length, 2, "the belt into a centred store must stay one straight segment");
 });

@@ -95,9 +95,13 @@ export function buildRoom(model: ProjectModel, bloc: string): Room | null {
   };
   const onBelt = components.filter((c) => !wiring.includes(c)).sort((a, b) => firstSeen(a.id) - firstSeen(b.id));
 
-  const doors = roomDoors(model, bloc, steps, owner);
-  const doorBlocs = new Set(doors.map((d) => d.bloc));
   const floor = buildFloor(model);
+  // The journey's way out (where the data ends) is always a door, never a thing a machine only searches.
+  const entry = journey?.entree ?? floor.entree;
+  const exits = new Set(journey?.sortie?.length ? journey.sortie : floor.sortie?.kind === "store" ? [floor.sortie.id] : []);
+  exits.delete(bloc);
+  const doors = roomDoors(model, bloc, steps, owner, exits);
+  const doorBlocs = new Set(doors.map((d) => d.bloc));
   const aside = new Set(floor.strip);
   const { placed, unplaced } = placeChutes(model, journey);
 
@@ -127,8 +131,6 @@ export function buildRoom(model: ProjectModel, bloc: string): Room | null {
     .filter((j) => j !== journey && j.etapes.some((s) => owner(s) === bloc))
     .flatMap((j) => (j.branches ?? []).map((b) => ({ ...b, journey: j.id })));
   // A door's role: the journey's declared way in and out, else the floor's entry and exit.
-  const entry = journey?.entree ?? floor.entree;
-  const exits = new Set(journey?.sortie?.length ? journey.sortie : floor.sortie?.kind === "store" ? [floor.sortie.id] : []);
   for (const door of doors) door.role = door.side === "left" && door.bloc === entry ? "entree" : door.side === "right" && exits.has(door.bloc) ? "sortie" : null;
   return { bloc, journey, belt, band: wiring.map((c) => c.id), doors, reply: replyOf(doors, belt, floor.links, bloc), unplaced, elsewhere };
 }
@@ -137,7 +139,8 @@ export function buildRoom(model: ProjectModel, bloc: string): Room | null {
 function replyOf(doors: Door[], belt: Machine[], links: { from: string; to: string; verb: string; full: string }[], bloc: string): Reply | null {
   for (const door of doors.filter((d) => d.side === "left")) {
     const back = door.crossings.filter((c) => c.dir === "out").at(-1);
-    const machine = back && belt.find((m) => m.nom === back.machine);
+    // The crossing names the machine on the far side when the step happens there: the answer leaves from the step before.
+    const machine = back && (belt.find((m) => m.nom === back.machine) ?? belt.find((m) => m.steps.includes(back.step - 1)));
     if (!back || !machine) continue;
     const link = links.find((l) => l.from === bloc && l.to === door.bloc);
     return { door: door.bloc, machine: machine.id, step: back.step, verb: link?.verb || "répond à", words: link?.full ?? "" };
@@ -162,7 +165,7 @@ function placeChutes(model: ProjectModel, journey: Journey | null) {
  * parts that send data in. Each lists the steps that cross it. Start-up and checks (control flows) and
  * things that never run are not doors; what a machine only searches hangs under it instead.
  */
-function roomDoors(model: ProjectModel, bloc: string, steps: JourneyStep[], owner: (s: JourneyStep) => string | null): Door[] {
+function roomDoors(model: ProjectModel, bloc: string, steps: JourneyStep[], owner: (s: JourneyStep) => string | null, exits: Set<string>): Door[] {
   const floor = buildFloor(model);
   const aside = new Set(floor.strip);
   const links = floor.links.filter((l) => l.style !== "control" && !aside.has(l.from) && !aside.has(l.to));
@@ -196,7 +199,11 @@ function roomDoors(model: ProjectModel, bloc: string, steps: JourneyStep[], owne
   // Parts it sends data to that no step only touches (those hang under the machine): doors on the right.
   const touched = new Set(steps.flatMap((s) => (owner(s) === bloc ? s.touche : [])));
   for (const link of links)
-    if (link.from === bloc && link.style !== "reply" && !doors.has(link.to) && !touched.has(link.to)) door(link.to, "right");
+    if (link.from === bloc && link.style !== "reply" && !doors.has(link.to) && (!touched.has(link.to) || exits.has(link.to))) {
+      const d = door(link.to, "right");
+      // The way out, reached by touching it: each step here that touches it crosses this door.
+      if (exits.has(link.to)) steps.forEach((s, i) => owner(s) === bloc && s.touche.includes(link.to) && d.crossings.push({ step: i + 1, dir: "out", machine: machine(s) }));
+    }
   const first = (d: Door) => d.crossings[0]?.step ?? Number.MAX_SAFE_INTEGER;
   const order = (d: Door) => model.blocs.findIndex((b) => b.id === d.bloc);
   return [...doors.values()].sort((a, b) => (a.side === b.side ? first(a) - first(b) || order(a) - order(b) : a.side === "left" ? -1 : 1));

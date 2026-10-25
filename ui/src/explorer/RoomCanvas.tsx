@@ -181,7 +181,7 @@ export function RoomCanvas({ model, room, enterable, selected, play, onSelect, o
             ))}
             {room.belt.flatMap((machine) => machine.chutes.map((chute, k) => <ChuteCard key={`${machine.id}:${k}`} chute={chute} rect={plan.rects.get(`chute:${machine.id}:${k}`)!} />))}
             {room.belt.flatMap((machine) =>
-              machine.hung.map((h) => <HungTag key={`${machine.id}:${h.bloc}`} id={h.bloc} name={name(h.bloc)} steps={h.steps} rect={plan.rects.get(`hung:${machine.id}:${h.bloc}`)!} onSelect={onSelect} />),
+              machine.hung.map((h) => <HungTag key={`${machine.id}:${h.bloc}`} id={h.bloc} name={name(h.bloc)} verb={floor.links.find((l) => l.from === room.bloc && l.to === h.bloc)?.verb ?? null} steps={h.steps} rect={plan.rects.get(`hung:${machine.id}:${h.bloc}`)!} onSelect={onSelect} />),
             )}
           </div>
         </div>
