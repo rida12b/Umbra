@@ -8,13 +8,7 @@ import { FloorHeader } from "./FloorHeader";
 import { FloorPiece, type Look } from "./floorParts";
 import type { Box, Level } from "./levels";
 import { buildRoom } from "./room";
-
-// Where the reader was on the floor before entering a room: Échap brings them back there, focus on that room.
-const remembered: { model: ProjectModel | null; top: number; entered: string | null } = { model: null, top: 0, entered: null };
-/** Going from room to room by a door: Échap then focuses the room the reader is in, not the first one entered. */
-export function rememberRoom(bloc: string) {
-  if (remembered.model) remembered.entered = bloc;
-}
+import { enteredRoom, takeReturn } from "./roomMemory";
 
 const PAD = 24; // around the floor; also room for the ENTRÉE badge and the wrap lane on the left
 
@@ -48,14 +42,14 @@ export function FloorCanvas({ model, floor, level, selected, play, onSelect, onE
   const plan = useMemo(() => placeFloor(floor, Math.max(width - 2 * PAD, 240), counts, settings.length > 0), [floor, width, counts, settings.length]);
   useLayoutEffect(() => {
     const el = screen.current;
-    if (!el || remembered.model !== model) return;
-    el.scrollTop = remembered.top;
-    const card = remembered.entered && el.querySelector<HTMLElement>(`[data-floor-id="${CSS.escape(remembered.entered)}"] button`);
+    const back = el && takeReturn(model);
+    if (!el || !back) return;
+    el.scrollTop = back.top;
+    const card = back.entered && el.querySelector<HTMLElement>(`[data-floor-id="${CSS.escape(back.entered)}"] button`);
     if (card) card.focus({ preventScroll: true });
-    remembered.model = null;
   }, [model, plan]);
   const enter = (box: Box) => {
-    Object.assign(remembered, { model, top: screen.current?.scrollTop ?? 0, entered: box.id });
+    enteredRoom(model, box.id, screen.current?.scrollTop ?? 0);
     onEnter(box);
   };
   const boxes = new Map(level.boxes.map((b) => [b.id, b]));
@@ -110,12 +104,12 @@ export function FloorCanvas({ model, floor, level, selected, play, onSelect, onE
             return (
               <div key={`label-${link.id}`} aria-hidden="true">
                 {link.verb && (
-                  <span className="fl-chip w-[118px]" style={{ left: label.x, top: points.length > 2 ? label.y : y - 30 }}>
+                  <span className="fl-chip w-[112px]" style={{ left: label.x, top: points.length > 2 ? label.y : y - 30 }}>
                     {link.verb}
                   </span>
                 )}
                 {carried && points.length === 2 && (
-                  <span className="fl-chip data w-[118px] text-[11.5px]" style={{ left: label.x, top: y + 34 }}>
+                  <span className="fl-chip data w-[112px] text-[11.5px]" style={{ left: label.x, top: y + 34 }}>
                     « {carried} »
                   </span>
                 )}

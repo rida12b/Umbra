@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { Fragment, useState } from "react";
 import type { Cited } from "../api";
 import { EvidenceItem } from "../panel/EvidenceItem";
 
@@ -25,13 +25,26 @@ export function CitedCode({ projectId, cited, open: openAtFirst = false }: { pro
   return (
     <button
       type="button"
-      className="mt-1 block max-w-full text-left font-mono text-[12px] break-all text-fl-service hover:underline" // blue and whole, as in mockup B (V45)
+      className="mt-1 block max-w-full text-left font-mono text-[12px] text-fl-service hover:underline" // blue and whole, as in mockup B (V45)
       onClick={(event) => {
         event.stopPropagation();
         setOpen(true);
       }}
     >
-      {where}
+      {/* The path breaks after a « / » (anywhere only if a name is too long), the line numbers never (V45). */}
+      <span className="[overflow-wrap:anywhere]">
+        {cited.fichier.split("/").map((part, i, all) => (
+          <Fragment key={i}>
+            {part}
+            {i < all.length - 1 && (
+              <>
+                /<wbr />
+              </>
+            )}
+          </Fragment>
+        ))}
+      </span>
+      <span className="whitespace-nowrap">:{cited.lignes[0]}–{cited.lignes[1]}</span>
     </button>
   );
 }

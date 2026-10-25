@@ -59,14 +59,18 @@ export function FloorPiece(props: PieceProps) {
           {badge === "entree" ? "▶ ENTRÉE" : "SORTIE ■"}
         </span>
       )}
-      <button type="button" aria-pressed={selected} className="flex min-h-0 shrink-0 flex-col gap-1 text-left">
+      <button type="button" aria-pressed={selected} className="flex min-h-0 shrink-0 items-center gap-2.5 text-left">
         <span className="sr-only">{badge === "entree" ? "Entrée : " : badge === "sortie" ? "Sortie : " : ""}</span>
-        <span className="flex items-start gap-2">
-          {(person || tag) && <Icon size={person ? 26 : 16} strokeWidth={person ? 1.6 : 2} className={`mt-0.5 shrink-0 ${person ? "text-fl-person" : "text-faint"}`} aria-hidden="true" />}
+        {/* The mockup's side card (V8): the glyph centred on the left, name and words stacked to its right. Strip tags have none (V18). */}
+        {(person || (tag && shape !== "tool")) && (
+          <Icon size={person ? 26 : 16} strokeWidth={person ? 1.6 : 2} className={`shrink-0 ${person ? "text-fl-person" : "text-faint"}`} aria-hidden="true" />
+        )}
+        <span className="flex min-w-0 flex-col gap-0.5">
           <span className={`font-semibold leading-tight text-ink ${tag ? "line-clamp-2 text-[14px]" : "line-clamp-3 text-[15px]"}`}>{box.title}</span>
+          <span className="sr-only"> ({KIND_NAME[shape]}) </span>
+          <span className="line-clamp-2 text-[12.5px] leading-snug text-muted">{box.words}</span>
+          {relation && <span className="line-clamp-2 text-[11.5px] leading-snug text-faint">{relation}</span>}
         </span>
-        <span className="sr-only"> ({KIND_NAME[shape]}) </span>
-        <span className={`line-clamp-2 text-[12.5px] leading-snug ${relation ? "text-ink/80 italic" : "text-muted"}`}>{relation ?? box.words}</span>
       </button>
       {!tag && kindLine && <span className="text-[11px] text-faint">{kindLine}</span>}
       {!tag && preview.length > 0 && (

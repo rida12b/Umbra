@@ -18,7 +18,9 @@ if (!designDir || !base || !code || !outDir) {
 const pairs = JSON.parse(readFileSync(join(designDir, "pairs.json"), "utf-8"));
 mkdirSync(outDir, { recursive: true });
 
-const browser = await chromium.launch();
+// Show the scrollbars, as Chrome on Windows does and as the refs were shot: Playwright hides them by default,
+// and a 17 px scrollbar is enough to wrap a layout that fits without it.
+const browser = await chromium.launch({ ignoreDefaultArgs: ["--hide-scrollbars"] });
 const page = await browser.newPage({ viewport: { width: 1440, height: 900 }, colorScheme: "dark" });
 await page.goto(`${base}/#login=${code}`);
 await page.waitForURL(/#\/$/);

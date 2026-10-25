@@ -30,11 +30,11 @@ export interface FloorPlan {
 }
 
 // Widths by kind, as in the mockup: a person at the entry is narrow, a working room lists its machines.
-const WIDTH = { person: 180, room: 280, store: 230, outside: 200, tool: 200 } as const;
+const WIDTH = { person: 180, room: 280, store: 220, outside: 190, tool: 190 } as const;
 const HEIGHT = 190; // a belt line; a room listing many machines makes its line taller (roomHeight)
 const TAG = { w: 230, h: 96 }; // a 2-line name and a 2-line link to its room
-const SIDE_W = 280; // a person or supplier hung on a room: one-line name, as wide as the mockup's (V8)
-const GAP = 130; // between two rooms: the action words above the belt, the data words below it
+const SIDE = { w: 280, h: 84 }; // a person or supplier hung on a room: as wide and low as the mockup's card (V8)
+const GAP = 120; // between two rooms: the action words above the belt, the data words below it (112 px chips)
 const STACK = 44; // between a room and its tags, and between two tags: room for the reply line and a short verb
 const LINE_GAP = 52; // between two lines of the belt
 const BAND = 44; // band titles and margins
@@ -83,21 +83,21 @@ export function placeFloor(floor: Floor, available: number, machines: Record<str
   lines.forEach((line, n) => {
     const up = Math.max(0, ...line.map((id) => above.get(id)?.length ?? 0));
     const down = Math.max(0, ...line.map((id) => below.get(id)?.length ?? 0));
-    const beltY = y + up * (TAG.h + STACK);
+    const beltY = y + up * (SIDE.h + STACK);
     const h = Math.max(...line.map(roomHeight));
     let x = 0;
     line.forEach((id) => {
       const w = widthOf(id);
       rects.set(id, { x, y: beltY, w, h });
       // Tags are centred on their room, never wider than the room and its two half-gaps.
-      const tw = Math.min(SIDE_W, w + GAP - 16);
+      const tw = Math.min(SIDE.w, w + GAP - 16);
       const tx = x + (w - tw) / 2;
-      (above.get(id) ?? []).forEach((tag, k) => rects.set(tag, { x: tx, y: beltY - (k + 1) * (TAG.h + STACK), w: tw, h: TAG.h }));
-      (below.get(id) ?? []).forEach((tag, k) => rects.set(tag, { x: tx, y: beltY + h + STACK + 40 + k * (TAG.h + STACK), w: tw, h: TAG.h }));
+      (above.get(id) ?? []).forEach((tag, k) => rects.set(tag, { x: tx, y: beltY - (k + 1) * (SIDE.h + STACK), w: tw, h: SIDE.h }));
+      (below.get(id) ?? []).forEach((tag, k) => rects.set(tag, { x: tx, y: beltY + h + STACK + 40 + k * (SIDE.h + STACK), w: tw, h: SIDE.h }));
       width = Math.max(width, x + w + LANE * 2);
       x += w + GAP;
     });
-    y = beltY + h + down * (TAG.h + STACK) + (down ? 40 : 70) + LINE_GAP; // room for the reply path and its words
+    y = beltY + h + down * (SIDE.h + STACK) + (down ? 40 : 70) + LINE_GAP; // room for the reply path and its words
     const last = line.at(-1);
     if (last && n < lines.length - 1) gapBelow.set(last, y - LINE_GAP / 2);
   });
@@ -108,8 +108,10 @@ export function placeFloor(floor: Floor, available: number, machines: Record<str
     const top = y + BAND;
     ids.forEach((id, i) => rects.set(id, { x: (i % perRow) * (TAG.w + 16), y: top + Math.floor(i / perRow) * (TAG.h + 16), w: TAG.w, h: TAG.h }));
     const rowsUsed = Math.ceil(ids.length / perRow);
-    const rect = { x: -12, y: y + 8, w: Math.min(ids.length, perRow) * (TAG.w + 16) + 8, h: BAND - 8 + rowsUsed * (TAG.h + 16) };
-    width = Math.max(width, rect.w);
+    const tags = Math.min(ids.length, perRow) * (TAG.w + 16) + 8;
+    // As wide as the floor (V18): the band's frame reaches into the padding, the floor's width does not grow for it.
+    const rect = { x: -12, y: y + 8, w: Math.max(width + 24, tags), h: BAND - 8 + rowsUsed * (TAG.h + 16) };
+    width = Math.max(width, tags);
     y = rect.y + rect.h + 16;
     return rect;
   };

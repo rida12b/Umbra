@@ -129,6 +129,7 @@
 .fl-machine.dim { opacity: .45; }
 .fl-io { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; border: 1px dashed var(--u-line); border-radius: 5px; padding: 1px 6px; font-size: 11px; line-height: 1.35; color: var(--u-muted); overflow: hidden; }
 .fl-io.out { text-align: right; }
+.fl-io.solid { border-style: solid; color: var(--u-ink); } /* a door's step (V36): a solid chip, the machine's in/out stay dashed */
 .fl-door { position: absolute; display: flex; flex-direction: column; gap: 6px; border-radius: 10px; border: 1.5px dashed var(--u-line); background: var(--u-bg); padding: 9px 10px; text-align: left; }
 .fl-door.in { border: 1.5px dotted var(--fl-person-line); background: var(--fl-person-bg); }
 .fl-door.out { border-color: var(--fl-store); background: var(--fl-store-bg); }

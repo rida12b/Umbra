@@ -40,10 +40,10 @@ test("a long belt wraps to a new line instead of growing sideways", () => {
   assert.ok(plan.belt.some((r) => r.points.length > 2));
 });
 
-test("Watchdog's three rooms fit one line at the mockup's width (1440 px: 1040 px canvas − scrollbar − padding ≈ 990 px)", () => {
+test("Watchdog's three rooms fit one line at the mockup's width (1440 px: 1039 px canvas − 17 px scrollbar − 2×24 px padding = 974 px)", () => {
   for (const name of ["watchdog", "watchdog-v17"]) {
     const floor = buildFloor(load(name));
-    assert.ok(placeFloor(floor, 990).belt.every((r) => r.points.length === 2), name);
+    assert.ok(placeFloor(floor, 970).belt.every((r) => r.points.length === 2), name);
   }
 });
 

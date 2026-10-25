@@ -152,8 +152,8 @@ export function Explorer({ project, route, theme, narrow }: Props) {
       />
     );
     body = narrow ? (
-      <div className="h-full overflow-y-auto">
-        <NarrowLevel level={level} selected={route.select ?? null} play={playState} onSelect={select} onEnter={enter} onOpenDoor={openDoor} />
+      <div key={level.room?.bloc ?? "level"} className="h-full overflow-y-auto">
+        <NarrowLevel model={model} level={level} selected={route.select ?? null} play={playState} onSelect={select} onEnter={enter} onOpenDoor={openDoor} />
         <section className="border-t border-line-soft" aria-label="Explication">
           {panel}
         </section>

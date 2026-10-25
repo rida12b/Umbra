@@ -101,6 +101,18 @@ test("a room opened in place: its machine in data order, the door data comes in 
   await expect(page.locator(".react-flow__edge.link-hypothesis")).toHaveCount(1); // create_order calls validate
 });
 
+test("on a phone, the keyboard follows: into the room's name, then back on the room after Échap", async ({ page, isMobile }) => {
+  test.skip(!isMobile, "the phone layout");
+  const project = await signIn(page);
+  await page.goto(`/#/p/${project}`);
+  await page.locator('[data-narrow-id="api"]').getByRole("button", { name: /Entrer dedans/ }).click();
+  await expect(page).toHaveURL(/node=x%3Apart%3Aapi/);
+  await expect(page.locator(":focus")).toHaveText("API commandes");
+  await page.keyboard.press("Escape");
+  await expect(page).toHaveURL(/node=x%3Aparts/);
+  await expect(page.locator('[data-narrow-id="api"] :focus')).toHaveCount(1);
+});
+
 test("old links open the parts with the path playing", async ({ page }) => {
   const project = await signIn(page);
   await page.goto(`/#/p/${project}?node=parcours%3A&journey=order&step=abc`);

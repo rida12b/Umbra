@@ -70,7 +70,7 @@ export function DoorCard({ door, name, person, rect, enterable, onOpen }: {
         {door.verb && ` — ${door.verb}`}
       </span>
       {crossings.slice(0, 3).map((c) => (
-        <span key={c.step} className="fl-io text-left" title={`étape ${c.step} : ${c.machine}`}>
+        <span key={c.step} className="fl-io solid text-left" title={`étape ${c.step} : ${c.machine}`}>
           {c.step} · {c.machine}
         </span>
       ))}

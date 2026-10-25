@@ -3,14 +3,15 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import type { ProjectModel } from "../api";
 import type { Play } from "./ExplorerCanvas";
 import { buildFloor } from "./floor";
-import { rememberRoom } from "./FloorCanvas";
 import { FloorHeader } from "./FloorHeader";
 import { Line, LineMarkers } from "./floorLines";
 import type { Room } from "./room";
 import { placeRoom, type Rect } from "./roomLayout";
+import { rememberRoom } from "./roomMemory";
 import { ChuteCard, DoorCard, HungTag, MachineCard, WiringBand } from "./roomParts";
 
 const PAD = 24;
+const BUTTON_STRIP = 56; // the « hors champ » button's height and margin at the bottom of the view
 const STILL = typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
 interface Props {
@@ -53,7 +54,8 @@ export function RoomCanvas({ model, room, enterable, selected, play, onSelect, o
     const view = el.getBoundingClientRect();
     return [...el.querySelectorAll<HTMLElement>("[data-room-item]")].filter((item) => {
       const box = item.getBoundingClientRect();
-      return box.bottom > view.bottom + 1 || box.right > view.right + 1; // below or right: the button only goes forward, never loops
+      // Below (or under the button's strip) or right: the button only goes forward, never loops, never hides an item.
+      return box.bottom > view.bottom - BUTTON_STRIP || box.right > view.right + 1;
     });
   }, []);
   useEffect(() => {
@@ -61,9 +63,11 @@ export function RoomCanvas({ model, room, enterable, selected, play, onSelect, o
     if (!el) return;
     const count = () => setHidden(outOfSight().length);
     count();
+    const late = window.setTimeout(count, 260); // after the room's opening animation (220 ms) has set the final sizes
     el.addEventListener("scroll", count, { passive: true });
     window.addEventListener("resize", count);
     return () => {
+      window.clearTimeout(late);
       el.removeEventListener("scroll", count);
       window.removeEventListener("resize", count);
     };
@@ -81,6 +85,12 @@ export function RoomCanvas({ model, room, enterable, selected, play, onSelect, o
     onOpenDoor(bloc);
   };
   const strip = floor.strip.map((id) => model.blocs.find((b) => b.id === id)).filter((b) => b !== undefined);
+  const settings = model.reglages_projet ?? [];
+  // The same words as on the floor (V18, V39): what the strip item does to the floor, never data.
+  const control = (id: string) => {
+    const link = floor.stripLinks.find((l) => l.from === id || l.to === id);
+    return link ? `${link.verb || "→"} « ${name(link.from === id ? link.to : link.from)} » — contrôle, pas de donnée` : null;
+  };
 
   const look = (id: string) => (play ? (play.step.boxes.includes(id) ? "lit" : "dim") : "normal");
   const bare = (id: string) => id.replace(/^door:/, "");
@@ -89,107 +99,118 @@ export function RoomCanvas({ model, room, enterable, selected, play, onSelect, o
   const crossing = (bloc: string, dir: "in" | "out") => room.doors.find((d) => d.bloc === bloc)?.crossings.find((c) => c.dir === dir)?.step;
   const f = plan.frame;
   return (
-    <div ref={screen} className="absolute inset-0 overflow-x-hidden overflow-y-auto" onClick={() => onSelect(null)}>
-      <FloorHeader model={model} floor={floor} />
-      <div className={STILL ? "" : "room-open"} style={{ position: "relative", width: plan.size.width + 2 * PAD, height: plan.size.height + 2 * PAD }}>
-        <div className="absolute" style={{ left: PAD, top: PAD, width: plan.size.width, height: plan.size.height }}>
-          <div className="fl-frame" style={{ left: f.x, top: f.y, width: f.w, height: f.h }} aria-hidden="true" />
-          <p ref={title} tabIndex={-1} className="absolute line-clamp-2 text-[13px] leading-snug text-muted outline-none" style={{ left: f.x + 16, top: f.y + 8, width: f.w - 32 }}>
-            <strong className="font-bold text-ink">{block?.nom ?? room.bloc}</strong>
-            {block?.en_bref && ` — ${block.en_bref}`}
-            <span className="text-[11.5px] text-faint"> · pièce ouverte, la donnée va de gauche à droite</span>
-          </p>
-          <svg className="pointer-events-none absolute overflow-visible" width={plan.size.width} height={plan.size.height} aria-hidden="true">
-            <LineMarkers />
+    <div className="absolute inset-0">
+      <div ref={screen} className="absolute inset-0 overflow-x-hidden overflow-y-auto" onClick={() => onSelect(null)}>
+        <FloorHeader model={model} floor={floor} />
+        <div className={STILL ? "" : "room-open"} style={{ position: "relative", width: plan.size.width + 2 * PAD, height: plan.size.height + 2 * PAD }}>
+          <div className="absolute" style={{ left: PAD, top: PAD, width: plan.size.width, height: plan.size.height }}>
+            <div className="fl-frame" style={{ left: f.x, top: f.y, width: f.w, height: f.h }} aria-hidden="true" />
+            <p ref={title} tabIndex={-1} className="absolute line-clamp-2 text-[13px] leading-snug text-muted outline-none" style={{ left: f.x + 16, top: f.y + 8, width: f.w - 32 }}>
+              <strong className="font-bold text-ink">{block?.nom ?? room.bloc}</strong>
+              {block?.en_bref && ` — ${block.en_bref}`}
+              <span className="text-[11.5px] text-faint"> · pièce ouverte, la donnée va de gauche à droite</span>
+            </p>
+            <svg className="pointer-events-none absolute overflow-visible" width={plan.size.width} height={plan.size.height} aria-hidden="true">
+              <LineMarkers />
+              {plan.rects.get("band") &&
+                wired.map((m) => {
+                  const band = plan.rects.get("band")!;
+                  const r = plan.rects.get(m.id)!;
+                  const x = r.x + r.w / 2;
+                  return <line key={m.id} x1={x} y1={band.y + band.h} x2={x} y2={r.y} stroke="var(--fl-control)" strokeWidth={1.2} />;
+                })}
+              {room.belt.flatMap((m) =>
+                m.chutes.map((_, k) => {
+                  const r = plan.rects.get(m.id)!;
+                  const c = plan.rects.get(`chute:${m.id}:${k}`)!;
+                  const top = k === 0 ? r.y + r.h : plan.rects.get(`chute:${m.id}:${k - 1}`)!.y + plan.rects.get(`chute:${m.id}:${k - 1}`)!.h;
+                  return <line key={`${m.id}:${k}`} x1={r.x + 26} y1={top} x2={r.x + 26} y2={c.y} stroke="var(--fl-refus)" strokeOpacity={0.6} strokeWidth={1.5} strokeDasharray="4 4" />;
+                }),
+              )}
+              {plan.reply && <Line points={plan.reply.points} kind="reply" lit={lit(plan.reply.from, plan.reply.to)} />}
+              {[...plan.belt, ...plan.doorLinks].map((s) => (
+                <Line key={`${s.from}>${s.to}`} points={s.points} kind="belt" lit={lit(s.from, s.to)} dim />
+              ))}
+            </svg>
             {plan.rects.get("band") &&
               wired.map((m) => {
                 const band = plan.rects.get("band")!;
                 const r = plan.rects.get(m.id)!;
-                const x = r.x + r.w / 2;
-                return <line key={m.id} x1={x} y1={band.y + band.h} x2={x} y2={r.y} stroke="var(--fl-control)" strokeWidth={1.2} />;
+                return (
+                  <span key={m.id} className="fl-chip ctl text-[10.5px]" style={{ left: r.x + r.w / 2, top: (band.y + band.h + r.y) / 2 }} aria-hidden="true">
+                    câblage
+                  </span>
+                );
               })}
-            {room.belt.flatMap((m) =>
-              m.chutes.map((_, k) => {
-                const r = plan.rects.get(m.id)!;
-                const c = plan.rects.get(`chute:${m.id}:${k}`)!;
-                const top = k === 0 ? r.y + r.h : plan.rects.get(`chute:${m.id}:${k - 1}`)!.y + plan.rects.get(`chute:${m.id}:${k - 1}`)!.h;
-                return <line key={`${m.id}:${k}`} x1={r.x + 26} y1={top} x2={r.x + 26} y2={c.y} stroke="var(--fl-refus)" strokeOpacity={0.6} strokeWidth={1.5} strokeDasharray="4 4" />;
-              }),
-            )}
-            {plan.reply && <Line points={plan.reply.points} kind="reply" lit={lit(plan.reply.from, plan.reply.to)} />}
-            {[...plan.belt, ...plan.doorLinks].map((s) => (
-              <Line key={`${s.from}>${s.to}`} points={s.points} kind="belt" lit={lit(s.from, s.to)} dim />
-            ))}
-          </svg>
-          {plan.rects.get("band") &&
-            wired.map((m) => {
-              const band = plan.rects.get("band")!;
-              const r = plan.rects.get(m.id)!;
+            {plan.doorLinks.map((s) => {
+              const step = s.from.startsWith("door:") ? crossing(bare(s.from), "in") : crossing(bare(s.to), "out");
+              const p = s.points;
+              if (step === undefined || p.length < 2) return null;
               return (
-                <span key={m.id} className="fl-chip ctl text-[10.5px]" style={{ left: r.x + r.w / 2, top: (band.y + band.h + r.y) / 2 }} aria-hidden="true">
-                  câblage
+                // A turning section shares its start with the straight one above it: its number goes on its own, vertical part.
+                <span
+                  key={`n-${s.from}>${s.to}`}
+                  className="fl-chip text-[11px] font-semibold"
+                  style={p.length > 2 ? { left: p[1]!.x - 16, top: (p[1]!.y + p[2]!.y) / 2 } : { left: (p[0]!.x + p.at(-1)!.x) / 2, top: p[0]!.y - 17 }}
+                  aria-hidden="true"
+                >
+                  {step}
                 </span>
               );
             })}
-          {plan.doorLinks.map((s) => {
-            const step = s.from.startsWith("door:") ? crossing(bare(s.from), "in") : crossing(bare(s.to), "out");
-            const p = s.points;
-            if (step === undefined || p.length < 2) return null;
-            return (
-              // A turning section shares its start with the straight one above it: its number goes on its own, vertical part.
-              <span
-                key={`n-${s.from}>${s.to}`}
-                className="fl-chip text-[11px] font-semibold"
-                style={p.length > 2 ? { left: p[1]!.x - 16, top: (p[1]!.y + p[2]!.y) / 2 } : { left: (p[0]!.x + p.at(-1)!.x) / 2, top: p[0]!.y - 17 }}
-                aria-hidden="true"
-              >
-                {step}
-              </span>
-            );
-          })}
-          {room.reply && plan.rects.get("reply") && <ReplyLabel rect={plan.rects.get("reply")!} step={room.reply.step} verb={room.reply.verb} to={name(room.reply.door)} words={room.reply.words} />}
-          {room.band.length > 0 && plan.rects.get("band") && <WiringBand rect={plan.rects.get("band")!} items={wiring} />}
-          {room.belt.length === 0 && (
-            <p className="absolute text-[14px] text-muted" style={{ left: f.x + 16, top: (plan.rects.get("band")?.y ?? 34) + (plan.rects.get("band")?.h ?? 0) + 24 }}>
-              Aucune donnée ne passe dans cette pièce : elle sert seulement au démarrage ou au développement.
-            </p>
-          )}
-          {room.doors.map((door) => (
-            <DoorCard
-              key={door.bloc}
-              door={door}
-              name={name(door.bloc)}
-              person={["user", "device"].includes(model.blocs.find((b) => b.id === door.bloc)?.type ?? "")}
-              rect={plan.rects.get(`door:${door.bloc}`)!}
-              enterable={enterable.has(door.bloc)}
-              onOpen={openDoor}
-            />
-          ))}
-          {room.belt.map((machine) => (
-            <MachineCard key={machine.id} machine={machine} rect={plan.rects.get(machine.id)!} look={look(machine.id)} selected={selected === machine.id} onSelect={onSelect} />
-          ))}
-          {room.belt.flatMap((machine) => machine.chutes.map((chute, k) => <ChuteCard key={`${machine.id}:${k}`} chute={chute} rect={plan.rects.get(`chute:${machine.id}:${k}`)!} />))}
-          {room.belt.flatMap((machine) =>
-            machine.hung.map((h) => <HungTag key={`${machine.id}:${h.bloc}`} id={h.bloc} name={name(h.bloc)} steps={h.steps} rect={plan.rects.get(`hung:${machine.id}:${h.bloc}`)!} onSelect={onSelect} />),
-          )}
-        </div>
-      </div>
-      {strip.length > 0 && (
-        // The floor's strip stays under the room (V39): the same « Autour du projet », after a scroll.
-        <section className="mx-6 mb-6 rounded-xl border border-dashed border-line px-3 pt-2 pb-3" aria-label="Autour du projet (ne tourne pas)">
-          <p className="text-[12px] font-semibold tracking-wide text-faint uppercase">Autour du projet (ne tourne pas)</p>
-          <ul className="mt-2 flex flex-wrap gap-3">
-            {strip.map((b) => (
-              <li key={b.id} className="w-[230px] rounded-lg border border-dashed border-line px-2.5 py-1.5 text-[12.5px]">
-                <span className="block font-semibold text-ink">{b.nom}</span>
-                <span className="line-clamp-2 text-muted">{b.en_bref || b.role}</span>
-              </li>
+            {room.reply && plan.rects.get("reply") && <ReplyLabel rect={plan.rects.get("reply")!} step={room.reply.step} verb={room.reply.verb} to={name(room.reply.door)} words={room.reply.words} />}
+            {room.band.length > 0 && plan.rects.get("band") && <WiringBand rect={plan.rects.get("band")!} items={wiring} />}
+            {room.belt.length === 0 && (
+              <p className="absolute text-[14px] text-muted" style={{ left: f.x + 16, top: (plan.rects.get("band")?.y ?? 34) + (plan.rects.get("band")?.h ?? 0) + 24 }}>
+                Aucune donnée ne passe dans cette pièce : elle sert seulement au démarrage ou au développement.
+              </p>
+            )}
+            {room.doors.map((door) => (
+              <DoorCard
+                key={door.bloc}
+                door={door}
+                name={name(door.bloc)}
+                person={["user", "device"].includes(model.blocs.find((b) => b.id === door.bloc)?.type ?? "")}
+                rect={plan.rects.get(`door:${door.bloc}`)!}
+                enterable={enterable.has(door.bloc)}
+                onOpen={openDoor}
+              />
             ))}
-          </ul>
-        </section>
-      )}
-      {/* Room for the « hors champ » button: it never sits on a door or a machine. */}
-      <div className="h-14" aria-hidden="true" />
+            {room.belt.map((machine) => (
+              <MachineCard key={machine.id} machine={machine} rect={plan.rects.get(machine.id)!} look={look(machine.id)} selected={selected === machine.id} onSelect={onSelect} />
+            ))}
+            {room.belt.flatMap((machine) => machine.chutes.map((chute, k) => <ChuteCard key={`${machine.id}:${k}`} chute={chute} rect={plan.rects.get(`chute:${machine.id}:${k}`)!} />))}
+            {room.belt.flatMap((machine) =>
+              machine.hung.map((h) => <HungTag key={`${machine.id}:${h.bloc}`} id={h.bloc} name={name(h.bloc)} steps={h.steps} rect={plan.rects.get(`hung:${machine.id}:${h.bloc}`)!} onSelect={onSelect} />),
+            )}
+          </div>
+        </div>
+        {(strip.length > 0 || settings.length > 0) && (
+          // The floor's strip stays under the room (V39): the same « Autour du projet », after a scroll.
+          <section className="mx-6 mb-6 rounded-xl border border-dashed border-line px-3 pt-2 pb-3" aria-label="Autour du projet (ne tourne pas)">
+            <p className="text-[12px] font-semibold tracking-wide text-faint uppercase">Autour du projet (ne tourne pas)</p>
+            <ul className="mt-2 flex flex-wrap gap-3">
+              {strip.map((b) => (
+                <li key={b.id} className="w-[230px] rounded-lg border border-dashed border-line px-2.5 py-1.5 text-[12.5px]">
+                  <span className="block font-semibold text-ink">{b.nom}</span>
+                  <span className="line-clamp-2 text-muted">{b.en_bref || b.role}</span>
+                  {control(b.id) && <span className="line-clamp-2 text-[11.5px] text-faint">{control(b.id)}</span>}
+                </li>
+              ))}
+              {settings.length > 0 && (
+                <li className="w-[230px] rounded-lg border border-dashed border-fl-code px-2.5 py-1.5 text-[12.5px]">
+                  <span className="block font-semibold text-ink">Réglages du projet</span>
+                  <span className="line-clamp-2 text-muted">
+                    {settings.length} réglage{settings.length > 1 ? "s" : ""} · {[...new Set(settings.map((r) => r.fichier).filter(Boolean))].join(", ")}
+                  </span>
+                </li>
+              )}
+            </ul>
+          </section>
+        )}
+        {/* Room for the « hors champ » button at the end: once scrolled down, it covers nothing. */}
+        <div style={{ height: BUTTON_STRIP }} aria-hidden="true" />
+      </div>
       {hidden > 0 && (
         <button
           type="button"
@@ -197,7 +218,7 @@ export function RoomCanvas({ model, room, enterable, selected, play, onSelect, o
             event.stopPropagation();
             showNext();
           }}
-          className="sticky bottom-3 left-full mr-3 ml-auto flex w-fit items-center gap-1.5 rounded-full border border-line bg-panel px-3 py-1.5 text-[13px] font-medium shadow-md"
+          className="absolute right-4 bottom-3 flex items-center gap-1.5 rounded-full border border-line bg-panel px-3 py-1.5 text-[13px] font-medium shadow-md"
         >
           {hidden} hors champ <ArrowDown size={14} aria-hidden="true" />
         </button>
