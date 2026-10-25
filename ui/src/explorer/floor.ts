@@ -63,7 +63,7 @@ const SHAPE: Record<BlockType, Shape> = {
   docs: "tool",
   tests: "tool",
   infra: "tool",
-  library: "tool",
+  library: "room", // code that runs, called by a room (it hangs on it, see helper)
 };
 const LIMIT = /perdu|au plus|seulement|pas encore|limite/i;
 
@@ -106,11 +106,16 @@ export function buildFloor(model: ProjectModel): Floor {
   // In step order: the parts that do the work, and every part a step reaches.
   const workers: string[] = [];
   const reached: { id: string; from: string }[] = [];
+  // A library, a model or an outside service is called by a room and answers it: it hangs on that room,
+  // even when a step is done inside it; the belt carries the data through the rooms only.
+  const helper = (id: string) => blocks.get(id)!.type === "library" || shapeOf(blocks.get(id)!) === "outside";
   for (const step of steps) {
     const here = stepBloc(model, step.composant);
     if (!here) continue;
-    if (!workers.includes(here)) workers.push(here);
-    for (const id of step.touche) if (blocks.has(id) && id !== here) reached.push({ id, from: here });
+    const caller = workers.at(-1);
+    if (helper(here) && caller) reached.push({ id: here, from: caller });
+    else if (!workers.includes(here)) workers.push(here);
+    for (const id of step.touche) if (blocks.has(id) && id !== here) reached.push({ id, from: helper(here) && caller ? caller : here });
   }
   const inJourney = [...workers, ...reached.map((r) => r.id)];
   const entree =

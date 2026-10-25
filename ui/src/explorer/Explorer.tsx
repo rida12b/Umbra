@@ -202,8 +202,19 @@ export function Explorer({ project, route, theme, narrow }: Props) {
             </span>
           );
         })}
-        {levelKey && !narrow && (
-          <span className="ml-auto text-[13px] text-faint">{journey ? "Échap : arrêter le chemin" : "Échap : remonter d'un niveau"}</span>
+        {levelKey && !narrow && journey && <span className="ml-auto text-[13px] text-faint">Échap : arrêter le chemin</span>}
+        {levelKey && !narrow && !journey && model && trail(model, levelKey).length > 1 && (
+          // As in the mockup (V25): a real button, the key in small after it.
+          <button
+            type="button"
+            onClick={() => {
+              const above = trail(model, levelKey).at(-2);
+              if (above) openLevel(above.key);
+            }}
+            className="ml-auto rounded-md border border-line px-2.5 py-1 text-[13px] text-ink hover:bg-panel"
+          >
+            ‹ Remonter <span className="text-[11.5px] text-faint">(Échap)</span>
+          </button>
         )}
       </nav>
       <div className="min-h-0 flex-1">{body}</div>

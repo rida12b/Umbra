@@ -27,7 +27,7 @@ test("the factory floor: ENTRÉE to SORTIE, tools aside; a click explains, « En
   } else {
     await expect(page.locator('[data-floor-id="user"]')).toContainText("ENTRÉE");
     await expect(page.getByRole("button", { name: /^Entrée : Client/ })).toBeVisible(); // said to keyboard and screen readers too
-    await expect(page.getByText("Sortie ■ :").locator("..")).toContainText("Base PostgreSQL"); // the end is named above the fold
+    await expect(page.getByRole("list", { name: "Le chemin de la donnée, pièce par pièce" })).toContainText("Base PostgreSQL (sortie)"); // the end is said to screen readers
     await expect(page.locator('[data-floor-id="db"]')).toContainText("SORTIE");
     // The belt reads like text: left to right, then the next line.
     const at = async (id: string) => {
@@ -40,7 +40,7 @@ test("the factory floor: ENTRÉE to SORTIE, tools aside; a click explains, « En
     await expect(page.locator('[data-floor-id="docs"]')).toBeVisible();
     const drawn = await page.locator("[data-shape]").evaluateAll((els) => [...new Set(els.map((e) => e.getAttribute("data-shape")))].sort());
     const keyed = await page.locator("[data-key-shape]").evaluateAll((els) => els.map((e) => e.getAttribute("data-key-shape")).sort());
-    expect(keyed).toEqual(drawn); // the key lists the kinds drawn, no more, no less
+    for (const shape of drawn) expect(keyed).toContain(shape); // every kind drawn is in the key (mockup B keeps the usual kinds even when absent)
     await page.locator('[data-floor-id="api"]').click();
   }
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true);

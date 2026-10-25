@@ -14,6 +14,7 @@ export interface Crossing {
 export interface Door {
   bloc: string;
   side: "left" | "right"; // left: where data comes from; right: where it goes
+  role: "entree" | "sortie" | null; // the driving journey's own way in and way out (V27, V36)
   verb: string;
   crossings: Crossing[];
 }
@@ -28,6 +29,8 @@ export interface Machine {
   nom: string;
   words: string;
   steps: number[];
+  entre: string[]; // v1.7: what it takes in and gives out, in the model's words (V32)
+  sort: string[];
   hung: { bloc: string; steps: number[] }[];
   chutes: Chute[];
 }
@@ -37,8 +40,17 @@ export interface Room {
   belt: Machine[];
   band: string[]; // start-up wiring: not on the belt
   doors: Door[];
+  reply: Reply | null; // the answer going back to where the data came from (V37, V38)
   unplaced: (Branch & { journey: string })[]; // the driving journey's refusals no single machine holds
   elsewhere: (Branch & { journey: string })[]; // refusals of the other journeys that pass here
+}
+
+export interface Reply {
+  door: string; // the left door it goes back to
+  machine: string; // the machine that answers
+  step: number;
+  verb: string;
+  words: string; // what the answer holds, in the model's words
 }
 
 const WIRING_FILES = /(^|\/)(main|app)\.py$/;
@@ -100,6 +112,8 @@ export function buildRoom(model: ProjectModel, bloc: string): Room | null {
       nom: c.nom,
       words: c.en_bref || c.role,
       steps: mine,
+      entre: c.entre ?? [],
+      sort: c.sort ?? [],
       hung: [...hung].map(([id, at]) => ({ bloc: id, steps: at })),
       chutes: (placed.get(c.id) ?? []).map((b) => ({
         quand: b.quand_simple || b.quand,
@@ -112,7 +126,23 @@ export function buildRoom(model: ProjectModel, bloc: string): Room | null {
   const elsewhere = model.parcours
     .filter((j) => j !== journey && j.etapes.some((s) => owner(s) === bloc))
     .flatMap((j) => (j.branches ?? []).map((b) => ({ ...b, journey: j.id })));
-  return { bloc, journey, belt, band: wiring.map((c) => c.id), doors, unplaced, elsewhere };
+  // A door's role: the journey's declared way in and out, else the floor's entry and exit.
+  const entry = journey?.entree ?? floor.entree;
+  const exits = new Set(journey?.sortie?.length ? journey.sortie : floor.sortie?.kind === "store" ? [floor.sortie.id] : []);
+  for (const door of doors) door.role = door.side === "left" && door.bloc === entry ? "entree" : door.side === "right" && exits.has(door.bloc) ? "sortie" : null;
+  return { bloc, journey, belt, band: wiring.map((c) => c.id), doors, reply: replyOf(doors, belt, floor.links, bloc), unplaced, elsewhere };
+}
+
+/** The last step that goes back out by a left door (the final answer, not a check on the way): who answers, and what it says. */
+function replyOf(doors: Door[], belt: Machine[], links: { from: string; to: string; verb: string; full: string }[], bloc: string): Reply | null {
+  for (const door of doors.filter((d) => d.side === "left")) {
+    const back = door.crossings.filter((c) => c.dir === "out").at(-1);
+    const machine = back && belt.find((m) => m.nom === back.machine);
+    if (!back || !machine) continue;
+    const link = links.find((l) => l.from === bloc && l.to === door.bloc);
+    return { door: door.bloc, machine: machine.id, step: back.step, verb: link?.verb || "répond à", words: link?.full ?? "" };
+  }
+  return null;
 }
 
 /** Each branch of the driving journey under the single component whose files hold it; never guessed. */
@@ -141,7 +171,7 @@ function roomDoors(model: ProjectModel, bloc: string, steps: JourneyStep[], owne
   const door = (id: string, side: Door["side"]) => {
     if (!doors.has(id)) {
       const flow = links.find((l) => side === "left" ? l.from === id && l.to === bloc : l.from === bloc && l.to === id) ?? links.find((l) => (l.from === id && l.to === bloc) || (l.from === bloc && l.to === id));
-      doors.set(id, { bloc: id, side, verb: flow?.verb ?? "", crossings: [] });
+      doors.set(id, { bloc: id, side, role: null, verb: flow?.verb ?? "", crossings: [] });
     }
     return doors.get(id)!;
   };
@@ -183,7 +213,7 @@ export function stepRuns(model: ProjectModel, journey: Journey): { title: string
     const bloc = owner(step) ?? runs.at(-1)?.bloc ?? "";
     const last = runs.at(-1);
     if (last && last.bloc === bloc) last.to = i + 1;
-    else runs.push({ title: model.blocs.find((b) => b.id === bloc)?.nom ?? bloc, bloc, from: i + 1, to: i + 1 });
+    else runs.push({ title: model.blocs.find((b) => b.id === bloc)?.nom ?? (bloc || "Fait à la main"), bloc, from: i + 1, to: i + 1 });
   });
   const last = runs.at(-1);
   if (last && runs.slice(0, -1).some((r) => r.bloc === last.bloc) && entry) {

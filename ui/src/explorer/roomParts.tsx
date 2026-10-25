@@ -1,17 +1,18 @@
-import { ArrowRight, CornerDownRight, Search, Wrench } from "lucide-react";
+import { Search, User } from "lucide-react";
 import { lowerFirst } from "../arch/story";
 import type { Chute, Door, Machine } from "./room";
 import type { Rect } from "./roomLayout";
 
-// The pieces of an open room: a machine, a door, a refusal hanging under its machine, a thing the
-// machine searches or calls, and the start-up wiring band. Long words are cut, the full text stays on
-// hover and focus.
+// The pieces of an open room, as in mockup B (inventaire.md V27-V38): a machine with its step number in
+// a circle and its in/out chips, a door outside the frame (green entry, amber exit), a red refusal card
+// under its machine, a thing the machine searches or calls, and the start-up wiring band. Long words
+// are cut, the full text stays on hover and focus.
 
 type Look = "normal" | "lit" | "dim";
-const tone = (look: Look) => (look === "lit" ? "border-lamp-line shadow-[0_0_0_3px_var(--u-lamp-soft)]" : look === "dim" ? "opacity-45" : "");
 const at = (r: Rect) => ({ left: r.x, top: r.y, width: r.w, height: r.h });
 
 export function MachineCard({ machine, rect, look, selected, onSelect }: { machine: Machine; rect: Rect; look: Look; selected: boolean; onSelect: (id: string) => void }) {
+  const [first, ...again] = machine.steps;
   return (
     <button
       type="button"
@@ -22,67 +23,70 @@ export function MachineCard({ machine, rect, look, selected, onSelect }: { machi
         event.stopPropagation();
         onSelect(machine.id);
       }}
-      className={`absolute flex flex-col rounded-xl border-2 border-l-[6px] border-line border-l-kind-room bg-panel px-3 py-2.5 text-left ${tone(look)} ${selected ? "ring-2 ring-lamp" : ""}`}
+      className={`fl-machine ${look === "lit" ? "lit" : look === "dim" ? "dim" : ""} ${selected ? "ring-2 ring-fl-service" : ""}`}
       style={at(rect)}
     >
-      <span className="line-clamp-2 text-[15px] font-semibold leading-snug text-ink">{machine.nom}</span>
-      <span className="mt-1 line-clamp-3 text-[13.5px] leading-snug text-muted">{machine.words}</span>
-      {machine.steps.length > 0 && (
-        <span className="mt-auto text-[12.5px] text-faint">
-          {machine.steps.length > 1 ? "étapes" : "étape"} {machine.steps.join(", ")}
-        </span>
-      )}
+      <span className="flex items-start gap-1.5">
+        {first !== undefined && <span className="fl-num mt-0.5">{first}</span>}
+        <span className="line-clamp-3 text-[14px] leading-tight font-bold text-ink">{machine.nom}</span>
+      </span>
+      <span className="mt-1 line-clamp-2 text-[12.5px] leading-snug text-muted">{machine.words}</span>
+      {again.length > 0 && <span className="text-[11.5px] text-faint">aussi à l'étape {again.join(", ")}</span>}
+      <span className="mt-auto flex flex-col gap-1">
+        {machine.entre[0] && <span className="fl-io" title={machine.entre.join(", ")}>→ reçoit {machine.entre[0]}</span>}
+        {machine.sort[0] && <span className="fl-io out" title={machine.sort.join(", ")}>rend {machine.sort[0]} →</span>}
+      </span>
     </button>
   );
 }
 
 export function DoorCard({ door, name, rect, enterable, onOpen }: { door: Door; name: string; rect: Rect; enterable: boolean; onOpen: (bloc: string) => void }) {
-  const label = door.side === "left" ? `depuis ${name}` : `vers ${name}`;
+  const into = door.side === "left";
+  const crossings = door.crossings.filter((c) => c.dir === (into ? "in" : "out"));
   return (
     <button
       type="button"
       data-room-item={`door:${door.bloc}`}
-      title={`${label}${door.verb ? ` — ${door.verb}` : ""}${enterable ? " (entrer dans cette pièce)" : ""}`}
+      title={`${into ? "depuis" : "vers"} ${name}${door.verb ? ` — ${door.verb}` : ""}${enterable ? " (entrer dans cette pièce)" : ""}`}
       onClick={(event) => {
         event.stopPropagation();
         onOpen(door.bloc);
       }}
-      className="absolute flex flex-col rounded-xl border-2 border-dashed border-line bg-bg px-2.5 py-2 text-left text-[12.5px] hover:border-ink/40"
+      className={`fl-door ${door.role === "entree" ? "in" : door.role === "sortie" ? "out" : ""}`}
       style={at(rect)}
     >
-      <span className="flex items-start gap-1 font-semibold text-ink">
-        <ArrowRight size={14} className="mt-0.5 shrink-0" aria-hidden="true" />
-        <span className="line-clamp-2 text-[13px] leading-snug">{label}</span>
+      {door.role === "entree" && (
+        <span className="flex items-center gap-1.5">
+          <User size={18} className="text-fl-person" aria-hidden="true" />
+          <span className="fl-badge in">▶ ENTRÉE</span>
+        </span>
+      )}
+      {door.role === "sortie" && <span className="fl-badge out">SORTIE ■</span>}
+      <span className="line-clamp-5 text-[12.5px] leading-snug text-muted">
+        {into ? "depuis" : "vers"} <strong className="font-semibold text-ink">{name}</strong>
+        {door.verb && ` — ${door.verb}`}
       </span>
-      {door.verb && <span className="mt-0.5 line-clamp-2 italic text-muted">{door.verb}</span>}
-      <span className="mt-auto flex flex-col gap-0.5 text-faint">
-        {door.crossings.slice(0, 3).map((c) => (
-          <span key={`${c.dir}${c.step}`} className="line-clamp-2" title={`étape ${c.step} : ${c.machine}`}>
-            {c.dir === (door.side === "left" ? "in" : "out") ? "→" : "↩"} {c.step} · {c.machine}
-          </span>
-        ))}
-        {door.crossings.length > 3 && <span>+ {door.crossings.length - 3} passage(s)</span>}
-      </span>
+      {crossings.slice(0, 3).map((c) => (
+        <span key={c.step} className="fl-io text-left" title={`étape ${c.step} : ${c.machine}`}>
+          {c.step} · {c.machine}
+        </span>
+      ))}
+      <span className="mt-auto text-[12.5px] text-fl-service">{door.role === "entree" ? "Voir la fiche ›" : enterable ? "Entrer dans cette pièce ›" : "Voir la fiche ›"}</span>
     </button>
   );
 }
 
 export function ChuteCard({ chute, rect }: { chute: Chute; rect: Rect }) {
+  const text = `Si ${lowerFirst(chute.quand)} — ${chute.alors}`;
   return (
-    <div
-      data-room-item="chute"
-      tabIndex={0}
-      title={`Si ${lowerFirst(chute.quand)} — ${chute.alors}`}
-      aria-label={`Si ${lowerFirst(chute.quand)} — ${chute.alors}`} // the whole refusal, for keyboard and screen readers
-      className="absolute flex flex-col rounded-lg border border-danger/60 border-l-4 border-l-danger bg-panel px-2.5 py-1.5 text-[12.5px] leading-snug"
-      style={at(rect)}
-    >
-      <span className="flex items-start gap-1 font-medium text-ink">
-        <CornerDownRight size={13} className="mt-0.5 shrink-0 text-danger" aria-hidden="true" />
-        <span>Si {lowerFirst(chute.quand)}</span>
+    <div data-room-item="chute" tabIndex={0} title={text} aria-label={`Refus. ${text}`} className="fl-refus" style={at(rect)}>
+      <span className="flex items-center gap-1.5 text-[13px] font-bold text-fl-refus">
+        <span className="size-[9px] shrink-0 bg-fl-refus" aria-hidden="true" />
+        refus
       </span>
+      <span className="line-clamp-4 text-ink/90">Si {lowerFirst(chute.quand)}</span>
       <span className="line-clamp-5 text-muted">{chute.alors}</span>
-      {chute.technical && <span className="mt-auto text-[11.5px] text-faint">texte du modèle, technique</span>}
+      {chute.technical && <span className="fl-tech mt-auto self-start">texte du modèle, technique</span>}
     </div>
   );
 }
@@ -109,15 +113,18 @@ export function HungTag({ name, steps, rect, onSelect, id }: { name: string; ste
   );
 }
 
-export function WiringBand({ rect, names }: { rect: Rect; names: string[] }) {
+/** The start-up wiring (V29): what runs once when the service starts, with where it is in the code. */
+export function WiringBand({ rect, items }: { rect: Rect; items: { nom: string; words: string; file: string | null }[] }) {
   return (
-    <div data-room-item="band" className="absolute flex flex-col justify-center rounded-xl border border-dashed border-line px-3 text-[13px]" style={at(rect)}>
-      <span className="flex items-center gap-1.5 text-[12px] font-semibold tracking-wide text-faint uppercase">
-        <Wrench size={13} aria-hidden="true" /> câblage, au démarrage
-      </span>
-      <span className="truncate text-ink" title={names.join(", ")}>
-        {names.join(" · ")}
-      </span>
+    <div data-room-item="band" className="absolute flex flex-col justify-center gap-1 rounded-lg border border-dashed border-line px-3 text-[12.5px]" style={at(rect)}>
+      <span className="w-fit rounded border border-line px-1.5 text-[10.5px] font-semibold tracking-wide text-faint uppercase">câblage, au démarrage</span>
+      {items.map((item) => (
+        <span key={item.nom} className="truncate text-muted" title={`${item.nom} — ${item.words}`}>
+          <strong className="font-semibold text-ink">{item.nom}</strong>
+          {item.words && ` — ${item.words}`}
+          {item.file && <span className="font-mono text-fl-service"> · {item.file}</span>}
+        </span>
+      ))}
     </div>
   );
 }

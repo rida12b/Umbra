@@ -2,8 +2,11 @@ import { ArrowDown } from "lucide-react";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { ProjectModel } from "../api";
 import type { Play } from "./ExplorerCanvas";
+import { buildFloor } from "./floor";
+import { FloorHeader } from "./FloorHeader";
+import { Line, LineMarkers } from "./floorLines";
 import type { Room } from "./room";
-import { placeRoom, type Segment } from "./roomLayout";
+import { placeRoom, type Rect } from "./roomLayout";
 import { ChuteCard, DoorCard, HungTag, MachineCard, WiringBand } from "./roomParts";
 
 const PAD = 24;
@@ -19,7 +22,7 @@ interface Props {
   onOpenDoor: (bloc: string) => void;
 }
 
-/** A part opened in place: its machines in data order, its doors, its refusals; scrolled down only. */
+/** A part opened in place, under the floor's own header: its machines in data order, its doors, its refusals. */
 export function RoomCanvas({ model, room, enterable, selected, play, onSelect, onOpenDoor }: Props) {
   const screen = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(1000);
@@ -33,8 +36,14 @@ export function RoomCanvas({ model, room, enterable, selected, play, onSelect, o
     observer.observe(el);
     return () => observer.disconnect();
   }, []);
-  const plan = useMemo(() => placeRoom(room, Math.max(width - 2 * PAD, 240)), [room, width]);
-  const name = (id: string) => model.blocs.find((b) => b.id === id)?.nom ?? model.composants.find((c) => c.id === id)?.nom ?? id;
+  const floor = useMemo(() => buildFloor(model), [model]);
+  const name = useCallback((id: string) => model.blocs.find((b) => b.id === id)?.nom ?? model.composants.find((c) => c.id === id)?.nom ?? id, [model]);
+  const plan = useMemo(() => placeRoom(room, Math.max(width - 2 * PAD, 240), (bloc) => name(bloc).length), [room, width, name]);
+  const block = model.blocs.find((b) => b.id === room.bloc);
+  const component = (id: string) => model.composants.find((c) => c.id === id);
+  const wiring = room.band.map((id) => ({ nom: name(id), words: component(id)?.en_bref ?? "", file: component(id)?.fichiers[0] ?? null }));
+  // The band wires the machines it uses (V30): a thin grey mark down to each of them.
+  const wired = room.belt.filter((m) => room.band.some((id) => component(id)?.utilise.includes(m.id)));
 
   // Items not fully in sight are counted; the button brings the next one into view.
   const outOfSight = useCallback(() => {
@@ -64,23 +73,74 @@ export function RoomCanvas({ model, room, enterable, selected, play, onSelect, o
   };
 
   const look = (id: string) => (play ? (play.step.boxes.includes(id) ? "lit" : "dim") : "normal");
+  const bare = (id: string) => id.replace(/^door:/, "");
+  const lit = (from: string, to: string) => !!play && play.step.boxes.includes(bare(from)) && play.step.boxes.includes(bare(to));
+  // The step that crosses each door, on its belt section (V34).
+  const crossing = (bloc: string, dir: "in" | "out") => room.doors.find((d) => d.bloc === bloc)?.crossings.find((c) => c.dir === dir)?.step;
+  const f = plan.frame;
   return (
     <div ref={screen} className="absolute inset-0 overflow-x-hidden overflow-y-auto" onClick={() => onSelect(null)}>
+      <FloorHeader model={model} floor={floor} />
       <div className={STILL ? "" : "room-open"} style={{ position: "relative", width: plan.size.width + 2 * PAD, height: plan.size.height + 2 * PAD }}>
-        <div className="absolute" style={{ left: PAD, top: PAD }}>
+        <div className="absolute" style={{ left: PAD, top: PAD, width: plan.size.width, height: plan.size.height }}>
+          <div className="fl-frame" style={{ left: f.x, top: f.y, width: f.w, height: f.h }} aria-hidden="true" />
+          <p className="absolute truncate text-[13px] text-muted" style={{ left: f.x + 16, top: f.y + 9, width: f.w - 32 }}>
+            <strong className="font-bold text-ink">{block?.nom ?? room.bloc}</strong>
+            {block?.en_bref && ` — ${block.en_bref}`}
+            <span className="text-[11.5px] text-faint"> · pièce ouverte, la donnée va de gauche à droite</span>
+          </p>
           <svg className="pointer-events-none absolute overflow-visible" width={plan.size.width} height={plan.size.height} aria-hidden="true">
-            <defs>
-              <marker id="room-arrow" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto">
-                <path d="M0 0 8 4 0 8z" style={{ fill: "var(--u-muted)" }} />
-              </marker>
-            </defs>
-            {[...plan.belt, ...plan.doorLinks].map((s: Segment) => (
-              <path key={`${s.from}>${s.to}`} d={s.points.map((p, i) => `${i ? "L" : "M"}${p.x} ${p.y}`).join(" ")} fill="none" stroke="var(--u-muted)" strokeWidth={2.5} markerEnd="url(#room-arrow)" />
+            <LineMarkers />
+            {plan.rects.get("band") &&
+              wired.map((m) => {
+                const band = plan.rects.get("band")!;
+                const r = plan.rects.get(m.id)!;
+                const x = r.x + r.w / 2;
+                return <line key={m.id} x1={x} y1={band.y + band.h} x2={x} y2={r.y} stroke="var(--fl-control)" strokeWidth={1.2} />;
+              })}
+            {room.belt.flatMap((m) =>
+              m.chutes.map((_, k) => {
+                const r = plan.rects.get(m.id)!;
+                const c = plan.rects.get(`chute:${m.id}:${k}`)!;
+                const top = k === 0 ? r.y + r.h : plan.rects.get(`chute:${m.id}:${k - 1}`)!.y + plan.rects.get(`chute:${m.id}:${k - 1}`)!.h;
+                return <line key={`${m.id}:${k}`} x1={r.x + 26} y1={top} x2={r.x + 26} y2={c.y} stroke="var(--fl-refus)" strokeOpacity={0.6} strokeWidth={1.5} strokeDasharray="4 4" />;
+              }),
+            )}
+            {plan.reply && <Line points={plan.reply.points} kind="reply" lit={lit(plan.reply.from, plan.reply.to)} />}
+            {[...plan.belt, ...plan.doorLinks].map((s) => (
+              <Line key={`${s.from}>${s.to}`} points={s.points} kind="belt" lit={lit(s.from, s.to)} dim />
             ))}
           </svg>
-          {room.band.length > 0 && plan.rects.get("band") && <WiringBand rect={plan.rects.get("band")!} names={room.band.map(name)} />}
+          {plan.rects.get("band") &&
+            wired.map((m) => {
+              const band = plan.rects.get("band")!;
+              const r = plan.rects.get(m.id)!;
+              return (
+                <span key={m.id} className="fl-chip ctl text-[10.5px]" style={{ left: r.x + r.w / 2, top: (band.y + band.h + r.y) / 2 }} aria-hidden="true">
+                  câblage
+                </span>
+              );
+            })}
+          {plan.doorLinks.map((s) => {
+            const step = s.from.startsWith("door:") ? crossing(bare(s.from), "in") : crossing(bare(s.to), "out");
+            const p = s.points;
+            if (step === undefined || p.length < 2) return null;
+            return (
+              // A turning section shares its start with the straight one above it: its number goes on its own, vertical part.
+              <span
+                key={`n-${s.from}>${s.to}`}
+                className="fl-chip text-[11px] font-semibold"
+                style={p.length > 2 ? { left: p[1]!.x - 16, top: (p[1]!.y + p[2]!.y) / 2 } : { left: (p[0]!.x + p.at(-1)!.x) / 2, top: p[0]!.y - 17 }}
+                aria-hidden="true"
+              >
+                {step}
+              </span>
+            );
+          })}
+          {room.reply && plan.rects.get("reply") && <ReplyLabel rect={plan.rects.get("reply")!} step={room.reply.step} verb={room.reply.verb} to={name(room.reply.door)} words={room.reply.words} />}
+          {room.band.length > 0 && plan.rects.get("band") && <WiringBand rect={plan.rects.get("band")!} items={wiring} />}
           {room.belt.length === 0 && (
-            <p className="absolute text-[14px] text-muted" style={{ top: (plan.rects.get("band")?.h ?? 0) + 24 }}>
+            <p className="absolute text-[14px] text-muted" style={{ left: f.x + 16, top: (plan.rects.get("band")?.y ?? 34) + (plan.rects.get("band")?.h ?? 0) + 24 }}>
               Aucune donnée ne passe dans cette pièce : elle sert seulement au démarrage ou au développement.
             </p>
           )}
@@ -109,5 +169,15 @@ export function RoomCanvas({ model, room, enterable, selected, play, onSelect, o
         </button>
       )}
     </div>
+  );
+}
+
+/** The answer's words under the room (V38): its step, who it answers, and what it holds. */
+function ReplyLabel({ rect, step, verb, to, words }: { rect: Rect; step: number; verb: string; to: string; words: string }) {
+  return (
+    <p className="absolute rounded-md border border-dashed border-line bg-bg px-2.5 py-1 text-center text-[12px] leading-snug" style={{ left: rect.x, top: rect.y, width: rect.w, minHeight: rect.h }}>
+      {step} · {verb} {to} <span className="fl-tech">texte du modèle, technique</span>
+      {words && <span className="block truncate text-[11px] text-muted" title={words}>{words}</span>}
+    </p>
   );
 }
