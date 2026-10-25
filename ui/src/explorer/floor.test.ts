@@ -219,3 +219,11 @@ test("a main journey declared by the study (v1.7) is the one the belt follows", 
   model.parcours.find((j) => j.id === "demarrage")!.principal_deduit = true; // deduced: the floor's own rule
   assert.equal(buildFloor(model).journey?.id, "envoi-evenement");
 });
+
+test("v1.7 Watchdog: the validation library hangs on the service it answers; the belt keeps the rooms", () => {
+  const floor = buildFloor(load("watchdog-v17"));
+  assert.equal(floor.entree, "agent-surveille");
+  assert.deepEqual(floor.belt, ["api", "memoire"]);
+  assert.equal(roleOf(floor, "validation"), "supplier");
+  assert.equal(attachOf(floor, "validation"), "api");
+});

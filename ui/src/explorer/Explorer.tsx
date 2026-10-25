@@ -10,6 +10,8 @@ import { StateMessage } from "../ui";
 import { CodeLevel } from "./CodeLevel";
 import { ExplorerCanvas, type Play } from "./ExplorerCanvas";
 import { FloorCanvas } from "./FloorCanvas";
+import { RoomCanvas } from "./RoomCanvas";
+import { enterable } from "./room";
 import { InfoPanel } from "./InfoPanel";
 import { buildLevel, levelOf, trail, type Box, type LevelKey } from "./levels";
 import { NarrowLevel } from "./NarrowLevel";
@@ -62,6 +64,9 @@ export function Explorer({ project, route, theme, narrow }: Props) {
     [go, openLevel],
   );
   const select = useCallback((id: string | null) => go({ select: id }), [go]);
+  const rooms = useMemo(() => (model ? enterable(model) : new Set<string>()), [model]);
+  // A door opens the room behind it (a history entry: Back returns here), or explains a part without machines.
+  const openDoor = useCallback((bloc: string) => (rooms.has(bloc) ? openLevel(`part:${bloc}`) : select(bloc)), [rooms, openLevel, select]);
   const play = useCallback((journey: string, step: number) => go({ journey, step, select: null }), [go]);
   const stop = useCallback(() => go({ journey: null, step: null }), [go]);
   const onStep = useCallback((step: number) => go({ step, select: null }), [go]);
@@ -115,6 +120,15 @@ export function Explorer({ project, route, theme, narrow }: Props) {
         onOpen={(node, expand) => go({ node, expand, select: null })}
       />
     );
+  else if (level && level.room === null)
+    body = (
+      <StateMessage title={`« ${level.title} » n'a pas de machine à ouvrir`}>
+        <p>{level.hint}</p>
+        <button type="button" className="mt-3 underline underline-offset-[3px]" onClick={() => openLevel(DEFAULT_LEVEL)}>
+          Revenir à l'usine
+        </button>
+      </StateMessage>
+    );
   else if (!level)
     body = (
       <StateMessage title="Ce niveau n'existe plus">
@@ -138,8 +152,8 @@ export function Explorer({ project, route, theme, narrow }: Props) {
       />
     );
     body = narrow ? (
-      <div className="h-full overflow-y-auto">
-        <NarrowLevel level={level} selected={route.select ?? null} play={playState} onSelect={select} onEnter={enter} />
+      <div key={level.room?.bloc ?? "level"} className="h-full overflow-y-auto">
+        <NarrowLevel model={model} level={level} selected={route.select ?? null} play={playState} onSelect={select} onEnter={enter} onOpenDoor={openDoor} />
         <section className="border-t border-line-soft" aria-label="Explication">
           {panel}
         </section>
@@ -149,6 +163,8 @@ export function Explorer({ project, route, theme, narrow }: Props) {
         <section className="map-surface relative min-h-0" aria-label={`Carte : ${level.title}`}>
           {level.floor ? (
             <FloorCanvas model={model} floor={level.floor} level={level} selected={route.select ?? null} play={playState} onSelect={select} onEnter={enter} />
+          ) : level.room ? (
+            <RoomCanvas key={level.room.bloc} model={model} room={level.room} enterable={rooms} selected={route.select ?? null} play={playState} onSelect={select} onOpenDoor={openDoor} />
           ) : (
             <ExplorerCanvas level={level} theme={theme} selected={route.select ?? null} play={playState} onSelect={select} onEnter={enter} />
           )}
@@ -163,7 +179,7 @@ export function Explorer({ project, route, theme, narrow }: Props) {
   return (
     <div className="flex h-full min-h-0 flex-col">
       <MethodBanner projectId={project.id} state={state} />
-      <nav className="flex flex-wrap items-center gap-1 border-b border-line-soft px-5 py-2.5 text-[15px]" aria-label="Où vous êtes">
+      <nav className="flex min-h-[51px] flex-wrap items-center gap-1 border-b border-line-soft px-5 py-2 text-[15px]" aria-label="Où vous êtes">
         {crumbs.map((crumb, index) => {
           const last = index === crumbs.length - 1;
           const code = "code" in crumb;
@@ -186,8 +202,19 @@ export function Explorer({ project, route, theme, narrow }: Props) {
             </span>
           );
         })}
-        {levelKey && !narrow && (
-          <span className="ml-auto text-[13px] text-faint">{journey ? "Échap : arrêter le chemin" : "Échap : remonter d'un niveau"}</span>
+        {levelKey && !narrow && journey && <span className="ml-auto text-[13px] text-faint">Échap : arrêter le chemin</span>}
+        {levelKey && !narrow && !journey && model && trail(model, levelKey).length > 1 && (
+          // As in the mockup (V25): a real button, the key in small after it.
+          <button
+            type="button"
+            onClick={() => {
+              const above = trail(model, levelKey).at(-2);
+              if (above) openLevel(above.key);
+            }}
+            className="ml-auto rounded-md border border-line px-2.5 py-1 text-[13px] text-ink hover:bg-panel"
+          >
+            ‹ Remonter <span className="text-[11.5px] text-faint">(Échap)</span>
+          </button>
         )}
       </nav>
       <div className="min-h-0 flex-1">{body}</div>

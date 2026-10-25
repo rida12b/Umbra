@@ -20,3 +20,9 @@ export function stepActors(model: ProjectModel, step: JourneyStep): ArchBlock[] 
   if (reached && step.manuel) [here, reached] = [reached, here];
   return [here, reached].filter((b): b is ArchBlock => b !== null);
 }
+
+/** « Le serveur… », « L'en-tête… » → « le serveur… », « l'en-tête… »; a name (« WeasyPrint », « API ») keeps its capitals. */
+export function lowerFirst(text: string): string {
+  const word = text.split(/[\s'’]/)[0] ?? "";
+  return /[A-Z]/.test(word.slice(1)) ? text : text.charAt(0).toLowerCase() + text.slice(1);
+}

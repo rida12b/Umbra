@@ -1,10 +1,12 @@
 import { ChevronRight, Play } from "lucide-react";
 import type { ReactNode } from "react";
-import type { Journey, ProjectModel } from "../api";
+import type { Branch, Journey, ProjectModel } from "../api";
 import { CitedCode } from "../arch/CitedCode";
-import { stepLabel } from "../arch/story";
+import { lowerFirst, stepLabel } from "../arch/story";
 import { steps, Tag } from "../ui";
 import type { Box, Level } from "./levels";
+import type { Floor } from "./floor";
+import { buildRoom, stepRuns } from "./room";
 
 interface Props {
   projectId: string;
@@ -21,32 +23,227 @@ interface Props {
 export function InfoPanel({ projectId, model, level, box, playing, onEnter, onPlay, onStep }: Props) {
   if (box) return <BoxInfo projectId={projectId} model={model} box={box} onEnter={onEnter} onPlay={onPlay} />;
   if (playing) return <StepInfo projectId={projectId} journey={playing.journey} number={playing.step} onStep={onStep} />;
+  if (level.room) return <RoomInfo projectId={projectId} model={model} level={level} onPlay={onPlay} />;
+  if (level.floor) return <FloorInfo model={model} level={level} floor={level.floor} onEnter={onEnter} onPlay={onPlay} />;
   return (
     <Panel>
       <p className="text-[13px] font-semibold text-faint">Vous êtes ici</p>
       <h2 className="mt-1 text-[22px] leading-tight font-semibold">{level.title}</h2>
       <p className="mt-2 text-[15px] leading-relaxed text-muted">{level.hint}</p>
-      {level.floor && level.floor.stripLinks.length > 0 && (
-        <p className="mt-4 text-[14px] leading-relaxed text-muted">
-          Autour du projet :{" "}
-          {level.floor.stripLinks.map((l) => `${model.blocs.find((b) => b.id === l.from)?.nom ?? l.from} ${l.verb || "→"} ${model.blocs.find((b) => b.id === l.to)?.nom ?? l.to}`).join(" ; ")}.
-        </p>
-      )}
       <Journeys model={model} onPlay={onPlay} />
-      <p className="mt-6 text-[13.5px] leading-relaxed text-faint">
-        Cliquez une pièce pour savoir ce qu'elle fait. « Entrer » montre ce qu'elle contient, jusqu'au code.
+      <Doubts model={model} />
+    </Panel>
+  );
+}
+
+/** The panel of the factory floor (V19-V24): the belt's journey first, then the rooms, then the other journeys. */
+function FloorInfo({ model, level, floor, onEnter, onPlay }: {
+  model: ProjectModel; level: Level; floor: Floor; onEnter: (box: Box) => void; onPlay: (id: string, step: number) => void;
+}) {
+  const main = floor.journey;
+  const others = model.parcours.filter((j) => j !== main);
+  const blocOf = (id: string | null) => (id ? (model.composants.find((c) => c.id === id)?.bloc ?? id) : null);
+  const rooms = floor.items.filter((i) => i.role === "belt" || i.role === "orphan");
+  const data = model.donnee?.[0]?.nom;
+  return (
+    <Panel>
+      <p className="text-[12px] text-faint">Vous êtes ici</p>
+      <h2 className="mt-1 text-[20px] leading-tight font-bold">L'usine (vue d'ensemble)</h2>
+      <p className="mt-2 text-[13px] leading-relaxed text-muted">
+        Les grandes pièces du projet, posées sur le tapis qui suit la donnée : elle entre à gauche, ressort à droite. Pour voir l'intérieur d'une pièce,
+        cliquez sur « Entrer ».
       </p>
-      {model.incertitudes.length > 0 && (
-        <details className="mt-5 text-[14px]">
-          <summary className="cursor-pointer text-muted hover:text-ink">Ce que Claude n'a pas pu vérifier ({model.incertitudes.length})</summary>
-          <ul className="mt-2 list-disc space-y-1.5 pl-5 text-muted">
-            {model.incertitudes.map((item, index) => (
-              <li key={index}>{item}</li>
+      {main && (
+        <section className="mt-6">
+          <h3 className="text-[14px] font-bold">Le trajet sur le tapis</h3>
+          <div className="mt-2 rounded-lg border border-line-soft px-3 py-2.5 text-[13px]">
+            <p className="text-[14px] leading-snug font-bold">{main.nom}</p>
+            {main.depart && (
+              <p className="mt-1 text-muted">
+                <strong className="text-fl-data">Départ : </strong>
+                {main.depart}
+              </p>
+            )}
+            {main.fin && (
+              <p className="text-muted">
+                <strong className="text-fl-data">Arrivée : </strong>
+                {main.fin}
+              </p>
+            )}
+            <p className="mt-1 text-[12px] text-faint">
+              {steps(main.etapes.length)}
+              {main.branches?.length ? ` · ${otherCases(main.branches.length)}` : ""}
+            </p>
+            <button
+              type="button"
+              onClick={() => onPlay(main.id, 1)}
+              aria-label={`Suivre le trajet : ${main.nom}`}
+              className="mt-2.5 inline-flex items-center gap-2 rounded-md border border-fl-data bg-fl-data/15 px-3 py-1.5 text-[13px] font-bold text-ink hover:bg-fl-data/25"
+            >
+              <Play size={13} className="fill-fl-data text-fl-data" aria-hidden="true" />
+              {data ? `Suivre « ${data} »` : "Suivre ce trajet"}
+            </button>
+            <p className="mt-2 text-[11px] leading-snug text-faint">
+              {main.principal_deduit || !main.principal
+                ? "Choisi car il passe par le plus de pièces : le modèle ne dit pas lequel est le trajet principal."
+                : "Le modèle le donne comme trajet principal."}
+            </p>
+          </div>
+        </section>
+      )}
+      {rooms.length > 0 && (
+        <section className="mt-6">
+          <h3 className="text-[14px] font-bold">Les pièces</h3>
+          <ul className="mt-2 flex flex-col gap-2">
+            {rooms.map((item) => {
+              const box = level.boxes.find((b) => b.id === item.id);
+              const block = model.blocs.find((b) => b.id === item.id);
+              if (!box || !block) return null;
+              const room = buildRoom(model, item.id);
+              const machines = room ? room.belt.length + room.band.length : 0;
+              const here = (main?.etapes ?? []).filter((s) => blocOf(s.composant) === item.id).length;
+              return (
+                <li key={item.id} className="rounded-lg border border-line-soft px-3 py-2.5 text-[13px]">
+                  <p className="text-[14px] font-bold">{block.nom}</p>
+                  <p className="text-muted">{block.en_bref || block.role}</p>
+                  <p className="mt-1 flex items-end justify-between gap-2 text-[12px] text-faint">
+                    <span>{[machines ? `${machines} machine${machines > 1 ? "s" : ""}` : "", here ? `${here} étape${here > 1 ? "s" : ""} ici` : ""].filter(Boolean).join(" · ")}</span>
+                    {box.inside > 0 && (
+                      <button type="button" onClick={() => onEnter(box)} className="shrink-0 text-[13px] text-fl-service hover:underline">
+                        Entrer ›
+                      </button>
+                    )}
+                  </p>
+                </li>
+              );
+            })}
+          </ul>
+        </section>
+      )}
+      {others.length > 0 && (
+        <section className="mt-6">
+          <h3 className="text-[14px] font-bold">
+            Autres trajets <span className="text-[11.5px] font-normal text-faint">(un seul trajet à la fois sur le tapis)</span>
+          </h3>
+          <ul className="mt-2 flex flex-col gap-2">
+            {others.map((journey) => (
+              <li key={journey.id}>
+                <details className="rounded-lg border border-line-soft px-3 py-2.5 text-[13px]">
+                  <summary className="cursor-pointer">
+                    <span className="text-[14px] font-bold">{journey.nom}</span>
+                    {/* Shown while folded, as in the mockup (V24). */}
+                    <span className="mt-1 line-clamp-2 block text-muted">{journey.depart || journey.declencheur}</span>
+                  </summary>
+                  <button type="button" onClick={() => onPlay(journey.id, 1)} aria-label={`Suivre le trajet : ${journey.nom}`} className="mt-1.5 inline-flex items-center gap-1.5 text-[13px] text-fl-data hover:underline">
+                    <Play size={12} aria-hidden="true" /> Suivre ce trajet ({steps(journey.etapes.length)})
+                  </button>
+                </details>
+              </li>
             ))}
           </ul>
-        </details>
+        </section>
+      )}
+      <Doubts model={model} />
+    </Panel>
+  );
+}
+
+function Doubts({ model }: { model: ProjectModel }) {
+  if (model.incertitudes.length === 0) return null;
+  return (
+    <details className="mt-6 text-[13px]">
+      <summary className="cursor-pointer text-muted hover:text-ink">Ce que Claude n'a pas pu vérifier ({model.incertitudes.length})</summary>
+      <ul className="mt-2 list-disc space-y-1.5 pl-5 text-muted">
+        {model.incertitudes.map((item, index) => (
+          <li key={index}>{item}</li>
+        ))}
+      </ul>
+    </details>
+  );
+}
+
+/** The panel of an open room (V40, V44-V46): the driving journey's steps grouped by room, each refusal after the step that handles it. */
+function RoomInfo({ projectId, model, level, onPlay }: { projectId: string; model: ProjectModel; level: Level; onPlay: (id: string, step: number) => void }) {
+  const room = level.room!;
+  const block = model.blocs.find((b) => b.id === room.bloc);
+  const journey = room.journey;
+  const others = model.parcours.filter((j) => j !== journey && stepRuns(model, j).some((r) => r.bloc === room.bloc));
+  const branchesAt = (n: number) => (journey?.branches ?? []).filter((b) => b.etape === n);
+  const loose = (journey?.branches ?? []).filter((b) => !b.etape || b.etape < 1 || b.etape > (journey?.etapes.length ?? 0));
+  return (
+    <Panel>
+      <p className="text-[12px] text-faint">Vous êtes dans la pièce</p>
+      <h2 className="mt-1 text-[20px] leading-tight font-bold">{level.title}</h2>
+      <p className="mt-1.5 text-[13px] leading-relaxed text-muted">{block?.en_bref || block?.role}</p>
+      {journey && (
+        <section className="mt-5">
+          <button type="button" onClick={() => onPlay(journey.id, 1)} className="flex items-center gap-2 text-left text-[14px] font-bold hover:underline">
+            <Play size={14} className="shrink-0 fill-fl-data text-fl-data" aria-hidden="true" />
+            {journey.nom}
+          </button>
+          <p className="mt-0.5 text-[12px] text-faint">Les numéros sur les machines suivent ce trajet.</p>
+          {stepRuns(model, journey).map((run) => (
+            <div key={run.from} className={run.bloc === room.bloc ? "" : "opacity-75"}>
+              <p className="mt-4 mb-1.5 text-[11px] font-semibold tracking-wide text-faint uppercase">{run.title.startsWith("Retour") || run.title.startsWith("Fait") ? run.title : `Dans « ${run.title} »`}</p>
+              <ol className="flex flex-col gap-2">
+                {journey.etapes.slice(run.from - 1, run.to).map((step, k) => {
+                  const n = run.from + k;
+                  return (
+                    <li key={n}>
+                      <div className="rounded-lg border border-line-soft px-3 py-2 text-[13px]">
+                        <button type="button" onClick={() => onPlay(journey.id, n)} className="flex items-start gap-2 text-left hover:underline">
+                          <span className="fl-num mt-0.5">{n}</span>
+                          <span className="font-bold leading-snug">{stepLabel(step)}</span>
+                        </button>
+                        <p className="mt-1 leading-snug text-muted">{step.simple || step.texte}</p>
+                        <CitedCode projectId={projectId} cited={step} />
+                      </div>
+                      {branchesAt(n).map((branch, b) => (
+                        <IfThen key={b} projectId={projectId} branch={branch} />
+                      ))}
+                    </li>
+                  );
+                })}
+              </ol>
+            </div>
+          ))}
+          {loose.map((branch, b) => (
+            <IfThen key={`loose-${b}`} projectId={projectId} branch={branch} />
+          ))}
+        </section>
+      )}
+      {others.length > 0 && (
+        <section className="mt-6">
+          <h3 className="text-[14px] font-bold">Passent aussi par ici</h3>
+          <ul className="mt-2 flex flex-col gap-1.5">
+            {others.map((j) => (
+              <li key={j.id}>
+                <button type="button" onClick={() => onPlay(j.id, 1)} className="flex items-center gap-2 text-left text-[13px] hover:underline">
+                  <Play size={12} className="shrink-0 text-fl-data" aria-hidden="true" />
+                  {j.nom} <span className="text-faint">· {steps(j.etapes.length)}</span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        </section>
       )}
     </Panel>
+  );
+}
+
+/** A special case, as in the mockup (V46): no frame, a red bar on the left, « Si … alors … ». */
+function IfThen({ projectId, branch }: { projectId: string; branch: Branch }) {
+  const technical = !branch.quand_simple;
+  return (
+    <div className="my-2 border-l-[3px] border-fl-refus py-0.5 pl-3 text-[12.5px] leading-snug text-muted">
+      <p>
+        <strong className="text-ink">Si</strong> {lowerFirst(branch.quand_simple || branch.quand)}
+      </p>
+      <p>
+        <strong className="text-ink">alors</strong> {lowerFirst(branch.alors_simple || branch.alors)} {technical && <span className="fl-tech">texte du modèle, technique</span>}
+      </p>
+      <CitedCode projectId={projectId} cited={branch} />
+    </div>
   );
 }
 
@@ -252,10 +449,4 @@ function StepInfo({ projectId, journey, number, onStep }: {
       </details>
     </Panel>
   );
-}
-
-/** « Le serveur… », « L'en-tête… » → « le serveur… », « l'en-tête… »; a name (« WeasyPrint », « API ») keeps its capitals. */
-function lowerFirst(text: string): string {
-  const word = text.split(/[\s'’]/)[0] ?? "";
-  return /[A-Z]/.test(word.slice(1)) ? text : text.charAt(0).toLowerCase() + text.slice(1);
 }

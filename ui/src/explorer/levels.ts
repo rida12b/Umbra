@@ -1,8 +1,9 @@
 import type { ArchBlock, BlockType, ProjectModel } from "../api";
 import { buildFloor, type Floor } from "./floor";
+import { buildRoom, type Room } from "./room";
 
 // What the explorer shows at each zoom level, built from the Project model only (no API call):
-// the factory floor (parts) → the components of one part → the files of one component.
+// the factory floor (parts) → one part opened in place (its machines) → the files of one machine.
 // The level below files is the code itself, read from the index (see CodeLevel).
 
 export const KIND: Record<BlockType, string> = {
@@ -56,6 +57,7 @@ export interface Level {
   boxes: Box[];
   links: Link[];
   floor: Floor | null; // the top level is drawn as a factory floor (ADR-0006)
+  room?: Room | null; // a part opened in place (#76); null: a part without machines
 }
 
 function blockBox(model: ProjectModel, block: ArchBlock, faded = false): Box {
@@ -67,7 +69,7 @@ function blockBox(model: ProjectModel, block: ArchBlock, faded = false): Box {
     words: block.en_bref || block.role,
     faded: faded || block.importance === "ancien",
     target: { kind: "block", id: block.id },
-    inside: components || block.code.length,
+    inside: components, // only a part with machines can be entered (a person opens its explanation)
   };
 }
 
@@ -88,63 +90,31 @@ export function buildLevel(model: ProjectModel, key: LevelKey, projectName: stri
   if (key.startsWith("part:")) {
     const block = model.blocs.find((b) => b.id === key.slice(5));
     if (!block) return null;
-    const components = model.composants.filter((c) => c.bloc === block.id);
-    const own = new Set(components.map((c) => c.id));
-    const boxes: Box[] = components.map((c) => ({
-      id: c.id,
-      kind: "Composant",
-      title: c.nom,
-      words: c.en_bref || c.role,
-      faded: false,
-      target: { kind: "component", id: c.id },
-      inside: c.fichiers.length,
-    }));
-    if (boxes.length === 0)
-      for (const code of block.code)
-        boxes.push({
-          id: `file:${code.chemin}`,
-          kind: code.element.startsWith("dir:") || code.element === "app:" ? "Dossier" : "Fichier",
-          title: code.chemin.split("/").pop() || block.nom, // « app: » is the whole project folder
-          words: model.modules[code.chemin] ?? model.dossiers[code.chemin] ?? code.chemin,
-          faded: false,
-          target: { kind: "file", path: code.element },
-          inside: 1,
-        });
-    const links = new Map<string, Link>();
-    const neighbour = (id: string) => {
-      const other = model.blocs.find((b) => b.id === id);
-      if (!other || other.id === block.id) return null;
-      const shown = boxes.find((b) => b.target.kind === "block" && b.target.id === other.id);
-      if (shown) return shown.id;
-      const box = blockBox(model, other, true);
-      if (own.has(box.id)) box.id = `@bloc:${box.id}`; // a component may share a neighbour's id
-      boxes.push(box);
-      return box.id;
+    const room = buildRoom(model, block.id); // null: a part without machines (a person, a store, a service)
+    const component = (id: string): Box => {
+      const c = model.composants.find((x) => x.id === id)!;
+      return { id, kind: "Composant", title: c.nom, words: c.en_bref || c.role, faded: false, target: { kind: "component", id }, inside: c.fichiers.length };
     };
-    const add = (from: string | null, to: string | null, verb: string, full: string) => {
-      if (!from || !to || from === to) return;
-      const id = `${from}>${to}`;
-      if (!links.has(id)) links.set(id, { id, from, to, verb, full });
-    };
-    for (const c of components)
-      for (const used of c.utilise) add(c.id, own.has(used) ? used : neighbour(used), "utilise", `${c.nom} utilise ${used}`);
-    // The journeys say which component reaches which outside part, and in what words.
-    for (const journey of model.parcours)
-      for (const step of journey.etapes)
-        if (step.composant && own.has(step.composant))
-          for (const reached of step.touche) {
-            const other = neighbour(reached);
-            // A step done by hand is done by the part it reaches (a person): the arrow starts there.
-            if (step.manuel) add(other, step.composant, step.action || "", step.simple || step.texte);
-            else add(step.composant, other, step.action || "", step.simple || step.texte);
-          }
+    const around = room ? [...room.doors.map((d) => d.bloc), ...room.belt.flatMap((m) => m.hung.map((h) => h.bloc))] : [];
+    const boxes: Box[] = room
+      ? [
+          ...[...room.belt.map((m) => m.id), ...room.band].map(component),
+          ...[...new Set(around)].flatMap((id) => {
+            const other = model.blocs.find((b) => b.id === id);
+            return other ? [blockBox(model, other, true)] : [];
+          }),
+        ]
+      : [];
     return {
       key,
       title: block.nom,
-      hint: `Ce qu'il y a dans « ${block.nom} »${boxes.some((b) => b.faded) ? ", et les pièces voisines (estompées)" : ""}.`,
+      hint: room
+        ? `Ce qui se passe dans « ${block.nom} », machine par machine, dans l'ordre où la donnée les traverse.`
+        : `« ${block.nom} » n'a pas de machine à montrer : c'est ${block.type === "user" ? "une personne" : "une pièce sans code étudié"}.`,
       boxes,
-      links: [...links.values()],
+      links: [],
       floor: null,
+      room,
     };
   }
 
