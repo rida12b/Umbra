@@ -114,7 +114,9 @@ def updated_model(
     # New flows may join blocks that were not returned again: check them against every block.
     new_flows = _flows(raw_patch.get("flux"), {b["id"] for b in merged["blocs"]})
     replaced = {(f["de"], f["vers"], f["nature"]) for f in new_flows}
-    merged["flux"] = [f for f in model["flux"] if (f["de"], f["vers"], f.get("nature", "donnee")) not in replaced]
+    merged["flux"] = [
+        f for f in model["flux"] if (f["de"], f["vers"], f.get("nature", "donnee")) not in replaced
+    ]
     merged["flux"] += new_flows
     merged["incertitudes"] = patch["incertitudes"] or model["incertitudes"]
     if any(_dict(j).get("principal") is True for j in _list(raw_patch.get("parcours"))):
@@ -128,7 +130,11 @@ def updated_model(
     return checked_model(merged, line_counts, directories, texts=texts)
 
 
-PROJECT_SECTIONS = (("donnee", ("nom",)), ("reglages_projet", ("fichier", "code")), ("pour_changer", ("composant", "intention")))
+PROJECT_SECTIONS = (
+    ("donnee", ("nom",)),
+    ("reglages_projet", ("fichier", "code")),
+    ("pour_changer", ("composant", "intention")),
+)
 
 
 def _merged_rows(stored: list[dict], raw_patch: dict, section: str, key: tuple[str, ...]) -> list[dict]:
@@ -248,7 +254,8 @@ def _journey(item: object, line_counts: dict[str, int], block_ids: set[str]) -> 
             for b in _list(item.get("branches"))
             if isinstance(b, dict) and b.get("quand")
         ],
-        "principal": item.get("principal") is True and not item.get("principal_deduit"),  # deduced: picked again
+        "principal": item.get("principal") is True
+        and not item.get("principal_deduit"),  # deduced: picked again
         "entree": item.get("entree") if item.get("entree") in block_ids else None,
         "sortie": [b for b in _texts(item.get("sortie")) if b in block_ids],
         "phases": v17.phases(item.get("phases"), old_to_new, len(steps)),
@@ -263,7 +270,9 @@ def _step(s: dict, line_counts: dict[str, int], block_ids: set[str]) -> dict:
         "action": str(s.get("action", ""))[:MAX_ACTION],
         "simple": str(s.get("simple", ""))[:MAX_SIMPLE],
         # A step done by hand may have no component; otherwise a missing one is "", never "None".
-        "composant": None if composant is None and manual else (composant if isinstance(composant, str) else ""),
+        "composant": None
+        if composant is None and manual
+        else (composant if isinstance(composant, str) else ""),
         "touche": [b for b in _texts(s.get("touche")) if b in block_ids],
         "conditions": _texts(s.get("conditions")),
         "manuel": manual,

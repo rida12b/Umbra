@@ -11,14 +11,15 @@ from secret_fixtures import write_repo
 
 from umbra_engine.analysis.runner import MODEL_KEY, MODEL_PRODUCER, file_digests
 from umbra_engine.api import create_app
-from umbra_engine.indexer import index_project
 from umbra_engine.gateways.claude import ClaudeUnavailableError
+from umbra_engine.indexer import index_project
 from umbra_engine.registry import Registry
 
 OLD = "claude-code-study@1.6"
 FILES = {"app/main.py": "def main():\n    return 1\n", "app/store.py": "def save():\n    return 2\n"}
 OLD_MODEL = {
-    "pitch": "Une petite application.", "resume": "r", "flux": [], "composants": [], "modules": {}, "dossiers": {},
+    "pitch": "Une petite application.", "resume": "r", "flux": [], "composants": [], "modules": {},
+    "dossiers": {},
     "incertitudes": [], "blocs": [{"id": "api", "nom": "API", "type": "backend", "role": "r", "code": []}],
     "parcours": [],
 }  # fmt: skip

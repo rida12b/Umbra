@@ -146,7 +146,9 @@ def test_a_setting_that_only_matches_a_masked_secret_never_verifies():
     released = texts() | {"settings.py": 'API_KEY = "************"\n'}
     raw = with_setting(code='API_KEY = "sk-live-abc123"', fichier="settings.py", lignes=[1, 1])
     model = check(raw, released)
-    assert component(model, "auth-tenant")["reglages"][0]["verifie"] is False  # Claude only ever sees the mask
+    assert (
+        component(model, "auth-tenant")["reglages"][0]["verifie"] is False
+    )  # Claude only ever sees the mask
 
 
 def test_a_project_setting_the_code_never_reads_is_marked_and_not_offered_as_a_lever():
@@ -280,7 +282,10 @@ def test_unknown_values_and_too_many_rows_never_break_the_model():
 
 
 def test_a_long_effect_is_cut_on_a_word():
-    effect = "Le service refuse toute demande qui ne porte pas le nom du client dans son en-tête, même la documentation, et ne garde rien"
+    effect = (
+        "Le service refuse toute demande qui ne porte pas le nom du client dans son en-tête, "
+        "même la documentation, et ne garde rien"
+    )
     row = setting(with_setting(effet=effect))
     assert len(row["effet"]) <= MAX_SHORT and row["effet"].endswith("…")
     assert effect.startswith(row["effet"][:-1].rstrip()) and effect[len(row["effet"][:-1].rstrip())] == " "
@@ -322,7 +327,8 @@ def test_an_update_drops_what_points_to_removed_entries_and_keeps_both_kinds_of_
 def test_the_prompt_asks_for_every_new_field_and_the_two_reader_rules():
     assert "atelier" in SCHEMA
     for word in ("entre", "sort", "reglages", "termes", "donnee", "reglages_projet", "nature",
-                 "principal", "entree", "sortie", "quand_simple", "alors_simple", "etape", "phases", "pour_changer"):  # fmt: skip
+                 "principal", "entree", "sortie", "quand_simple", "alors_simple", "etape", "phases",
+                 "pour_changer"):  # fmt: skip
         assert f'"{word}"' in SCHEMA, word
     assert all(key in UPDATE for key in ("donnee", "reglages_projet", "pour_changer"))
     prompt = study_prompt()
@@ -373,29 +379,61 @@ _ANSWER = answer()
 
 
 def test_a_setting_value_is_kept_only_when_the_cited_lines_show_it_and_never_for_a_secret():
-    released = texts() | {"settings.py": 'JWT_SECRET = os.getenv("JWT_SECRET", "my-jwt-signing-key-prod")\nADMIN_PASSWORD=*************\n'}
+    released = texts() | {
+        "settings.py": (
+            'JWT_SECRET = os.getenv("JWT_SECRET", "my-jwt-signing-key-prod")\n'
+            "ADMIN_PASSWORD=*************\n"
+        )
+    }
     raw = answer()
     auth = next(c for c in raw["composants"] if c["id"] == "auth-tenant")
     auth["reglages"] = [
-        {"nom": "Clé", "code": "JWT_SECRET", "valeur": "my-jwt-signing-key-prod", "fichier": "settings.py", "lignes": [1, 1]},
-        {"nom": "Mot de passe", "code": "ADMIN_PASSWORD", "valeur": "Watchdog2024!", "fichier": "settings.py", "lignes": [2, 2]},
+        {
+            "nom": "Clé",
+            "code": "JWT_SECRET",
+            "valeur": "my-jwt-signing-key-prod",
+            "fichier": "settings.py",
+            "lignes": [1, 1],
+        },
+        {
+            "nom": "Mot de passe",
+            "code": "ADMIN_PASSWORD",
+            "valeur": "Watchdog2024!",
+            "fichier": "settings.py",
+            "lignes": [2, 2],
+        },
         {"nom": "Code du refus", "code": "401", "valeur": "401", "fichier": AUTH, "lignes": [36, 36]},
     ]
     model = check(raw, released)
     dumped = json.dumps(model, ensure_ascii=False)
     assert "my-jwt-signing-key-prod" not in dumped and "Watchdog2024!" not in dumped
-    assert component(model, "auth-tenant")["reglages"][2]["valeur"] == "401"  # a plain value seen in the code stays
+    assert (
+        component(model, "auth-tenant")["reglages"][2]["valeur"] == "401"
+    )  # a plain value seen in the code stays
     assert "secret" in study_prompt().lower() and "valeur" in study_prompt()
 
 
 def test_levers_returned_by_an_update_replace_all_the_levers_of_their_component():
     model = check(answer())
     counts = {p: len(t.splitlines()) for p, t in texts().items()}
-    full = [{"intention": f"Je veux changer l'ancien réglage {n}", "composant": "auth-tenant", "reglage": "X-Tenant-ID"} for n in (1, 2, 3)]
+    full = [
+        {
+            "intention": f"Je veux changer l'ancien réglage {n}",
+            "composant": "auth-tenant",
+            "reglage": "X-Tenant-ID",
+        }
+        for n in (1, 2, 3)
+    ]
     model = updated_model(model, {"pour_changer": full}, counts, {"watchdog_ai"}, texts=texts())
-    patch = {"pour_changer": [{"intention": "Je veux changer le message de refus", "composant": "auth-tenant", "reglage": "401"}]}
+    patch = {
+        "pour_changer": [
+            {"intention": "Je veux changer le message de refus", "composant": "auth-tenant", "reglage": "401"}
+        ]
+    }
     merged = updated_model(model, patch, counts, {"watchdog_ai"}, texts=texts())
-    assert [p["intention"] for p in merged["pour_changer"] if p["composant"] == "auth-tenant"] == ["Je veux changer le message de refus"]
+    assert [p["intention"] for p in merged["pour_changer"] if p["composant"] == "auth-tenant"] == [
+        "Je veux changer le message de refus"
+    ]
     assert any(p["composant"] == "app" for p in merged["pour_changer"])  # other components keep theirs
     assert "replace all its levers" in UPDATE
 
@@ -411,13 +449,19 @@ def test_a_lever_on_a_project_setting_takes_that_setting_citation():
     assert (port["fichier"], port["lignes"], port["verifie"]) == (".env.example", [3, 3], True)
     assert "motif" not in port
     unread = next(p for p in check(answer())["pour_changer"] if p["composant"] == "app")
-    assert (unread["fichier"], unread["verifie"], unread["motif"]) == (".env.example", False, "non lu par le code")
+    assert (unread["fichier"], unread["verifie"], unread["motif"]) == (
+        ".env.example",
+        False,
+        "non lu par le code",
+    )
 
 
 def test_caps_hold_in_code_levers_only_on_core_parts_and_citations_up_to_fifteen_lines():
     raw = answer()
     next(b for b in raw["blocs"] if b["id"] == "memoire")["importance"] = "secondaire"
-    raw["pour_changer"].append({"intention": "Je veux changer le rangement", "composant": "stockage-events", "reglage": "_events"})
+    raw["pour_changer"].append(
+        {"intention": "Je veux changer le rangement", "composant": "stockage-events", "reglage": "_events"}
+    )
     auth = next(c for c in raw["composants"] if c["id"] == "auth-tenant")
     auth["termes"] = [{"simple": f"mot {n}", "code": f"code{n}"} for n in range(5)]
     raw["parcours"][1]["branches"][0]["quand_simple"] = "mot " * 200
@@ -435,33 +479,70 @@ def test_an_update_adds_and_replaces_project_level_rows_by_their_key():
     patch = {
         "donnee": [{"nom": "alerte", "dans_le_code": "Alert", "entre_par": "api", "finit_dans": "memoire"}],
         "reglages_projet": [
-            {"nom": "Port ailleurs", "code": "APP_PORT=8000", "valeur": "", "fichier": "README.md", "lignes": [1, 1], "lu_par_le_code": "non"},
-            {"nom": "Port renommé", "code": "APP_PORT=8000", "valeur": "8000", "fichier": ".env.example", "lignes": [3, 3], "lu_par_le_code": "non"},
+            {
+                "nom": "Port ailleurs",
+                "code": "APP_PORT=8000",
+                "valeur": "",
+                "fichier": "README.md",
+                "lignes": [1, 1],
+                "lu_par_le_code": "non",
+            },
+            {
+                "nom": "Port renommé",
+                "code": "APP_PORT=8000",
+                "valeur": "8000",
+                "fichier": ".env.example",
+                "lignes": [3, 3],
+                "lu_par_le_code": "non",
+            },
         ],
     }
     merged = updated_model(model, patch, counts, {"watchdog_ai"}, texts=texts())
     assert [d["nom"] for d in merged["donnee"]] == ["compte rendu", "alerte"]
     ports = [r for r in merged["reglages_projet"] if r["code"] == "APP_PORT=8000"]
-    assert sorted(r["nom"] for r in ports) == ["Port ailleurs", "Port renommé"]  # same code, two files; same file replaced
+    assert sorted(r["nom"] for r in ports) == [
+        "Port ailleurs",
+        "Port renommé",
+    ]  # same code, two files; same file replaced
 
 
 def test_a_secret_never_stays_in_a_setting_code_or_a_lever_and_plain_settings_keep_their_value():
     released = texts() | {
-        "config/app.env": "APP_KEY=base64Zq7rLm2Xw9kQ\nDB_PASS=Zq7!rLm2Xw9k\nMAX_TOKENS=4096\nAUTHOR_NAME=Rida\n",
+        "config/app.env": "APP_KEY=base64Zq7rLm2Xw9kQ\nDB_PASS=Zq7!rLm2Xw9k\n"
+        "MAX_TOKENS=4096\nAUTHOR_NAME=Rida\n",
     }
     raw = answer()
-    rows = [("APP_KEY=base64Zq7rLm2Xw9kQ", "base64Zq7rLm2Xw9kQ", 1), ("DB_PASS=Zq7!rLm2Xw9k", "Zq7!rLm2Xw9k", 2),
+    rows = [("APP_KEY=base64Zq7rLm2Xw9kQ", "base64Zq7rLm2Xw9kQ", 1),
+            ("DB_PASS=Zq7!rLm2Xw9k", "Zq7!rLm2Xw9k", 2),
             ("MAX_TOKENS=4096", "4096", 3), ("AUTHOR_NAME=Rida", "Rida", 4)]  # fmt: skip
     raw["reglages_projet"] = [
-        {"nom": code.split("=")[0], "code": code, "valeur": value, "fichier": "config/app.env", "lignes": [n, n], "lu_par_le_code": "oui"}
+        {
+            "nom": code.split("=")[0],
+            "code": code,
+            "valeur": value,
+            "fichier": "config/app.env",
+            "lignes": [n, n],
+            "lu_par_le_code": "oui",
+        }
         for code, value, n in rows
     ]
-    raw["pour_changer"].append({"intention": "Je veux changer la clé", "composant": "app", "reglage": "APP_KEY=base64Zq7rLm2Xw9kQ"})
+    raw["pour_changer"].append(
+        {"intention": "Je veux changer la clé", "composant": "app", "reglage": "APP_KEY=base64Zq7rLm2Xw9kQ"}
+    )
     model = check(raw, released)
     dumped = json.dumps(model, ensure_ascii=False)
     assert "base64Zq7rLm2Xw9kQ" not in dumped and "Zq7!rLm2Xw9k" not in dumped
     by_name = {r["nom"]: r for r in model["reglages_projet"]}
-    assert (by_name["APP_KEY"]["code"], by_name["APP_KEY"]["verifie"]) == ("APP_KEY", True)  # checked on the raw line first
+    assert (by_name["APP_KEY"]["code"], by_name["APP_KEY"]["verifie"]) == (
+        "APP_KEY",
+        True,
+    )  # checked on the raw line first
     assert by_name["DB_PASS"]["code"] == "DB_PASS"
-    assert (by_name["MAX_TOKENS"]["valeur"], by_name["AUTHOR_NAME"]["valeur"]) == ("4096", "Rida")  # not secrets
-    assert next(p for p in model["pour_changer"] if p["intention"] == "Je veux changer la clé")["reglage"] == "APP_KEY"
+    assert (by_name["MAX_TOKENS"]["valeur"], by_name["AUTHOR_NAME"]["valeur"]) == (
+        "4096",
+        "Rida",
+    )  # not secrets
+    assert (
+        next(p for p in model["pour_changer"] if p["intention"] == "Je veux changer la clé")["reglage"]
+        == "APP_KEY"
+    )

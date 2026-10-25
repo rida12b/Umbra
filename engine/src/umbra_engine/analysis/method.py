@@ -157,7 +157,8 @@ Answer with ONLY one JSON object containing just what changed, with the same sha
   "incertitudes": [...]}}
 Entries you return replace the entries with the same id (or path; a data row by its name, a project
 setting by file and code). A component you return is whole: its entre, sort, reglages and termes too.
-The levers you return for a component replace all its levers: return all of them. Leave out everything unchanged."""
+The levers you return for a component replace all its levers: return all of them.
+Leave out everything unchanged."""
 
 
 def study_prompt() -> str:

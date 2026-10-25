@@ -15,7 +15,16 @@ _SECRET_WORDS = {
     "pass", "passe", "passwd", "password", "pwd", "secret", "secrets", "key", "keys", "apikey", "token",
     "tokens", "credential", "credentials", "creds", "dsn", "auth", "jwt", "private", "salt", "cookie",
 }  # fmt: skip
-_COUNTED = {"max", "num", "limit", "total", "prompt", "completion", "input", "output"}  # « MAX_TOKENS »: a number
+_COUNTED = {
+    "max",
+    "num",
+    "limit",
+    "total",
+    "prompt",
+    "completion",
+    "input",
+    "output",
+}  # « MAX_TOKENS »: a number
 _WORD = re.compile(r"[A-Z]?[a-z]+|[A-Z]+(?![a-z])|\d+")
 _MASK = re.compile(r"\*{4,}")
 _URL_WITH_USER = re.compile(r"://[^/\s:@]+:[^/\s@]+@")
@@ -59,7 +68,9 @@ def checked_setting(row: dict, texts: dict[str, str]) -> dict:
     value: str = row["valeur"] if isinstance(row.get("valeur"), str) else ""
     seen = bool(value) and literal(value, cited)
     code: str = row["code"] if isinstance(row.get("code"), str) else ""
-    secret = is_secret(f"{row.get('nom', '')} {code}") or bool(_URL_WITH_USER.search(value) or _MASK.search(cited or ""))
+    secret = is_secret(f"{row.get('nom', '')} {code}") or bool(
+        _URL_WITH_USER.search(value) or _MASK.search(cited or "")
+    )
     return {
         "fichier": file,
         "lignes": lines,
@@ -72,7 +83,10 @@ def checked_setting(row: dict, texts: dict[str, str]) -> dict:
 
 def is_secret(names: str) -> bool:
     words = [w.lower() for w in _WORD.findall(names)]
-    return any(w in _SECRET_WORDS and not (w.startswith("token") and i and words[i - 1] in _COUNTED) for i, w in enumerate(words))
+    return any(
+        w in _SECRET_WORDS and not (w.startswith("token") and i and words[i - 1] in _COUNTED)
+        for i, w in enumerate(words)
+    )
 
 
 def name_only(code: str) -> str:

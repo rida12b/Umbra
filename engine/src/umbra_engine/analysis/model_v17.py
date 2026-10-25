@@ -168,11 +168,15 @@ def main_journey(journeys: list[dict], components: list[dict], block_ids: set[st
         declared[0]["principal"] = True
         return
     owner = {c["id"]: c["bloc"] for c in components}
-    has_part = lambda c: owner.get(c, c) in block_ids  # noqa: E731
-    score = lambda j: (
-        len({s["composant"] for s in j["etapes"] if s["composant"] and has_part(s["composant"])}),
-        len(j["etapes"]),
-    )  # noqa: E731
+
+    def score(j: dict) -> tuple[int, int]:
+        parts = {
+            s["composant"]
+            for s in j["etapes"]
+            if s["composant"] and owner.get(s["composant"], s["composant"]) in block_ids
+        }
+        return len(parts), len(j["etapes"])
+
     if journeys:
         best = max(enumerate(journeys), key=lambda pair: (score(pair[1]), -pair[0]))[1]
         best["principal"] = True
