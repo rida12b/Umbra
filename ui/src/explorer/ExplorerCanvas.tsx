@@ -39,13 +39,11 @@ interface Props {
   onEnter: (box: Box) => void;
 }
 
-type AnyNode = BoxFlowNode;
-
 /**
  * The whole level on screen when it fits at a readable size; otherwise its full width, from the top,
  * read by scrolling down (like a page). Never blown up past LARGEST_FIT.
  */
-function frame(flow: ReactFlowInstance<AnyNode, ArrowFlowEdge>, size: { width: number; height: number }, screen: HTMLElement | null): boolean {
+function frame(flow: ReactFlowInstance<BoxFlowNode, ArrowFlowEdge>, size: { width: number; height: number }, screen: HTMLElement | null): boolean {
   const width = screen?.clientWidth ?? 1000;
   const height = screen?.clientHeight ?? 700;
   const across = (width - 2 * MARGIN - CONTROLS) / Math.max(size.width, 1); // the zoom buttons sit top right
@@ -61,12 +59,12 @@ function frame(flow: ReactFlowInstance<AnyNode, ArrowFlowEdge>, size: { width: n
 
 /** One level below the floor: boxes placed by ELK, arrows between them, the played step moving. */
 export function ExplorerCanvas({ level, theme, selected, play, onSelect, onEnter }: Props) {
-  const [layout, setLayout] = useState<{ shape: string; key: string; placed: Drawing } | null>(null);
+  const [layout, setLayout] = useState<{ shape: string; key: string; placed: Placed } | null>(null);
   const [failed, setFailed] = useState(false);
   const [hovered, setHovered] = useState<string | null>(null);
   const screen = useRef<HTMLDivElement>(null);
   const [below, setBelow] = useState(false); // part of the map is under the screen: say so
-  const flowRef = useRef<ReactFlowInstance<AnyNode, ArrowFlowEdge> | null>(null);
+  const flowRef = useRef<ReactFlowInstance<BoxFlowNode, ArrowFlowEdge> | null>(null);
   const [framed, setFramed] = useState(0); // counts framings: the step is followed after the first one
   // A live refresh rebuilds the level; only a change of its boxes or arrows is laid out again.
   const shape = useMemo(
@@ -102,7 +100,7 @@ export function ExplorerCanvas({ level, theme, selected, play, onSelect, onEnter
     let current = true;
     setFailed(false);
     const arrows = level.links.map((link) => ({ key: link.id, source: link.from, target: link.to }));
-    const drawing: Promise<Drawing> = placeArchitecture(
+    const drawing: Promise<Placed> = placeArchitecture(
       level.boxes.map((box) => ({ id: box.id, width: BOX_WIDTH, height: BOX_HEIGHT })),
       // Room for each arrow's words between the columns, so they never sit on a box.
       arrows.map((arrow, i) => ({ ...arrow, labels: [{ width: textWidth(wordsOf(level.links[i]), 8) + 24, height: 26 }] })),
@@ -117,7 +115,7 @@ export function ExplorerCanvas({ level, theme, selected, play, onSelect, onEnter
 
   const lookOf = (box: Box): Look => (play ? (play.step.boxes.includes(box.id) ? "lit" : play.boxes.has(box.id) ? "normal" : "dim") : "normal");
 
-  const nodes: AnyNode[] = useMemo(() => {
+  const nodes: BoxFlowNode[] = useMemo(() => {
     if (!placed) return [];
     return level.boxes.flatMap((box) => {
       const position = placed.boxes.get(box.id);
@@ -139,14 +137,14 @@ export function ExplorerCanvas({ level, theme, selected, play, onSelect, onEnter
       const touched = focus !== null && (link.from === focus || link.to === focus);
       const always = level.links.length <= FEW_LINKS && !play; // few arrows: their words never crowd
       const label = moving || touched || always ? wordsOf(link) : null;
-      const data = { points: route.points, label, labelAt: null, look, moving };
+      const data = { points: route.points, label, look, moving };
       return [{ id: link.id, type: "arrow" as const, source: link.from, target: link.to, data }];
     });
     // A played step between two boxes the level has no arrow for: drawn for the time of the step.
     const step = play?.step;
     const [from, to] = step?.boxes ?? [];
     if (step?.arrow && !step.link && from && to)
-      arrows.push({ id: "step", type: "arrow", source: from, target: to, data: { points: null, label: step.words, labelAt: null, look: "lit", moving: true } });
+      arrows.push({ id: "step", type: "arrow", source: from, target: to, data: { points: null, label: step.words, look: "lit", moving: true } });
     return arrows;
   }, [placed, level, hovered, selected, play]);
 
@@ -192,8 +190,6 @@ export function ExplorerCanvas({ level, theme, selected, play, onSelect, onEnter
   );
 }
 
-/** A drawing of a level, placed by ELK. */
-type Drawing = Placed;
 
 /** An arrow's words: its verb, or (models without verbs) its description, cut. */
 function wordsOf(link: { verb: string; full: string } | undefined): string {

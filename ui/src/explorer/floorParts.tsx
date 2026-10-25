@@ -6,8 +6,8 @@ import type { Box } from "./levels";
 // The pieces the factory floor is drawn with. The kind of a part shows as an icon and a coloured
 // stripe (never the lit colour, which belongs to the journey being followed); the rest stays neutral.
 
-export const ICON: Record<Shape, LucideIcon> = { person: User, room: Server, store: Database, outside: Cloud, tool: Wrench };
-export const KIND_NAME: Record<Shape, string> = {
+const ICON: Record<Shape, LucideIcon> = { person: User, room: Server, store: Database, outside: Cloud, tool: Wrench };
+const KIND_NAME: Record<Shape, string> = {
   person: "Personne",
   room: "Pièce qui travaille",
   store: "Endroit où la donnée est gardée",
@@ -40,12 +40,13 @@ interface PieceProps {
   selected: boolean;
   badge: "entree" | "sortie" | null;
   footer: string | null; // « 4 machines · 3 étapes ici »
+  relation: string | null; // a hung part: how it is linked to its room, in words (« Serveur cherche dans »)
   limit: string | null; // under the SORTIE: what it cannot do
   onSelect: (id: string) => void;
   onEnter: (box: Box) => void;
 }
 
-export function FloorPiece({ box, shape, rect, tag, look, selected, badge, footer, limit, onSelect, onEnter }: PieceProps) {
+export function FloorPiece({ box, shape, rect, tag, look, selected, badge, footer, relation, limit, onSelect, onEnter }: PieceProps) {
   const Icon = ICON[shape];
   const tone = look === "lit" ? "border-lamp-line shadow-[0_0_0_3px_var(--u-lamp-soft)]" : look === "dim" ? "border-line-soft opacity-45" : "border-line";
   const dashed = shape === "outside" || shape === "tool" ? "border-dashed" : "";
@@ -65,6 +66,7 @@ export function FloorPiece({ box, shape, rect, tag, look, selected, badge, foote
     >
       {badge && (
         <span
+          aria-hidden="true" // said inside the button, where keyboard and screen-reader users land
           className={`absolute -top-3 left-3 rounded-md px-2 py-0.5 text-[12px] font-bold tracking-wide ${
             badge === "entree" ? "bg-kind-person text-bg" : "bg-kind-store text-bg"
           }`}
@@ -75,22 +77,30 @@ export function FloorPiece({ box, shape, rect, tag, look, selected, badge, foote
       <button
         type="button"
         aria-pressed={selected}
-        aria-label={`${box.title} — ${KIND_NAME[shape]}`}
         onClick={(event) => {
           event.stopPropagation();
           onSelect(box.id);
         }}
         className="flex min-h-0 flex-col rounded-md text-left"
       >
+        <span className="sr-only">{badge === "entree" ? "Entrée : " : badge === "sortie" ? "Sortie : " : ""}</span>
         <span className="flex items-start gap-1.5">
           <Icon size={tag ? 15 : 17} className={`mt-[3px] shrink-0 ${TINT[shape]}`} aria-hidden="true" />
-          <span className={`line-clamp-2 font-semibold leading-snug text-ink ${tag ? "text-[14px]" : "text-[16px]"}`}>{box.title}</span>
+          <span className={`font-semibold leading-snug text-ink ${tag ? "line-clamp-2 text-[14px]" : "line-clamp-3 text-[16px]"}`}>{box.title}</span>
         </span>
-        <span className={`leading-snug text-muted ${tag ? "block truncate text-[13px]" : "mt-0.5 line-clamp-2 text-[14px]"}`}>{box.words}</span>
+        <span className="sr-only"> ({KIND_NAME[shape]}) </span>
+        <span className={`leading-snug ${tag ? "line-clamp-2 text-[13px]" : "mt-0.5 line-clamp-2 text-[14px]"} ${relation ? "text-ink/80 italic" : "text-muted"}`}>
+          {relation ?? box.words}
+        </span>
       </button>
+      {!tag && limit && (
+        <em className="mt-auto line-clamp-2 pt-1 text-[12.5px] leading-snug text-muted" title={limit}>
+          « {limit} »
+        </em>
+      )}
       {!tag && (
-        <div className="mt-auto flex items-end justify-between gap-2 pt-1 text-[12.5px]">
-          <span className="min-w-0 text-faint">{limit ? <em className="line-clamp-2 text-muted" title={limit}>« {limit} »</em> : <span className="line-clamp-2">{footer}</span>}</span>
+        <div className={`${limit ? "" : "mt-auto"} flex items-end justify-between gap-2 pt-1 text-[12.5px]`}>
+          <span className="line-clamp-2 min-w-0 text-faint">{footer}</span>
           {box.inside > 0 && (
             <button
               type="button"

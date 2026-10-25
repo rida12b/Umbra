@@ -54,11 +54,18 @@ export function FloorCanvas({ model, floor, level, selected, play, onSelect, onE
     <div ref={screen} className="absolute inset-0 overflow-x-hidden overflow-y-auto" onClick={() => onSelect(null)}>
       <header className="flex flex-col gap-2 border-b border-line-soft px-8 pt-5 pb-4">
         <p className="max-w-[78ch] text-[16px] leading-relaxed text-ink">{model.pitch || model.resume}</p>
+        {floor.entree && floor.sortie && (
+          <p className="text-[15px] text-ink">
+            <span className="font-semibold text-kind-person">▶ Entrée :</span> {name(floor.entree)}
+            <span className="mx-2 text-faint">→</span>
+            <span className="font-semibold text-kind-store">Sortie ■ :</span>{" "}
+            {floor.sortie.kind === "store" ? name(floor.sortie.id) : `réponse renvoyée à ${name(floor.sortie.to)}`}
+          </p>
+        )}
         <p className="text-[14px] text-muted">
           {floor.journey ? (
             <>
               Le tapis suit le chemin <strong className="font-semibold text-ink">« {floor.journey.nom} »</strong>
-              {floor.sortie?.kind === "reply" && <> · la donnée finit en réponse renvoyée à {name(floor.sortie.to)}</>}
               {floor.equivalents > 1 && <> · choisi parmi {floor.equivalents} chemins équivalents</>}
             </>
           ) : (
@@ -68,6 +75,22 @@ export function FloorCanvas({ model, floor, level, selected, play, onSelect, onE
         </p>
         <FloorKey shapes={floor.shapes} lines={new Set(floor.links.map((l) => l.style))} />
       </header>
+      <ol className="sr-only" aria-label="Le chemin de la donnée, pièce par pièce">
+        {floor.entree && <li>Entrée : {name(floor.entree)}</li>}
+        {floor.beltLinks.map((link) => (
+          <li key={link.id}>
+            {link.verb} → {name(link.to)}
+            {link.to === sortieStore ? " (sortie)" : ""}
+          </li>
+        ))}
+        {floor.items
+          .filter((item) => floor.relations[item.id])
+          .map((item) => (
+            <li key={item.id}>
+              {name(item.id)} : {floor.relations[item.id]}
+            </li>
+          ))}
+      </ol>
       <div className="relative" style={{ width: plan.size.width + 2 * PAD, height: plan.size.height + 2 * PAD }}>
         <div className="absolute" style={{ left: PAD, top: PAD + 8 }}>
           <svg className="pointer-events-none absolute overflow-visible" width={plan.size.width} height={plan.size.height} aria-hidden="true">
@@ -78,21 +101,22 @@ export function FloorCanvas({ model, floor, level, selected, play, onSelect, onE
                 </marker>
               ))}
             </defs>
-            {plan.wraps.map(({ from, to, gapY }) => {
-              const a = plan.rects.get(from);
-              const b = plan.rects.get(to);
-              return a && b ? <Line key={`wrap-${from}`} points={wrapRoute(a, b, gapY)} look="normal" width={3} dash="" moving={false} /> : null;
-            })}
+            {plan.belt.map(({ link, points }) => (
+              <Line key={link.id} points={points} look={lineLook(link.id, link.from, link.to)} width={3} dash="" moving={false} />
+            ))}
             {plan.routes.map(({ link, points }) => {
               const look = lineLook(link.id, link.from, link.to);
               return <Line key={link.id} points={points} look={look} width={STROKE[link.style].width} dash={STROKE[link.style].dash} moving={look === "lit" && !!play} />;
             })}
           </svg>
-          {plan.routes.map(({ link, label }) =>
+          {[...plan.belt, ...plan.routes].map(({ link, label, points }) =>
             label && link.verb ? (
               <span
                 key={`label-${link.id}`}
-                className="pointer-events-none absolute line-clamp-3 w-[80px] -translate-x-1/2 -translate-y-1/2 text-center text-[12.5px] leading-tight text-muted"
+                aria-hidden="true" // told once, in order, by the list read to screen readers
+                className={`pointer-events-none absolute -translate-x-1/2 -translate-y-1/2 text-center text-[12.5px] leading-tight text-muted ${
+                  points.length > 2 && link.id.startsWith("belt:") ? "w-[220px] line-clamp-2" : "w-[84px] line-clamp-4"
+                }`}
                 style={{ left: label.x, top: label.y }}
               >
                 {link.verb}
@@ -120,6 +144,7 @@ export function FloorCanvas({ model, floor, level, selected, play, onSelect, onE
                 selected={selected === item.id}
                 badge={item.id === floor.entree && floor.belt.length > 0 ? "entree" : item.id === sortieStore && floor.belt.length > 1 ? "sortie" : null}
                 footer={footer || null}
+                relation={floor.relations[item.id] ?? null}
                 limit={item.id === sortieStore ? floor.limit : null}
                 onSelect={onSelect}
                 onEnter={onEnter}
@@ -153,14 +178,6 @@ function Line({ points, look, width, dash, moving }: { points: Point[]; look: Lo
       )}
     </g>
   );
-}
-
-/** The belt going on to the next line, like text: out of the last room, down its right side, back left between the lines, into the first room. */
-function wrapRoute(last: Rect, first: Rect, gapY: number): Point[] {
-  const out = { x: last.x + last.w, y: last.y + last.h / 2 };
-  const into = first.y + first.h / 2;
-  const lane = out.x + 34; // outside the gutter lanes of that column
-  return [out, { x: lane, y: out.y }, { x: lane, y: gapY }, { x: -18, y: gapY }, { x: -18, y: into }, { x: first.x, y: into }];
 }
 
 function Band({ rect, title }: { rect: Rect; title: string }) {

@@ -15,7 +15,7 @@ export interface Point {
   x: number;
   y: number;
 }
-export interface Route {
+interface Route {
   link: FloorLink;
   points: Point[];
   label: Point | null; // where its words go; null: words only in the panel
@@ -23,19 +23,19 @@ export interface Route {
 export interface FloorPlan {
   rects: Map<string, Rect>;
   routes: Route[];
-  wraps: { from: string; to: string; gapY: number }[]; // the belt going on to the next line: last room → first room, back left at gapY
+  belt: Route[]; // the conveyor, segment by segment; a segment that wraps runs back left between the lines
   strip: Rect | null; // the band « Autour du projet »
-  orphans: Rect | null; // the band « Pièces sans trajet connu »
+  orphans: Rect | null; // the band « Pièces sans chemin connu »
   size: { width: number; height: number };
 }
 
-export const ROOM = { w: 200, h: 156 };
-export const TAG = { w: 200, h: 76 };
+const ROOM = { w: 200, h: 176 }; // a 3-line title, 2 lines of words, the SORTIE's limit and the footer
+const TAG = { w: 200, h: 96 }; // a 2-line name and a 2-line link to its room
 const GAP = 88; // between two rooms: room for the arrow's words on three short lines (three rooms fit a laptop)
 const STACK = 44; // between a room and its tags, and between two tags: room for the reply line and a short verb
 const LINE_GAP = 52; // between two lines of the belt
 const BAND = 44; // band titles and margins
-const LANE = 10; // a link that must pass a room runs in the gutter right of the column
+const LANE = 10; // right of the last room of a line: the lane the belt takes down to the next line
 
 export function placeFloor(floor: Floor, available: number): FloorPlan {
   const byId = new Map(floor.items.map((i) => [i.id, i]));
@@ -61,7 +61,7 @@ export function placeFloor(floor: Floor, available: number): FloorPlan {
   }
 
   const rects = new Map<string, Rect>();
-  const wraps: { from: string; to: string; gapY: number }[] = [];
+  const gapBelow = new Map<string, number>(); // last room of a line → the middle of the gap under that line
   let y = 0;
   let width = 0;
   lines.forEach((line, n) => {
@@ -77,8 +77,7 @@ export function placeFloor(floor: Floor, available: number): FloorPlan {
     });
     y = beltY + ROOM.h + down * (TAG.h + STACK) + (down ? 0 : 24) + LINE_GAP;
     const last = line.at(-1);
-    const next = lines[n + 1]?.[0];
-    if (last && next) wraps.push({ from: last, to: next, gapY: y - LINE_GAP / 2 });
+    if (last && n < lines.length - 1) gapBelow.set(last, y - LINE_GAP / 2);
   });
 
   const band = (ids: string[]): Rect | null => {
@@ -95,53 +94,43 @@ export function placeFloor(floor: Floor, available: number): FloorPlan {
   const orphans = band(floor.items.filter((i) => i.role === "orphan").map((i) => i.id));
   const strip = band(floor.strip);
 
-  const lanes = new Map<number, number>(); // gutter routes already in each column: each gets its own lane
+  const belt = floor.beltLinks.flatMap((link): Route[] => {
+    const a = rects.get(link.from);
+    const b = rects.get(link.to);
+    if (!a || !b) return [];
+    const y = a.y + a.h / 2;
+    if (a.y === b.y) return [{ link, points: [{ x: a.x + a.w, y }, { x: b.x, y }], label: { x: (a.x + a.w + b.x) / 2, y: y - 34 } }];
+    // Like a line of text: out to the right, down, back left between the lines, into the next line's first room.
+    const gap = gapBelow.get(link.from) ?? a.y + a.h + LINE_GAP / 2;
+    const lane = a.x + a.w + 20;
+    const into = b.y + b.h / 2;
+    const points = [{ x: a.x + a.w, y }, { x: lane, y }, { x: lane, y: gap }, { x: -18, y: gap }, { x: -18, y: into }, { x: b.x, y: into }];
+    return [{ link, points, label: { x: Math.min(lane, available) / 2, y: gap - 14 } }];
+  });
   const routes = floor.links.flatMap((link) => {
-    const route = routeOf(link, rects, row, byId, lanes);
+    const route = routeOf(link, rects, row, byId);
     return route ? [route] : [];
   });
-  return { rects, routes, wraps, strip, orphans, size: { width, height: y } };
+  return { rects, routes, belt, strip, orphans, size: { width, height: y } };
 }
 
-const mid = (r: Rect): Point => ({ x: r.x + r.w / 2, y: r.y + r.h / 2 });
-
-function routeOf(link: FloorLink, rects: Map<string, Rect>, row: string[], byId: Map<string, FloorItem>, lanes: Map<number, number>): Route | null {
+function routeOf(link: FloorLink, rects: Map<string, Rect>, row: string[], byId: Map<string, FloorItem>): Route | null {
   const a = rects.get(link.from);
   const b = rects.get(link.to);
   if (!a || !b) return null;
-  const onBelt = row.includes(link.from) && row.includes(link.to);
-  if (onBelt && a.y === b.y) {
-    const [left, right] = a.x < b.x ? [a, b] : [b, a];
-    if (link.style === "reply") {
-      // The answer runs back under the rooms, dashed.
-      const under = Math.max(a.y + a.h, b.y + b.h) + 14;
-      // Its words sit near its arrow head, clear of the lines that come up from the tags below the rooms.
-      return { link, points: [{ x: a.x + 24, y: a.y + a.h }, { x: a.x + 24, y: under }, { x: b.x + b.w - 24, y: under }, { x: b.x + b.w - 24, y: b.y + b.h }], label: { x: b.x + b.w + 30, y: under + 24 } };
-    }
-    const next = Math.abs(row.indexOf(link.from) - row.indexOf(link.to)) === 1;
-    if (!next && link.style !== "data") return null; // a jump over rooms is drawn for the data only
-    const y = left.y + left.h / 2 + (next ? 0 : -left.h / 2 - 12); // a jump over a room goes over its top edge
-    const from = a.x < b.x ? { x: a.x + a.w, y } : { x: a.x, y };
-    const to = a.x < b.x ? { x: b.x, y } : { x: b.x + b.w, y };
-    if (next) return { link, points: [from, to], label: { x: (left.x + left.w + right.x) / 2, y: y - 34 } };
-    return { link, points: [{ x: mid(a).x, y: a.y }, { x: mid(a).x, y }, { x: mid(b).x, y }, { x: mid(b).x, y: b.y }], label: null };
+  if (row.includes(link.from) && row.includes(link.to)) {
+    // The belt draws how data goes forward; only an answer going back gets its own line, under the rooms.
+    if (link.style !== "reply" || a.y !== b.y) return null;
+    const under = Math.max(a.y + a.h, b.y + b.h) + 14;
+    // Its words sit near its arrow head, clear of the lines that come up from the tags below the rooms.
+    return { link, points: [{ x: a.x + 24, y: a.y + a.h }, { x: a.x + 24, y: under }, { x: b.x + b.w - 24, y: under }, { x: b.x + b.w - 24, y: b.y + b.h }], label: { x: b.x + b.w + 30, y: under + 24 } };
   }
-  // A tag and what it hangs on share a column: a straight line between their facing edges, words beside it.
-  // Only that one link of a tag is drawn; its others would cross the floor.
+  // A tag and what it hangs on, face to face in one column: a short line (the tag says the link in words).
+  // Any other line would cross the floor: not drawn, the panel tells it when one of its ends is selected.
   const hangs = byId.get(link.from)?.attach === link.to || byId.get(link.to)?.attach === link.from;
-  if (hangs && a.x === b.x) {
-    const [top, bottom] = a.y < b.y ? [a, b] : [b, a];
-    const between = () => [...rects.entries()].some(([other, r]) => other !== link.from && other !== link.to && r.x === a.x && r.y > top.y && r.y < bottom.y);
-    if (!between()) {
-      const x = a.x + 40;
-      return { link, points: [{ x, y: a.y < b.y ? a.y + a.h : a.y }, { x, y: a.y < b.y ? b.y : b.y + b.h }], label: { x: x + 52, y: (top.y + top.h + bottom.y) / 2 + 6 } };
-    }
-    // Something sits in between (a side door of a supplier): go round by the gutter on the right, one lane each.
-    const lane = lanes.get(a.x) ?? 0;
-    lanes.set(a.x, lane + 1);
-    const x = a.x + a.w + 8 + lane * 7;
-    return { link, points: [{ x: a.x + a.w, y: mid(a).y }, { x, y: mid(a).y }, { x, y: mid(b).y }, { x: b.x + b.w, y: mid(b).y }], label: null };
-  }
-  // Anything else would cross rooms: not drawn. The panel tells it when one of its ends is selected.
-  return null;
+  if (!hangs || a.x !== b.x) return null;
+  const [top, bottom] = a.y < b.y ? [a, b] : [b, a];
+  if ([...rects.entries()].some(([id, r]) => id !== link.from && id !== link.to && r.x === a.x && r.y > top.y && r.y < bottom.y)) return null;
+  const x = a.x + 40;
+  return { link, points: [{ x, y: a.y < b.y ? a.y + a.h : a.y }, { x, y: a.y < b.y ? b.y : b.y + b.h }], label: null };
 }

@@ -69,7 +69,6 @@ export function BoxNode({ data }: NodeProps<BoxFlowNode>) {
 export type ArrowData = {
   points: Point[] | null; // ELK's route; null: a plain curve between the two boxes (a played step)
   label: string | null; // shown on hover, selection or play only
-  labelAt: { at: Point } | null; // where the layout keeps room for it; null: the middle of its longest part
   look: Look;
   moving: boolean; // the step being played: a light runs along the arrow
 };
@@ -83,7 +82,7 @@ export function ArrowEdge(props: EdgeProps<ArrowFlowEdge>) {
   if (!data) return null;
   const [curve, curveX, curveY] = getBezierPath({ sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition });
   const path = data.points && data.points.length > 1 ? roundedPath(data.points) : curve;
-  const middle = data.labelAt?.at ?? (data.points && data.points.length > 1 ? midpoint(data.points) : { x: curveX, y: curveY });
+  const middle = data.points && data.points.length > 1 ? midpoint(data.points) : { x: curveX, y: curveY };
   return (
     <>
       <BaseEdge

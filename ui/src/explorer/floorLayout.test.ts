@@ -37,19 +37,19 @@ test("ENTRÉE opens the first line on the left, SORTIE closes the belt", () => {
 test("a long belt wraps to a new line instead of growing sideways", () => {
   const floor = buildFloor(load("justicia"));
   const plan = placeFloor(floor, 1040);
-  assert.ok(plan.wraps.length >= 1);
+  assert.ok(plan.belt.some((r) => r.points.length > 2));
 });
 
 test("Watchdog's three rooms fit one line on a laptop (1280 px: 880 px canvas − scrollbar − padding = 800 px)", () => {
   const floor = buildFloor(load("watchdog"));
-  assert.equal(placeFloor(floor, 800).wraps.length, 0);
+  assert.ok(placeFloor(floor, 800).belt.every((r) => r.points.length === 2));
 });
 
 test("no drawn line runs through a part it does not join", () => {
   for (const name of ["watchdog", "justicia"])
     for (const width of [800, 1040]) {
       const plan = placeFloor(buildFloor(load(name)), width);
-      for (const { link, points } of plan.routes)
+      for (const { link, points } of [...plan.routes, ...plan.belt])
         for (let i = 1; i < points.length; i++) {
           const [p, q] = [points[i - 1]!, points[i]!];
           for (const [id, r] of plan.rects) {
@@ -62,5 +62,17 @@ test("no drawn line runs through a part it does not join", () => {
             }
           }
         }
+    }
+});
+
+test("every room after ENTRÉE has a drawn belt segment coming in, with its words", () => {
+  for (const name of ["watchdog", "justicia"])
+    for (const width of [800, 1040, 1400]) {
+      const floor = buildFloor(load(name));
+      const plan = placeFloor(floor, width);
+      for (const id of floor.belt) {
+        const incoming = plan.belt.find((r) => r.link.to === id);
+        assert.ok(incoming && incoming.label && incoming.link.verb, `${name}@${width}: nothing feeds ${id}`);
+      }
     }
 });

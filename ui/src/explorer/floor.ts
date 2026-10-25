@@ -1,4 +1,5 @@
 import type { ArchBlock, BlockType, Journey, ProjectModel } from "../api";
+import { beltLinks, READ, relations, styledLinks } from "./floorLinks.ts";
 
 // The factory floor (ADR-0006): the project read as a conveyor belt that carries the data from ▶ ENTRÉE
 // to SORTIE ■ through the parts that do the work. What those parts call (a database they search, a
@@ -7,7 +8,7 @@ import type { ArchBlock, BlockType, Journey, ProjectModel } from "../api";
 // strip. Built from the model only: pure functions, tested on real models (floor.test.ts).
 
 export type Shape = "person" | "room" | "store" | "outside" | "tool";
-export type FloorRole = "entree" | "belt" | "supplier" | "side" | "orphan" | "strip";
+type FloorRole = "entree" | "belt" | "supplier" | "side" | "orphan" | "strip";
 export type LinkStyle = "data" | "reply" | "lookup" | "control";
 
 export interface FloorItem {
@@ -36,7 +37,9 @@ export interface Floor {
   sortie: Sortie | null;
   limit: string | null; // what the SORTIE cannot do (« Tout est perdu au redémarrage. »)
   items: FloorItem[]; // every bloc shown, in reading order
-  links: FloorLink[]; // the arrows drawn (none touches the strip)
+  beltLinks: FloorLink[]; // one per belt segment: the flow that feeds the next room
+  relations: Record<string, string>; // a hung part's link to its room, in words
+  links: FloorLink[]; // every other flow between parts on the floor (none touches the strip)
   stripLinks: FloorLink[]; // links to or from the strip: told in the panel, not drawn
   strip: string[];
   overflow: string[]; // folded into « +N » past MAX_ON_FLOOR
@@ -62,12 +65,9 @@ const SHAPE: Record<BlockType, Shape> = {
   infra: "tool",
   library: "tool",
 };
-// Verbs are the model's plain words (« cherche dans », « démarre »): their first word says the kind.
-const READ = /^(cherche|lit|lis|lire|télécharge|telecharge|récupère|recupere|demande|consulte|interroge)/i;
-const CONTROL = /^(démarre|demarre|lance|vérifie|verifie|configure|teste|déploie|deploie|surveille)/i;
 const LIMIT = /perdu|au plus|seulement|pas encore|limite/i;
 
-export const shapeOf = (block: ArchBlock): Shape => SHAPE[block.type] ?? "room";
+const shapeOf = (block: ArchBlock): Shape => SHAPE[block.type] ?? "room";
 
 /** The part a step happens in: its component's bloc, or a bloc named directly (older models). */
 function stepBloc(model: ProjectModel, composant: string): string | null {
@@ -125,7 +125,7 @@ export function buildFloor(model: ProjectModel): Floor {
   const belt = workers.filter((id) => id !== entree && id !== lastStore && !isTool(id));
   if (lastStore) belt.push(lastStore);
   const sortie: Sortie | null = lastStore ? { kind: "store", id: lastStore } : entree && belt.length ? { kind: "reply", to: entree } : null;
-  const limit = lastStore ? (blocks.get(lastStore)!.role.split(/(?<=[.!?])\s+/).find((s) => LIMIT.test(s)) ?? null) : null;
+  const limit = lastStore ? limitOf(blocks.get(lastStore)!.role) : null;
 
   const items = new Map<string, FloorItem>();
   const put = (id: string, role: FloorRole, attach: string | null = null) => {
@@ -172,18 +172,12 @@ export function buildFloor(model: ProjectModel): Floor {
   };
   const links: FloorLink[] = [];
   const stripLinks: FloorLink[] = [];
-  const seen = new Set<string>();
-  for (const flow of model.flux) {
-    const id = `${flow.de}>${flow.vers}`;
-    if (seen.has(id) || !blocks.has(flow.de) || !blocks.has(flow.vers) || flow.de === flow.vers) continue;
-    seen.add(id);
-    const verb = flow.verbe ?? "";
-    const back = model.flux.some((f) => f.de === flow.vers && f.vers === flow.de) && position(flow.vers) < position(flow.de);
-    const style: LinkStyle = back ? "reply" : READ.test(verb) ? "lookup" : CONTROL.test(verb) ? "control" : "data";
-    const link = { id, from: flow.de, to: flow.vers, verb, full: flow.quoi, style };
-    if (strip.includes(flow.de) || strip.includes(flow.vers)) stripLinks.push(link);
-    else if (items.has(flow.de) && items.has(flow.vers)) links.push(link);
+  for (const link of styledLinks(model, position)) {
+    if (!blocks.has(link.from) || !blocks.has(link.to)) continue;
+    if (strip.includes(link.from) || strip.includes(link.to)) stripLinks.push(link);
+    else if (items.has(link.from) && items.has(link.to)) links.push(link);
   }
+  const nameOf = (id: string) => blocks.get(id)?.nom ?? id;
 
   for (const id of strip) put(id, "strip");
   const all = [...items.values()];
@@ -195,6 +189,8 @@ export function buildFloor(model: ProjectModel): Floor {
     sortie,
     limit,
     items: all,
+    beltLinks: beltLinks(model, [...(entree ? [entree] : []), ...belt], journey, nameOf),
+    relations: relations(model, all, nameOf),
     links,
     stripLinks,
     strip,
@@ -202,4 +198,12 @@ export function buildFloor(model: ProjectModel): Floor {
     skipped,
     shapes: [...new Set(all.map((i) => i.shape))],
   };
+}
+
+/** The sentence of a store's role that states what it cannot do, cut to that clause (after a colon). */
+function limitOf(role: string): string | null {
+  const sentence = role.split(/(?<=[.!?])\s+/).find((s) => LIMIT.test(s));
+  if (!sentence) return null;
+  const clause = sentence.includes(":") ? sentence.slice(sentence.lastIndexOf(":") + 1).trim() : sentence;
+  return clause.charAt(0).toUpperCase() + clause.slice(1);
 }

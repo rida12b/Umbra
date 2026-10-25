@@ -43,7 +43,7 @@ test("JusticIA: only the parts doing the work ride the belt; what they call hang
   assert.equal(floor.entree, "user");
   assert.deepEqual(floor.belt, ["site", "api", "agent", "analyse", "memoire-nav"]);
   assert.deepEqual(floor.sortie, { kind: "store", id: "memoire-nav" });
-  assert.match(floor.limit ?? "", /au plus 50 conversations/);
+  assert.match(floor.limit ?? "", /au plus 50 conversations/i);
   for (const [id, anchor] of [["modele-vecteurs", "api"], ["base-lois", "api"], ["llm-kimi", "agent"], ["llm-gemini", "agent"]] as const) {
     assert.equal(roleOf(floor, id), "supplier", id);
     assert.equal(attachOf(floor, id), anchor, id);
@@ -145,4 +145,56 @@ test("past sixteen parts on the floor, side doors fold first into « +N », the 
 test("the key lists exactly the shapes on the floor", () => {
   assert.deepEqual([...buildFloor(watchdog()).shapes].sort(), ["person", "room", "store", "tool"]);
   assert.deepEqual([...buildFloor(justicia()).shapes].sort(), ["outside", "person", "room", "store", "tool"]);
+});
+
+test("the belt carries the data from room to room: each room after the first gets the real flow that feeds it", () => {
+  const belt = (floor: Floor) => floor.beltLinks.map((l) => `${l.from}>${l.to} ${l.verb}`);
+  assert.deepEqual(belt(buildFloor(watchdog())), [
+    "agent-surveille>api envoie ses comptes rendus à",
+    "api>memoire range l'événement dans",
+  ]);
+  const j = buildFloor(justicia());
+  assert.deepEqual(belt(j), [
+    "user>site écrit sa question sur",
+    "site>api envoie les demandes à",
+    "api>agent confie la question à",
+    "agent>analyse Serveur de l'assistant fait analyser par", // the server, not the engine, hands it over
+    "analyse>memoire-nav Site web de l'assistant enregistre dans",
+  ]);
+});
+
+test("a hung part says in words how it is linked to the room it hangs on", () => {
+  const j = buildFloor(justicia());
+  assert.equal(j.relations["base-lois"], "Serveur de l'assistant cherche dans");
+  assert.equal(j.relations["ingestion"], "remplit Base des articles de loi");
+  assert.equal(j.relations["hf-dataset"], "Outil de remplissage de la base télécharge depuis");
+  assert.equal(buildFloor(watchdog()).relations["operateur"], "démarre Porte d'entrée du service");
+});
+
+test("SORTIE is the store the journey writes to last, not the first one", () => {
+  const model = watchdog();
+  model.blocs.push({ id: "cache", nom: "File", type: "queue", role: "x.", importance: "secondaire", techno: "", code: [], indices: "" });
+  model.flux.push({ de: "api", vers: "cache", quoi: "pousse", verbe: "pousse dans" });
+  model.parcours.find((j) => j.id === "envoi-evenement")!.etapes[2]!.touche.push("cache");
+  assert.deepEqual(buildFloor(model).sortie, { kind: "store", id: "memoire" });
+});
+
+test("the limit under SORTIE keeps only the clause that states it", () => {
+  assert.equal(buildFloor(justicia()).limit, "Au plus 50 conversations de 50 messages chacune.");
+});
+
+test("the key never lists a kind whose only part was folded, and folding keeps every hang valid", () => {
+  const model = watchdog();
+  const blk = (id: string, type: "backend" | "external") => ({ id, nom: id, type, role: "x.", importance: "secondaire" as const, techno: "", code: [], indices: "" });
+  for (let i = 0; i < 14; i++) {
+    model.blocs.push(blk(`svc${i}`, "backend"));
+    model.flux.push({ de: "api", vers: `svc${i}`, quoi: "appel", verbe: "appelle" });
+  }
+  model.blocs.push(blk("llm", "external"));
+  model.flux.push({ de: "api", vers: "llm", quoi: "appel", verbe: "appelle" });
+  const floor = buildFloor(model);
+  assert.ok(floor.overflow.includes("llm"));
+  assert.ok(!floor.shapes.includes("outside"));
+  const shown = new Set(floor.items.map((i) => i.id));
+  for (const item of floor.items) if (item.attach) assert.ok(shown.has(item.attach), item.id);
 });
