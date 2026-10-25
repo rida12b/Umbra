@@ -20,13 +20,14 @@ class LiveProjects:
         events: EventHub,
         refresh_cards: Callable[[str], int],
         refresh_model: Callable[[str], str],
+        lock_of: Callable[[str], threading.Lock],
     ) -> None:
         self._open_store = open_store
         self._events = events
         self._refresh_cards = refresh_cards
         self._refresh_model = refresh_model
         self._watched: dict[str, threading.Event] = {}
-        self._locks: dict[str, threading.Lock] = {}
+        self._lock_of = lock_of  # shared with the engine's own indexing: one read of a Project at a time
         self._guard = threading.Lock()
 
     def follow(self, project: Project) -> None:
@@ -35,7 +36,6 @@ class LiveProjects:
             if project.id in self._watched:
                 return
             stop = self._watched[project.id] = threading.Event()
-            self._locks[project.id] = threading.Lock()
         watch_project(project.root, lambda: self.refresh(project), stop)
         self._study(project.id)  # first look: Claude studies the whole Project once, in the background
 
@@ -46,7 +46,7 @@ class LiveProjects:
 
     def refresh(self, project: Project) -> list[str]:
         """Index again, then publish the changed files; one refresh at a time per Project."""
-        with self._locks.setdefault(project.id, threading.Lock()):
+        with self._lock_of(project.id):
             with self._open_store(project) as store:
                 before = {f.path: f.digest for f in store.files()}
                 index_project(project, store)

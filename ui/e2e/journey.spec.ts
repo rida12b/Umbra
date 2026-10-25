@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { expect, test, type Page } from "@playwright/test";
 
 const state = () =>
-  JSON.parse(readFileSync(new URL(".state.json", import.meta.url), "utf-8")) as { project: string; token: string };
+  JSON.parse(readFileSync(new URL(".state.json", import.meta.url), "utf-8")) as { project: string; token: string; spare: string };
 
 /** A fresh one-time login, as `umbra-engine open` would give: the token stays out of the browser. */
 async function signIn(page: Page): Promise<string> {
@@ -112,6 +112,17 @@ test("on a phone, the keyboard follows: into the room's name, then back on the r
   await page.keyboard.press("Escape");
   await expect(page).toHaveURL(/node=x%3Aparts/);
   await expect(page.locator('[data-narrow-id="api"] :focus')).toHaveCount(1);
+});
+
+test("a project added while the engine runs opens on its factory floor, never on « l'étude a échoué » (#85)", async ({ page }) => {
+  await signIn(page);
+  const { token, spare } = state();
+  const secret = readFileSync(token, "utf-8").trim();
+  const added = await page.request.post("/v1/projects", { headers: { Authorization: `Bearer ${secret}` }, data: { path: spare } });
+  const { id } = (await added.json()) as { id: string };
+  await page.goto(`/#/p/${id}`);
+  await expect(page.getByRole("navigation", { name: "Où vous êtes" })).toContainText("L'usine", { timeout: 20_000 });
+  await expect(page.getByText("a échoué")).toHaveCount(0);
 });
 
 test("old links open the parts with the path playing", async ({ page }) => {

@@ -72,6 +72,11 @@ def main() -> None:
     for rel, text in FILES.items():
         (root / rel).parent.mkdir(parents=True, exist_ok=True)
         (root / rel).write_text(text, encoding="utf-8")
+    # A second copy, not registered: a test adds it while the engine runs (#85).
+    spare = work / "spare"
+    for rel, text in FILES.items():
+        (spare / rel).parent.mkdir(parents=True, exist_ok=True)
+        (spare / rel).write_text(text, encoding="utf-8")
     settings = Settings(home=work / "home", port=port)
     with Registry(settings) as registry:
         project, _ = registry.add(root)
@@ -80,7 +85,7 @@ def main() -> None:
     app = create_app(
         settings, ask=lambda prompt: "{}", study=lambda prompt, folder: json.dumps(MODEL)
     )
-    state = {"project": project.id, "token": str(settings.home / "token")}
+    state = {"project": project.id, "token": str(settings.home / "token"), "spare": str(spare)}
     (Path(__file__).parent / ".state.json").write_text(json.dumps(state), encoding="utf-8")
     uvicorn.run(app, host="127.0.0.1", port=port, log_level="warning")
 

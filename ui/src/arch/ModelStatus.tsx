@@ -1,9 +1,22 @@
-import type { ModelState } from "../api";
-import { useModel } from "../model";
+import { type PageModelState, useModel } from "../model";
 import { HypothesisNote, StateMessage } from "../ui";
 
 /** While there is no model yet: what is happening, in plain words. */
-export function ModelPending({ state }: { state: ModelState | null }) {
+export function ModelPending({ state }: { state: PageModelState | null }) {
+  if (state?.state === "error" && state.unreachable)
+    return (
+      <StateMessage title="Umbra n'a pas pu ouvrir le projet">
+        <p className="text-danger">{state.message}</p>
+        <p className="mt-2">Vérifiez que le moteur Umbra tourne toujours, puis rechargez la page.</p>
+      </StateMessage>
+    );
+  if (state?.state === "indexing")
+    return (
+      <StateMessage title="Umbra lit le projet">
+        <p>Il passe chaque fichier au gardien des secrets, puis repère les fonctions et leurs liens.</p>
+        <p className="mt-2 text-faint">Quelques secondes. Ensuite, Claude Code étudie le projet.</p>
+      </StateMessage>
+    );
   if (state?.state === "error")
     return (
       <StateMessage title="L'étude du projet a échoué">

@@ -26,7 +26,7 @@ from umbra_engine.gateways import claude
 from umbra_engine.indexer import IndexSummary, index_project
 from umbra_engine.journal import ingest
 from umbra_engine.live import LiveProjects
-from umbra_engine.project_store import INDEXED_SCHEMA, STALE_INDEX, ProjectStore
+from umbra_engine.project_store import STALE_INDEX, ProjectStore
 from umbra_engine.registry import Project, ProjectIdCollisionError, ProjectPathError, Registry
 from umbra_engine.settings import LOOPBACK_HOSTS, Settings, load_or_create_token
 from umbra_engine.ui_session import SESSION_HEADER, UiSessions
@@ -35,6 +35,7 @@ from umbra_engine.web import add_web_routes
 MAX_PAGE = 1000
 MODEL_FOLLOW_UP_S = 60.0
 JOURNAL_POLL_S = 0.5
+READ_JOIN_S = 10.0  # at shutdown, how long to wait for a project being read
 
 
 class ProjectIn(BaseModel):
@@ -70,15 +71,17 @@ def create_app(
         if live_projects is not None:
             for project in registry.list():
                 with registry.open_store(project) as store:
-                    current, ever = store.index_is_current(), INDEXED_SCHEMA in store.meta()
+                    current = store.index_is_current()
                 if current:
                     live_projects.follow(project)
-                elif ever:  # indexed by an older Umbra: read it again in the background, then follow it
-                    threading.Thread(target=reindex_and_follow, args=(project,), daemon=True).start()
+                else:  # never indexed (`umbra-engine add`), or by an older Umbra: read it, then follow it
+                    start_indexing(project)
         if live_projects is not None:
             threading.Thread(target=pump_journal, name="umbra-journal", daemon=True).start()
         yield
         journal_stop.set()
+        for reader in list(readers):  # let a project being read finish before the registry closes
+            reader.join(timeout=READ_JOIN_S)
         for timer in follow_ups:
             timer.cancel()
         if live_projects is not None:
@@ -96,11 +99,63 @@ def create_app(
             except Exception:  # noqa: BLE001 — a bad spool file must not stop the journal
                 continue
 
+    index_locks: dict[str, threading.Lock] = {}
+    index_guard = threading.Lock()
+    indexing: set[str] = set()
+    index_errors: dict[str, str] = {}  # a read that failed: said to the page instead of « indexing » forever
+    readers: list[threading.Thread] = []  # background reads, waited for at shutdown
+
+    def lock_of(project_id: str) -> threading.Lock:
+        with index_guard:
+            return index_locks.setdefault(project_id, threading.Lock())
+
+    def index_now(project: Project) -> IndexSummary:
+        with lock_of(project.id), registry.open_store(project) as store:
+            return index_project(project, store)
+
     def reindex_and_follow(project: Project) -> None:
-        with registry.open_store(project) as store:
-            index_project(project, store)
+        try:
+            index_now(project)
+        except Exception as error:  # noqa: BLE001 — a background read must report, never vanish
+            with index_guard:
+                index_errors[project.id] = f"{type(error).__name__}: {error}"
+            return
+        finally:
+            with index_guard:
+                indexing.discard(project.id)
+        if journal_stop.is_set():  # the engine stopped while it was reading: nothing to follow any more
+            return
+        # The page asks for its model again.
+        events.publish(project.id, {"type": "indexed", "changed": [], "count": 0})
         if live_projects is not None:
             live_projects.follow(project)
+
+    def start_indexing(project: Project) -> None:
+        """Read a Project in the background, one read at a time (#85); meanwhile its model is « indexing »."""
+        with index_guard:
+            if project.id in indexing:
+                return
+            indexing.add(project.id)
+        name = f"umbra-index-{project.id}"
+        reader = threading.Thread(target=reindex_and_follow, args=(project,), name=name, daemon=True)
+        readers.append(reader)
+        reader.start()
+
+    def ensure_indexed(project_id: str) -> bool:
+        """True when the index is current; otherwise start reading the Project and say False."""
+        project = known_project(project_id)
+        with index_guard:
+            failed = index_errors.get(project_id)
+            if project_id in indexing:
+                return False
+        if failed:
+            detail = f"reading the project failed: {failed}"
+            raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, detail)
+        with registry.open_store(project) as store:
+            if store.index_is_current():
+                return True
+        start_indexing(project)
+        return False
 
     app = FastAPI(title="Umbra engine", version=__version__, lifespan=lifespan)
     # A web page can make the browser resolve any host name to 127.0.0.1 (DNS rebinding);
@@ -137,6 +192,8 @@ def create_app(
             raise HTTPException(status.HTTP_400_BAD_REQUEST, str(error)) from error
         except ProjectIdCollisionError as error:
             raise HTTPException(status.HTTP_409_CONFLICT, str(error)) from error
+        if live_projects is not None:  # the running engine reads it at once, as at startup (#85)
+            ensure_indexed(project.id)
         return ProjectOut.of(project)
 
     @app.get("/v1/projects", dependencies=authorized)
@@ -190,8 +247,9 @@ def create_app(
     @app.post("/v1/projects/{project_id}/index", dependencies=authorized)
     def index(project_id: str) -> IndexSummary:
         project = known_project(project_id)
-        with registry.open_store(project) as store:
-            summary = index_project(project, store)
+        summary = index_now(project)
+        with index_guard:
+            index_errors.pop(project_id, None)  # an explicit read that works clears an old failure
         if live_projects is not None:
             live_projects.follow(project)
         return summary
@@ -222,10 +280,12 @@ def create_app(
         app, authorized, known_project, indexed_store, graph_of, app.state.explainer, ask
     )
     refresh_model = add_model_routes(
-        app, authorized, known_project, indexed_store, graph_of, app.state.explainer, study
+        app, authorized, known_project, indexed_store, graph_of, app.state.explainer, study, ensure_indexed
     )
     add_live_routes(app, authorized, known_project, events, registry.open_store)
-    live_projects = LiveProjects(registry.open_store, events, refresh_cards, refresh_model) if live else None
+    live_projects = (
+        LiveProjects(registry.open_store, events, refresh_cards, refresh_model, lock_of) if live else None
+    )
     app.state.live = live_projects
     add_web_routes(app, authorized, sessions)  # last: the web app is mounted at `/`
     return app

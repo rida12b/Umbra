@@ -241,7 +241,8 @@ export interface ProjectModel {
 }
 
 export interface ModelState {
-  state: "ready" | "stale" | "methode" | "missing" | "queued" | "working" | "error";
+  // indexing: Umbra is still reading the project (just added, never read); the study comes next (#85).
+  state: "ready" | "stale" | "methode" | "missing" | "queued" | "working" | "error" | "indexing";
   model: ProjectModel | null;
   created_at: string | null;
   changed: string[];

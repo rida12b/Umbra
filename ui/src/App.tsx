@@ -46,6 +46,19 @@ export function App() {
 
   const project =
     projects && "list" in projects ? projects.list.find((p) => p.id === route.projectId) : undefined;
+  // A project added after this page loaded (#85): read the list again once before calling it unknown.
+  const missing = Boolean(projects && "list" in projects && route.projectId && !project);
+  const [lookup, setLookup] = useState<{ id: string; done: boolean } | null>(null);
+  useEffect(() => {
+    if (!missing || !route.projectId || lookup?.id === route.projectId) return;
+    const id = route.projectId;
+    setLookup({ id, done: false });
+    api
+      .projects()
+      .then((list) => setProjects({ list }))
+      .catch(() => undefined)
+      .finally(() => setLookup({ id, done: true }));
+  }, [missing, route.projectId, lookup]);
   const live = useLiveEvents(project?.id ?? null);
 
   return (
@@ -69,7 +82,8 @@ export function App() {
         {projects === null && <StateMessage>Connexion au moteur local…</StateMessage>}
         {projects && "error" in projects && <ConnectionProblem error={projects.error} />}
         {projects && "list" in projects && !route.projectId && <ProjectList projects={projects.list} />}
-        {projects && "list" in projects && route.projectId && !project && (
+        {missing && !(lookup?.id === route.projectId && lookup.done) && <StateMessage>Ouverture du projet…</StateMessage>}
+        {missing && lookup?.id === route.projectId && lookup.done && (
           <StateMessage title="Projet inconnu">
             <p className="font-mono text-[13px]">{route.projectId}</p>
             <a className="mt-3 inline-block text-ink underline underline-offset-[3px]" href="#/">

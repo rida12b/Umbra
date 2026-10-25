@@ -4,34 +4,37 @@ import { useLive } from "./live";
 
 const POLL_MS = 4000;
 
-export const ModelContext = createContext<ModelState | null>(null);
+/** The model as the page sees it: `unreachable` when the engine itself did not answer (not a study failure). */
+export type PageModelState = ModelState & { unreachable?: boolean };
+
+export const ModelContext = createContext<PageModelState | null>(null);
 export const useModel = () => useContext(ModelContext);
 
 /**
  * The Project model: asks for a study when there is none (or an update when the code changed),
  * follows the session, and reads it again when the live stream says something changed.
  */
-export function useProjectModel(projectId: string | null): ModelState | null {
-  const [state, setState] = useState<ModelState | null>(null);
+export function useProjectModel(projectId: string | null): PageModelState | null {
+  const [state, setState] = useState<PageModelState | null>(null);
   const { revision } = useLive();
 
   useEffect(() => {
     if (!projectId) return;
     let current = true;
     let timer: number | undefined;
+    // Umbra could not answer at all: not a failed study, so the page does not blame Claude Code.
+    const unreachable = (error: Error) =>
+      current && setState({ state: "error", model: null, created_at: null, changed: [], message: error.message, unreachable: true });
+    const ask = () => api.model(projectId).then((found) => (found.state === "missing" || found.state === "stale" ? api.study(projectId) : found));
     const follow = (found: ModelState) => {
       if (!current) return;
       setState(found);
-      if (found.state === "queued" || found.state === "working") {
-        timer = window.setTimeout(() => api.model(projectId).then(follow, () => undefined), POLL_MS);
+      // Still reading the project, or studying it: ask again; once read, a missing model starts its study.
+      if (found.state === "indexing" || found.state === "queued" || found.state === "working") {
+        timer = window.setTimeout(() => ask().then(follow, unreachable), POLL_MS);
       }
     };
-    api
-      .model(projectId)
-      .then((found) => (found.state === "missing" || found.state === "stale" ? api.study(projectId) : found))
-      .then(follow, (error: Error) =>
-        current && setState({ state: "error", model: null, created_at: null, changed: [], message: error.message }),
-      );
+    ask().then(follow, unreachable);
     return () => {
       current = false;
       window.clearTimeout(timer);
