@@ -136,6 +136,8 @@ def _merged_rows(stored: list[dict], raw_patch: dict, section: str, key: tuple[s
     removes by the key's first field (a data name, a file, a component)."""
     new = [r for r in _list(raw_patch.get(section)) if isinstance(r, dict)]
     gone = set(_texts(_dict(raw_patch.get("supprime")).get(section)))
+    if section == "pour_changer":  # a component's levers travel whole, like its settings
+        gone |= {r.get("composant") for r in new}
     fresh = {tuple(r.get(k) for k in key) for r in new}
     kept = [r for r in stored if tuple(r.get(k) for k in key) not in fresh and r.get(key[0]) not in gone]
     return kept + new

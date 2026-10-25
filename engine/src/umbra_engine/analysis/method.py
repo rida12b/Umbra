@@ -71,6 +71,8 @@ Rules:
 - Branches get "quand_simple" and "alors_simple": what the person sees and whether anything is kept,
   in everyday words; codes and names stay in "quand"/"alors". Give "etape", the step that handles it.
 - "incertitudes": one plain sentence each, consequence for the user first, then the reason.
+- Never write the value of a secret (a key, a token, a password, a connection string with a user):
+  leave its "valeur" empty. Umbra keeps a value only when the cited lines show it.
 - A step's "composant" may be null only when the step is done by hand ("manuel": true).
 - Zone "atelier" is for what never runs with the product (docs, tests, tooling, build, CI). A block no
   journey touches never takes a data zone (recoit, traite, range).
@@ -154,8 +156,8 @@ Answer with ONLY one JSON object containing just what changed, with the same sha
   "modules": [paths], "donnee": [names], "reglages_projet": [files], "pour_changer": [composant ids]}},
   "incertitudes": [...]}}
 Entries you return replace the entries with the same id (or path; a data row by its name, a project
-setting by file and code, a lever by component and intention). A component you return is whole: its
-entre, sort, reglages and termes too. Leave out everything unchanged."""
+setting by file and code). A component you return is whole: its entre, sort, reglages and termes too.
+The levers you return for a component replace all its levers: return all of them. Leave out everything unchanged."""
 
 
 def study_prompt() -> str:

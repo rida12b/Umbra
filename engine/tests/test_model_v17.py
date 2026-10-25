@@ -367,3 +367,79 @@ class _AnyLines(dict):
 _ANY_LINES = _AnyLines()
 _TEXTS = texts()
 _ANSWER = answer()
+
+
+# --- review round (#78): secrets, levers in updates, levers on project settings, caps, merge ---
+
+
+def test_a_setting_value_is_kept_only_when_the_cited_lines_show_it_and_never_for_a_secret():
+    released = texts() | {"settings.py": 'JWT_SECRET = os.getenv("JWT_SECRET", "my-jwt-signing-key-prod")\nADMIN_PASSWORD=*************\n'}
+    raw = answer()
+    auth = next(c for c in raw["composants"] if c["id"] == "auth-tenant")
+    auth["reglages"] = [
+        {"nom": "Clé", "code": "JWT_SECRET", "valeur": "my-jwt-signing-key-prod", "fichier": "settings.py", "lignes": [1, 1]},
+        {"nom": "Mot de passe", "code": "ADMIN_PASSWORD", "valeur": "Watchdog2024!", "fichier": "settings.py", "lignes": [2, 2]},
+        {"nom": "Code du refus", "code": "401", "valeur": "401", "fichier": AUTH, "lignes": [36, 36]},
+    ]
+    model = check(raw, released)
+    dumped = json.dumps(model, ensure_ascii=False)
+    assert "my-jwt-signing-key-prod" not in dumped and "Watchdog2024!" not in dumped
+    assert component(model, "auth-tenant")["reglages"][2]["valeur"] == "401"  # a plain value seen in the code stays
+    assert "secret" in study_prompt().lower() and "valeur" in study_prompt()
+
+
+def test_levers_returned_by_an_update_replace_all_the_levers_of_their_component():
+    model = check(answer())
+    counts = {p: len(t.splitlines()) for p, t in texts().items()}
+    full = [{"intention": f"Je veux changer l'ancien réglage {n}", "composant": "auth-tenant", "reglage": "X-Tenant-ID"} for n in (1, 2, 3)]
+    model = updated_model(model, {"pour_changer": full}, counts, {"watchdog_ai"}, texts=texts())
+    patch = {"pour_changer": [{"intention": "Je veux changer le message de refus", "composant": "auth-tenant", "reglage": "401"}]}
+    merged = updated_model(model, patch, counts, {"watchdog_ai"}, texts=texts())
+    assert [p["intention"] for p in merged["pour_changer"] if p["composant"] == "auth-tenant"] == ["Je veux changer le message de refus"]
+    assert any(p["composant"] == "app" for p in merged["pour_changer"])  # other components keep theirs
+    assert "replace all its levers" in UPDATE
+
+
+def test_a_lever_on_a_project_setting_takes_that_setting_citation():
+    released = texts() | {"watchdog_ai/config.py": 'PORT = os.getenv("APP_PORT", "8000")\n'}
+    raw = answer()
+    lever = next(p for p in raw["pour_changer"] if p["composant"] == "app")
+    lever.pop("fichier", None)  # the schema asks for no citation on a lever
+    lever.pop("lignes", None)
+    model = check(raw, released)
+    port = next(p for p in model["pour_changer"] if p["composant"] == "app")
+    assert (port["fichier"], port["lignes"], port["verifie"]) == (".env.example", [3, 3], True)
+    assert "motif" not in port
+    unread = next(p for p in check(answer())["pour_changer"] if p["composant"] == "app")
+    assert (unread["fichier"], unread["verifie"], unread["motif"]) == (".env.example", False, "non lu par le code")
+
+
+def test_caps_hold_in_code_levers_only_on_core_parts_and_citations_up_to_fifteen_lines():
+    raw = answer()
+    next(b for b in raw["blocs"] if b["id"] == "memoire")["importance"] = "secondaire"
+    raw["pour_changer"].append({"intention": "Je veux changer le rangement", "composant": "stockage-events", "reglage": "_events"})
+    auth = next(c for c in raw["composants"] if c["id"] == "auth-tenant")
+    auth["termes"] = [{"simple": f"mot {n}", "code": f"code{n}"} for n in range(5)]
+    raw["parcours"][1]["branches"][0]["quand_simple"] = "mot " * 200
+    model = check(raw)
+    assert all(p["composant"] != "stockage-events" for p in model["pour_changer"])
+    assert len(component(model, "auth-tenant")["termes"]) == 3
+    assert len(model["parcours"][1]["branches"][0]["quand_simple"]) <= 400
+    assert setting(with_setting(code="401", lignes=[22, 37]))["verifie"] is False  # 16 lines
+    assert setting(with_setting(code="401", lignes=[23, 37]))["verifie"] is True  # 15 lines
+
+
+def test_an_update_adds_and_replaces_project_level_rows_by_their_key():
+    model = check(answer())
+    counts = {p: len(t.splitlines()) for p, t in texts().items()}
+    patch = {
+        "donnee": [{"nom": "alerte", "dans_le_code": "Alert", "entre_par": "api", "finit_dans": "memoire"}],
+        "reglages_projet": [
+            {"nom": "Port ailleurs", "code": "APP_PORT=8000", "valeur": "", "fichier": "README.md", "lignes": [1, 1], "lu_par_le_code": "non"},
+            {"nom": "Port renommé", "code": "APP_PORT=8000", "valeur": "8000", "fichier": ".env.example", "lignes": [3, 3], "lu_par_le_code": "non"},
+        ],
+    }
+    merged = updated_model(model, patch, counts, {"watchdog_ai"}, texts=texts())
+    assert [d["nom"] for d in merged["donnee"]] == ["compte rendu", "alerte"]
+    ports = [r for r in merged["reglages_projet"] if r["code"] == "APP_PORT=8000"]
+    assert sorted(r["nom"] for r in ports) == ["Port ailleurs", "Port renommé"]  # same code, two files; same file replaced

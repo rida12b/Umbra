@@ -9,6 +9,9 @@ import re
 
 MAX_SPAN = 15  # cited lines: more than this holds almost any code
 _PUNCTUATION = re.compile(r"[\W_]+")
+_SECRET_NAME = re.compile(r"key|secret|token|passw|credential|dsn|auth", re.IGNORECASE)
+_MASK = re.compile(r"\*{4,}")
+_URL_WITH_USER = re.compile(r"://[^/\s:@]+:[^/\s@]+@")
 
 
 def collapse(text: str) -> str:
@@ -42,14 +45,20 @@ def literal(code: object, cited: str | None) -> bool:
 
 
 def checked_setting(row: dict, texts: dict[str, str]) -> dict:
-    """The citation and the two verdicts, always computed again: a `verifie` in the answer is ignored."""
+    """The citation and the two verdicts, always computed again: a `verifie` in the answer is ignored.
+    The value is kept only when the cited lines show it and it is not a secret: Umbra stores the
+    model, so a key or a password must never reach it, even one the guard missed or Claude guessed."""
     file, lines, cited = cited_lines(row, texts)
-    value = row.get("valeur") if isinstance(row.get("valeur"), str) else ""
+    value: str = row["valeur"] if isinstance(row.get("valeur"), str) else ""
+    seen = bool(value) and literal(value, cited)
+    names = " ".join(str(row.get(k, "")) for k in ("nom", "code"))
+    secret = bool(_SECRET_NAME.search(names) or _URL_WITH_USER.search(value) or _MASK.search(cited or ""))
     return {
         "fichier": file,
         "lignes": lines,
         "verifie": literal(row.get("code"), cited),
-        "valeur_vue": bool(value) and literal(value, cited),
+        "valeur": value if seen and not secret else "",
+        "valeur_vue": seen,
     }
 
 

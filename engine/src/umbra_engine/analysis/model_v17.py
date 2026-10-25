@@ -44,7 +44,6 @@ def settings(value: object, texts: dict[str, str]) -> list[dict]:
             "nom": cut(row.get("nom"), MAX_SHORT),
             "code": str(row.get("code", "")),
             "sorte": row.get("sorte") if row.get("sorte") in SORTS else "",
-            "valeur": str(row.get("valeur", "")),
             "effet": cut(row.get("effet"), MAX_SHORT),
             **checked_setting(row, texts),
         }
@@ -70,7 +69,6 @@ def project_settings(value: object, texts: dict[str, str]) -> list[dict]:
             {
                 "nom": cut(row.get("nom"), MAX_SHORT),
                 "code": row["code"],
-                "valeur": str(row.get("valeur", "")),
                 **checked,
                 "lu_par_le_code": "oui" if read else "non",
             }
@@ -111,6 +109,7 @@ def levers(
         per_component[component["id"]] = per_component.get(component["id"], 0) + 1
         code = str(row.get("reglage", ""))
         own = next((s for s in component.get("reglages", []) if s["code"] == code), None)
+        own = own or next((s for s in project if s["code"] == code), None)  # a project setting (.env, config)
         unread = next((s for s in project if s["code"] == code and s["lu_par_le_code"] == "non"), None)
         cited = (
             {k: own[k] for k in ("fichier", "lignes", "verifie")}
