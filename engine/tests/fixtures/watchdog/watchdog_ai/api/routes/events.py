@@ -6,6 +6,7 @@ and returns the stored EventOut.
 """
 
 from fastapi import APIRouter, Request, status
+
 from watchdog_ai.ingestion.schemas import EventIn, EventOut
 from watchdog_ai.storage.events import append_event
 

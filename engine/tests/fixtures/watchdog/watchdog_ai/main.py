@@ -7,6 +7,7 @@ Start the server with:
 """
 
 from fastapi import FastAPI
+
 from watchdog_ai.api.middleware.tenant_auth import TenantAuthMiddleware
 from watchdog_ai.api.routes.events import router as events_router
 
