@@ -5,7 +5,7 @@ in the code it cites), the plain word ↔ code word bridge. For the Project: one
 flows, the settings of its config files, a « je veux changer… » index, and one main journey.
 """
 
-from umbra_engine.analysis.literal import checked_setting, cut, cited_lines, read_by_code
+from umbra_engine.analysis.literal import checked_setting, cited_lines, cut, read_by_code, safe_code
 
 MAX_SHORT = 90
 MAX_SIMPLE = 400
@@ -107,7 +107,7 @@ def levers(
         if per_component.get(component["id"], 0) >= MAX_LEVERS:
             continue
         per_component[component["id"]] = per_component.get(component["id"], 0) + 1
-        code = str(row.get("reglage", ""))
+        code = safe_code(str(row.get("reglage", "")))  # matched against settings already cut
         own = next((s for s in component.get("reglages", []) if s["code"] == code), None)
         own = own or next((s for s in project if s["code"] == code), None)  # a project setting (.env, config)
         unread = next((s for s in project if s["code"] == code and s["lu_par_le_code"] == "non"), None)

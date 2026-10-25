@@ -131,3 +131,14 @@ def test_scanning_stays_linear_on_hash_heavy_files():
     start = time.perf_counter()
     default_rules().scan("requirements.txt", text)
     assert time.perf_counter() - start < 2
+
+
+def test_short_password_names_in_config_files_are_redacted_too(make_repo):
+    """`DB_PASS`, `REDIS_PASS`, `MYSQL_PWD`, a `SENTRY_DSN` with a key: Umbra never sends or stores them (#78)."""
+    env = "DB_PASS=Zq7!rLm2Xw9k\nREDIS_PASS=Hj4nB8vQp2sT\nMYSQL_PWD=Kp9xR2mW7qLs\nAPP_PORT=8000\nBYPASS_CACHE=enabled\n"
+    repo = write_repo(make_repo("short-pass"), {".env.example": env})
+    result = SecretGuard(repo).read(".env.example")
+    assert isinstance(result, GuardedFile)
+    for value in ("Zq7!rLm2Xw9k", "Hj4nB8vQp2sT", "Kp9xR2mW7qLs"):
+        assert value not in result.text
+    assert "APP_PORT=8000" in result.text and "BYPASS_CACHE=enabled" in result.text

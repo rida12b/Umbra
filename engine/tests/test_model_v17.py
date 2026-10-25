@@ -443,3 +443,25 @@ def test_an_update_adds_and_replaces_project_level_rows_by_their_key():
     assert [d["nom"] for d in merged["donnee"]] == ["compte rendu", "alerte"]
     ports = [r for r in merged["reglages_projet"] if r["code"] == "APP_PORT=8000"]
     assert sorted(r["nom"] for r in ports) == ["Port ailleurs", "Port renommé"]  # same code, two files; same file replaced
+
+
+def test_a_secret_never_stays_in_a_setting_code_or_a_lever_and_plain_settings_keep_their_value():
+    released = texts() | {
+        "config/app.env": "APP_KEY=base64Zq7rLm2Xw9kQ\nDB_PASS=Zq7!rLm2Xw9k\nMAX_TOKENS=4096\nAUTHOR_NAME=Rida\n",
+    }
+    raw = answer()
+    rows = [("APP_KEY=base64Zq7rLm2Xw9kQ", "base64Zq7rLm2Xw9kQ", 1), ("DB_PASS=Zq7!rLm2Xw9k", "Zq7!rLm2Xw9k", 2),
+            ("MAX_TOKENS=4096", "4096", 3), ("AUTHOR_NAME=Rida", "Rida", 4)]  # fmt: skip
+    raw["reglages_projet"] = [
+        {"nom": code.split("=")[0], "code": code, "valeur": value, "fichier": "config/app.env", "lignes": [n, n], "lu_par_le_code": "oui"}
+        for code, value, n in rows
+    ]
+    raw["pour_changer"].append({"intention": "Je veux changer la clé", "composant": "app", "reglage": "APP_KEY=base64Zq7rLm2Xw9kQ"})
+    model = check(raw, released)
+    dumped = json.dumps(model, ensure_ascii=False)
+    assert "base64Zq7rLm2Xw9kQ" not in dumped and "Zq7!rLm2Xw9k" not in dumped
+    by_name = {r["nom"]: r for r in model["reglages_projet"]}
+    assert (by_name["APP_KEY"]["code"], by_name["APP_KEY"]["verifie"]) == ("APP_KEY", True)  # checked on the raw line first
+    assert by_name["DB_PASS"]["code"] == "DB_PASS"
+    assert (by_name["MAX_TOKENS"]["valeur"], by_name["AUTHOR_NAME"]["valeur"]) == ("4096", "Rida")  # not secrets
+    assert next(p for p in model["pour_changer"] if p["intention"] == "Je veux changer la clé")["reglage"] == "APP_KEY"

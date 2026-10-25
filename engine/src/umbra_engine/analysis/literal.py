@@ -9,7 +9,14 @@ import re
 
 MAX_SPAN = 15  # cited lines: more than this holds almost any code
 _PUNCTUATION = re.compile(r"[\W_]+")
-_SECRET_NAME = re.compile(r"key|secret|token|passw|credential|dsn|auth", re.IGNORECASE)
+# A setting is a secret when one WORD of its name says so (« DB_PASS », « apiKey », « Mot de passe »),
+# not when a word merely contains one (« MAX_TOKENS », « AUTHOR_NAME », « KEYBOARD_LAYOUT »).
+_SECRET_WORDS = {
+    "pass", "passe", "passwd", "password", "pwd", "secret", "secrets", "key", "keys", "apikey", "token",
+    "tokens", "credential", "credentials", "creds", "dsn", "auth", "jwt", "private", "salt", "cookie",
+}  # fmt: skip
+_COUNTED = {"max", "num", "limit", "total", "prompt", "completion", "input", "output"}  # « MAX_TOKENS »: a number
+_WORD = re.compile(r"[A-Z]?[a-z]+|[A-Z]+(?![a-z])|\d+")
 _MASK = re.compile(r"\*{4,}")
 _URL_WITH_USER = re.compile(r"://[^/\s:@]+:[^/\s@]+@")
 
@@ -51,15 +58,31 @@ def checked_setting(row: dict, texts: dict[str, str]) -> dict:
     file, lines, cited = cited_lines(row, texts)
     value: str = row["valeur"] if isinstance(row.get("valeur"), str) else ""
     seen = bool(value) and literal(value, cited)
-    names = " ".join(str(row.get(k, "")) for k in ("nom", "code"))
-    secret = bool(_SECRET_NAME.search(names) or _URL_WITH_USER.search(value) or _MASK.search(cited or ""))
+    code: str = row["code"] if isinstance(row.get("code"), str) else ""
+    secret = is_secret(f"{row.get('nom', '')} {code}") or bool(_URL_WITH_USER.search(value) or _MASK.search(cited or ""))
     return {
         "fichier": file,
         "lignes": lines,
-        "verifie": literal(row.get("code"), cited),
+        "verifie": literal(code, cited),  # on the line as written, before the value is cut out
+        "code": name_only(code) if secret else code,
         "valeur": value if seen and not secret else "",
         "valeur_vue": seen,
     }
+
+
+def is_secret(names: str) -> bool:
+    words = [w.lower() for w in _WORD.findall(names)]
+    return any(w in _SECRET_WORDS and not (w.startswith("token") and i and words[i - 1] in _COUNTED) for i, w in enumerate(words))
+
+
+def name_only(code: str) -> str:
+    """« APP_KEY=base64… » → « APP_KEY »; a URL keeps no user:password part."""
+    name = re.split(r"\s*[=:]\s*", code.strip(), maxsplit=1)[0]
+    return _URL_WITH_USER.sub("://", name)
+
+
+def safe_code(code: str) -> str:
+    return name_only(code) if is_secret(code) else code
 
 
 def read_by_code(code: str, file: str | None, line: str | None, texts: dict[str, str]) -> bool:
