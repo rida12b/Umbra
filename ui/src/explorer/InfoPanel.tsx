@@ -26,12 +26,15 @@ export function InfoPanel({ projectId, model, level, box, playing, onEnter, onPl
       <p className="text-[13px] font-semibold text-faint">Vous êtes ici</p>
       <h2 className="mt-1 text-[22px] leading-tight font-semibold">{level.title}</h2>
       <p className="mt-2 text-[15px] leading-relaxed text-muted">{level.hint}</p>
-      {(level.key === "context" || level.key === "parts") && (
-        <p className="mt-4 text-[16px] leading-relaxed">{model.pitch || model.resume}</p>
+      {level.floor && level.floor.stripLinks.length > 0 && (
+        <p className="mt-4 text-[14px] leading-relaxed text-muted">
+          Autour du projet :{" "}
+          {level.floor.stripLinks.map((l) => `${model.blocs.find((b) => b.id === l.from)?.nom ?? l.from} ${l.verb || "→"} ${model.blocs.find((b) => b.id === l.to)?.nom ?? l.to}`).join(" ; ")}.
+        </p>
       )}
       <Journeys model={model} onPlay={onPlay} />
       <p className="mt-6 text-[13.5px] leading-relaxed text-faint">
-        Cliquez une boîte pour savoir ce qu'elle fait. « Entrer dedans » montre ce qu'elle contient, jusqu'au code.
+        Cliquez une pièce pour savoir ce qu'elle fait. « Entrer » montre ce qu'elle contient, jusqu'au code.
       </p>
       {model.incertitudes.length > 0 && (
         <details className="mt-5 text-[14px]">

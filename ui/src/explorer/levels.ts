@@ -1,18 +1,9 @@
 import type { ArchBlock, BlockType, ProjectModel } from "../api";
+import { buildFloor, type Floor } from "./floor";
 
 // What the explorer shows at each zoom level, built from the Project model only (no API call):
-// context (who uses it, what it calls) → parts → the components of one part → the files of one component.
+// the factory floor (parts) → the components of one part → the files of one component.
 // The level below files is the code itself, read from the index (see CodeLevel).
-
-export type Zone = "utilise" | "recoit" | "traite" | "range" | "exterieur";
-export const ZONES: Zone[] = ["utilise", "recoit", "traite", "range", "exterieur"];
-export const ZONE_TITLE: Record<Zone, string> = {
-  utilise: "Qui l'utilise",
-  recoit: "Ce qui reçoit",
-  traite: "Ce qui traite",
-  range: "Où c'est rangé",
-  exterieur: "Services extérieurs",
-};
 
 export const KIND: Record<BlockType, string> = {
   user: "Personne",
@@ -32,43 +23,11 @@ export const KIND: Record<BlockType, string> = {
   infra: "Infrastructure",
 };
 
-const ZONE_OF_TYPE: Record<BlockType, Zone> = {
-  user: "utilise",
-  device: "utilise",
-  frontend: "recoit",
-  cli: "recoit",
-  backend: "traite",
-  worker: "traite",
-  library: "traite",
-  queue: "range",
-  database: "range",
-  storage: "range",
-  external: "exterieur",
-  ml_model: "exterieur",
-  docs: "utilise",
-  tests: "utilise",
-  infra: "utilise",
-};
-
-const GROUP_TITLE: Record<Zone, string> = {
-  utilise: "Autour du projet",
-  recoit: "Autres entrées",
-  traite: "Autres traitements",
-  range: "Autres rangements",
-  exterieur: "Autres services extérieurs",
-};
-
-export function zoneOf(block: ArchBlock): Zone {
-  return block.zone || ZONE_OF_TYPE[block.type];
-}
-
-export type LevelKey = "context" | "parts" | "around" | `part:${string}` | `component:${string}`;
+export type LevelKey = "parts" | `part:${string}` | `component:${string}`;
 
 /** What a box stands for: entering it shows the next level down (or the code). */
 export type Target =
-  | { kind: "system" }
   | { kind: "block"; id: string }
-  | { kind: "around" }
   | { kind: "component"; id: string }
   | { kind: "file"; path: string };
 
@@ -77,7 +36,6 @@ export interface Box {
   kind: string; // « Serveur », « Composant », « Fichier »
   title: string;
   words: string; // a few plain words under the title
-  zone: Zone | null; // its column; null on levels without zones
   faded: boolean; // legacy, or outside the part being looked at
   target: Target;
   inside: number; // how many things « Entrer » shows (0: nothing below)
@@ -97,26 +55,8 @@ export interface Level {
   hint: string; // one sentence: what this level shows
   boxes: Box[];
   links: Link[];
-  zoned: boolean;
+  floor: Floor | null; // the top level is drawn as a factory floor (ADR-0006)
 }
-
-const MAX_BOXES = 12; // more than this and nobody reads the map: the rest goes in a group
-// Box ids of things that are not a block: « @ » keeps them apart from the model's ids.
-const SYSTEM_BOX = "@system";
-const AROUND_BOX = "@around";
-
-/** A core part, or one a data path goes through (a fallback model is « secondary » but on the path). */
-function mainTest(model: ProjectModel): (b: ArchBlock) => boolean {
-  const onPath = new Set<string>();
-  const blockOf = new Map(model.composants.map((c) => [c.id, c.bloc]));
-  for (const journey of model.parcours)
-    for (const step of journey.etapes) {
-      onPath.add(blockOf.get(step.composant) ?? step.composant);
-      for (const id of step.touche) onPath.add(id);
-    }
-  return (b) => (b.importance ?? "coeur") === "coeur" || (b.importance !== "ancien" && onPath.has(b.id));
-}
-const isOutside = (b: ArchBlock) => zoneOf(b) === "utilise" || zoneOf(b) === "exterieur";
 
 function blockBox(model: ProjectModel, block: ArchBlock, faded = false): Box {
   const components = model.composants.filter((c) => c.bloc === block.id).length;
@@ -125,102 +65,23 @@ function blockBox(model: ProjectModel, block: ArchBlock, faded = false): Box {
     kind: KIND[block.type],
     title: block.nom,
     words: block.en_bref || block.role,
-    zone: zoneOf(block),
     faded: faded || block.importance === "ancien",
     target: { kind: "block", id: block.id },
     inside: components || block.code.length,
   };
 }
 
-/** The model's flows, re-pointed to the boxes of a level, one arrow per pair of boxes. */
-function linksBetween(model: ProjectModel, boxOf: (blockId: string) => string | null): Link[] {
-  const links = new Map<string, Link>();
-  for (const flow of model.flux) {
-    const from = boxOf(flow.de);
-    const to = boxOf(flow.vers);
-    if (!from || !to || from === to) continue;
-    const id = `${from}>${to}`;
-    if (!links.has(id)) links.set(id, { id, from, to, verb: flow.verbe || "", full: flow.quoi });
-  }
-  return [...links.values()];
-}
-
 export function buildLevel(model: ProjectModel, key: LevelKey, projectName: string): Level | null {
-  const isMain = mainTest(model);
-  if (key === "context") {
-    const outside = model.blocs.filter((b) => isMain(b) && isOutside(b));
-    const system: Box = {
-      id: SYSTEM_BOX,
-      kind: "Le logiciel",
-      title: projectName,
-      words: model.pitch || model.resume,
-      zone: "traite",
-      faded: false,
-      target: { kind: "system" },
-      inside: model.blocs.length,
-    };
-    const shown = new Set(outside.map((b) => b.id));
+  if (key === "parts") {
+    const floor = buildFloor(model);
+    const shown = new Set(floor.items.map((i) => i.id));
     return {
       key,
-      title: "Vue d'ensemble",
-      hint: "Le logiciel, qui l'utilise et les services extérieurs qu'il appelle.",
-      boxes: [system, ...outside.map((b) => blockBox(model, b))],
-      links: linksBetween(model, (id) => (shown.has(id) ? id : model.blocs.some((b) => b.id === id && isMain(b)) ? SYSTEM_BOX : null)),
-      zoned: true,
-    };
-  }
-
-  if (key === "parts" || key === "around") {
-    // Core parts first, then the parts a data path goes through, then the most connected. Past
-    // twelve boxes the rest is grouped by zone (« Autres services extérieurs »), so a played step
-    // that reaches a grouped part still lights the right row.
-    const degree = (b: ArchBlock) => model.flux.filter((f) => f.de === b.id || f.vers === b.id).length;
-    const rank = (b: ArchBlock) => ((b.importance ?? "coeur") === "coeur" ? 2 : isMain(b) ? 1 : 0) * 1000 + degree(b);
-    const ordered = [...model.blocs].sort((x, y) => rank(y) - rank(x));
-    let room = MAX_BOXES;
-    let main: ArchBlock[] = [];
-    let others: ArchBlock[] = [];
-    for (let pass = 0; pass < 3; pass++) {
-      main = ordered.filter((b) => isMain(b)).slice(0, room);
-      others = ordered.filter((b) => !main.includes(b));
-      room = MAX_BOXES - new Set(others.map(zoneOf)).size;
-    }
-    const shown = key === "around" ? others : main;
-    if (key === "around" && shown.length === 0) return null; // everything fits on the main map now
-    const groups: Box[] =
-      key === "parts"
-        ? ZONES.flatMap((zone) => {
-            const inside = others.filter((b) => zoneOf(b) === zone);
-            if (inside.length === 0) return [];
-            return [
-              {
-                id: `${AROUND_BOX}:${zone}`,
-                kind: "Groupe",
-                title: GROUP_TITLE[zone],
-                words: inside.map((b) => b.nom).join(", "),
-                zone,
-                faded: true,
-                target: { kind: "around" as const },
-                inside: inside.length,
-              },
-            ];
-          })
-        : [];
-    const ids = new Set(shown.map((b) => b.id));
-    const groupOf = (id: string) => {
-      const block = others.find((b) => b.id === id);
-      return block && key === "parts" ? `${AROUND_BOX}:${zoneOf(block)}` : null;
-    };
-    return {
-      key,
-      title: key === "around" ? "Les autres pièces" : "Les pièces",
-      hint:
-        key === "around"
-          ? "Les pièces qui ne tiennent pas sur la carte principale : outils, documentation, services de secours."
-          : "Les pièces du projet, de qui l'utilise jusqu'aux services extérieurs.",
-      boxes: [...groups, ...shown.map((b) => blockBox(model, b))],
-      links: linksBetween(model, (id) => (ids.has(id) ? id : groupOf(id))),
-      zoned: true,
+      title: "L'usine",
+      hint: `${projectName} vu comme une usine : la donnée entre à gauche, passe par les pièces qui travaillent, et ressort à droite.`,
+      boxes: model.blocs.filter((b) => shown.has(b.id)).map((b) => blockBox(model, b, floor.strip.includes(b.id))),
+      links: floor.links.map(({ id, from, to, verb, full }) => ({ id, from, to, verb, full })),
+      floor,
     };
   }
 
@@ -234,7 +95,6 @@ export function buildLevel(model: ProjectModel, key: LevelKey, projectName: stri
       kind: "Composant",
       title: c.nom,
       words: c.en_bref || c.role,
-      zone: null,
       faded: false,
       target: { kind: "component", id: c.id },
       inside: c.fichiers.length,
@@ -246,7 +106,6 @@ export function buildLevel(model: ProjectModel, key: LevelKey, projectName: stri
           kind: code.element.startsWith("dir:") || code.element === "app:" ? "Dossier" : "Fichier",
           title: code.chemin.split("/").pop() || block.nom, // « app: » is the whole project folder
           words: model.modules[code.chemin] ?? model.dossiers[code.chemin] ?? code.chemin,
-          zone: null,
           faded: false,
           target: { kind: "file", path: code.element },
           inside: 1,
@@ -285,7 +144,7 @@ export function buildLevel(model: ProjectModel, key: LevelKey, projectName: stri
       hint: `Ce qu'il y a dans « ${block.nom} »${boxes.some((b) => b.faded) ? ", et les pièces voisines (estompées)" : ""}.`,
       boxes,
       links: [...links.values()],
-      zoned: false,
+      floor: null,
     };
   }
 
@@ -301,27 +160,21 @@ export function buildLevel(model: ProjectModel, key: LevelKey, projectName: stri
         kind: "Fichier",
         title: path.split("/").pop() || path,
         words: model.modules[path] ?? path,
-        zone: null,
         faded: false,
         target: { kind: "file", path },
         inside: 1,
       })),
       links: [],
-      zoned: false,
+      floor: null,
     };
   }
   return null;
 }
 
-/** The levels above a level, for the breadcrumb: « Vue d'ensemble › Les pièces › Serveur ». */
+/** The levels above a level, for the breadcrumb: « L'usine › Serveur › Composant ». */
 export function trail(model: ProjectModel, key: LevelKey): { key: LevelKey; title: string }[] {
-  const top: { key: LevelKey; title: string }[] = [
-    { key: "context", title: "Vue d'ensemble" },
-    { key: "parts", title: "Les pièces" },
-  ];
-  if (key === "context") return top.slice(0, 1);
+  const top: { key: LevelKey; title: string }[] = [{ key: "parts", title: "L'usine" }];
   if (key === "parts") return top;
-  if (key === "around") return [...top, { key, title: "Les autres pièces" }];
   if (key.startsWith("part:")) {
     const block = model.blocs.find((b) => b.id === key.slice(5));
     return [...top, { key, title: block?.nom ?? "Pièce" }];
@@ -337,8 +190,6 @@ export function trail(model: ProjectModel, key: LevelKey): { key: LevelKey; titl
 
 /** The level a box opens. */
 export function levelOf(target: Target): LevelKey | null {
-  if (target.kind === "system") return "parts";
-  if (target.kind === "around") return "around";
   if (target.kind === "block") return `part:${target.id}`;
   if (target.kind === "component") return `component:${target.id}`;
   return null; // a file opens the code itself

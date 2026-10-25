@@ -8,6 +8,7 @@ import type { Theme } from "../theme";
 import { StateMessage } from "../ui";
 import { CodeLevel } from "./CodeLevel";
 import { ExplorerCanvas, type Play } from "./ExplorerCanvas";
+import { FloorCanvas } from "./FloorCanvas";
 import { InfoPanel } from "./InfoPanel";
 import { buildLevel, levelOf, trail, type Box, type LevelKey } from "./levels";
 import { NarrowLevel } from "./NarrowLevel";
@@ -24,7 +25,8 @@ export const DEFAULT_LEVEL: LevelKey = "parts";
 export function explorerLevel(node: string): LevelKey | null {
   if (node === "arch:" || node === "carte:") return DEFAULT_LEVEL; // links made before the explorer
   if (!node.startsWith(LEVEL_PREFIX)) return null;
-  return node.slice(LEVEL_PREFIX.length) as LevelKey;
+  const key = node.slice(LEVEL_PREFIX.length);
+  return key === "context" || key === "around" ? DEFAULT_LEVEL : (key as LevelKey); // levels before the factory floor
 }
 
 interface Props {
@@ -117,7 +119,7 @@ export function Explorer({ project, route, theme, narrow }: Props) {
       <StateMessage title="Ce niveau n'existe plus">
         <p>Le projet a changé depuis ce lien.</p>
         <button type="button" className="mt-3 underline underline-offset-[3px]" onClick={() => openLevel(DEFAULT_LEVEL)}>
-          Revenir aux pièces
+          Revenir à l'usine
         </button>
       </StateMessage>
     );
@@ -144,7 +146,11 @@ export function Explorer({ project, route, theme, narrow }: Props) {
     ) : (
       <div className="grid h-full min-h-0 grid-cols-[minmax(0,1fr)_400px]">
         <section className="map-surface relative min-h-0" aria-label={`Carte : ${level.title}`}>
-          <ExplorerCanvas level={level} theme={theme} selected={route.select ?? null} play={playState} onSelect={select} onEnter={enter} />
+          {level.floor ? (
+            <FloorCanvas model={model} floor={level.floor} level={level} selected={route.select ?? null} play={playState} onSelect={select} onEnter={enter} />
+          ) : (
+            <ExplorerCanvas level={level} theme={theme} selected={route.select ?? null} play={playState} onSelect={select} onEnter={enter} />
+          )}
         </section>
         <aside className="min-h-0 overflow-y-auto border-l border-line-soft" aria-label="Explication">
           {panel}

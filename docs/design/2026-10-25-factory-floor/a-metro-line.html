@@ -1,0 +1,1431 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Umbra — Ligne de métro</title>
+<style>
+:root{
+  --bg:#0d1117; --bg2:#151b23; --bg3:#1d2530; --line:#2f3844; --line2:#404b59;
+  --text:#e8eef5; --muted:#a3b0bf; --faint:#75818f;
+  --green:#4ade80; --blue:#60a5fa; --amber:#fbbf24; --red:#f87171; --redd:#ef4444;
+  --yellow:#facc15; --violet:#a78bfa;
+  --mono:ui-monospace,SFMono-Regular,Consolas,"Liberation Mono",monospace;
+  --sans:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--text);font-family:var(--sans)}
+body{height:100vh;display:grid;grid-template-columns:minmax(0,1fr) 400px;grid-template-rows:auto minmax(0,1fr);overflow:hidden}
+button{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--blue);outline-offset:2px}
+
+/* top band */
+#top{grid-column:1/3;border-bottom:1px solid var(--line);padding:10px 20px 10px;background:var(--bg2)}
+.brand{display:flex;gap:10px;align-items:baseline;font-size:12px;color:var(--faint)}
+.brand b{color:var(--muted);font-weight:600}
+.pitchrow{display:flex;gap:12px;align-items:flex-start;margin:6px 0 8px}
+.qtag{flex:none;font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--faint);border:1px solid var(--line2);border-radius:4px;padding:2px 6px;margin-top:3px}
+#pitch{margin:0;font-size:15px;line-height:1.45;max-width:1260px}
+#chips{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+#chips .lab{font-size:12px;color:var(--faint);margin-right:2px}
+.chip{display:inline-flex;align-items:center;gap:8px;border:1px solid var(--line2);background:var(--bg);border-radius:999px;padding:5px 12px 5px 8px;font-size:13px;cursor:pointer}
+.chip .bar{width:22px;height:5px;border-radius:3px}
+.chip small{color:var(--faint);font-size:11.5px}
+.chip[aria-pressed="true"]{border-color:currentColor;background:var(--bg3)}
+.chip .main{font-size:10.5px;color:var(--bg);background:var(--yellow);border-radius:3px;padding:1px 5px;font-weight:700}
+
+/* canvas */
+#stage{display:flex;flex-direction:column;min-height:0;min-width:0;border-right:1px solid var(--line)}
+#canvaswrap{flex:1;min-height:0;position:relative}
+#plan{width:100%;height:100%;display:block}
+#swipe{display:none}
+#player{height:58px;flex:none;display:flex;align-items:center;gap:8px;padding:0 14px;border-top:1px solid var(--line);background:var(--bg2)}
+#player button{background:var(--bg3);border:1px solid var(--line2);border-radius:6px;width:38px;height:36px;cursor:pointer;font-size:14px}
+#player button:hover{border-color:var(--muted)}
+#btn-play{width:46px!important;font-size:16px!important}
+#ptext{flex:1;min-width:0;font-size:13.5px;line-height:1.35;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+#ptext .n{color:var(--faint)}
+#ptext b{font-weight:650}
+code,.code{font-family:var(--mono);font-size:12px;background:var(--bg3);border:1px solid var(--line);border-radius:4px;padding:0 4px;color:#d7e3f0}
+.manual{white-space:nowrap;font-size:11px;color:var(--amber);border:1px solid var(--amber);border-radius:4px;padding:0 4px;margin-left:4px}
+
+/* svg grammar */
+#plan text{font-family:var(--sans);paint-order:stroke;stroke:var(--bg);stroke-width:4px;stroke-linejoin:round}
+.coltitle{font-size:11px;letter-spacing:.12em;fill:var(--faint);font-weight:600}
+.lbl{font-size:12.5px;fill:var(--text);font-weight:650}
+.sub{font-size:11px;fill:var(--muted)}
+.tiny{font-size:10.5px;fill:var(--faint)}
+.verb{font-size:11px;fill:var(--muted);font-style:italic}
+.blocname{font-size:13px;fill:var(--text);font-weight:700}
+.line{transition:opacity .25s}
+.line.dim{opacity:.16}
+.st{cursor:pointer}
+.st .dot{fill:var(--bg);stroke-width:4}
+.st .num{font-size:11.5px;font-weight:800;fill:var(--text);stroke-width:0!important}
+.st.off .dot{stroke:var(--line2)}
+.st.off .num{fill:var(--faint)}
+.st.now .dot{fill:currentColor}
+.st.now .num{fill:var(--bg)}
+.st.now .halo{opacity:1}
+.st .halo{opacity:0;fill:none;stroke:currentColor;stroke-width:2;transition:opacity .2s}
+.st:hover .dot,.st:focus-visible .dot{stroke-width:6}
+.ring{fill:none;stroke:#dfe6ee;stroke-width:3}
+.lblbox{fill:var(--bg2);opacity:.92}
+.clickable{cursor:pointer}
+.clickable:hover .blocname{text-decoration:underline}
+.sel .dot{stroke:#fff!important}
+#particle{filter:drop-shadow(0 0 6px currentColor);pointer-events:none}
+
+/* panel */
+#panel{overflow:auto;padding:18px 20px 40px;background:var(--bg)}
+.crumb{display:flex;flex-wrap:wrap;gap:6px;align-items:center;font-size:12.5px;color:var(--faint);margin-bottom:10px}
+.crumb button{background:none;border:1px solid var(--line2);border-radius:6px;padding:3px 9px;cursor:pointer;color:var(--muted)}
+.crumb button:hover{color:var(--text);border-color:var(--muted)}
+#panel h2{font-size:19px;margin:2px 0 6px;line-height:1.25}
+#panel h3{font-size:11.5px;letter-spacing:.09em;text-transform:uppercase;color:var(--faint);margin:20px 0 8px;font-weight:650}
+#panel p{margin:6px 0;font-size:14px;line-height:1.5}
+.muted{color:var(--muted)}
+.small{font-size:12.5px!important}
+.kind{display:inline-block;font-size:11px;border-radius:4px;padding:1px 6px;margin-right:6px;font-weight:600}
+.slot{border-top:1px solid var(--line);padding:10px 0 8px}
+.slot>.k{font-size:11px;letter-spacing:.09em;text-transform:uppercase;color:var(--faint);font-weight:650;margin-bottom:4px}
+.fait{font-size:16px;font-weight:600;line-height:1.4}
+.notyet{border:1px dashed var(--amber);border-radius:8px;padding:2px 12px 6px;margin:10px 0;background:rgba(251,191,36,.04)}
+.badge-notyet{display:inline-block;font-size:11px;color:var(--amber);border:1px solid rgba(251,191,36,.5);border-radius:4px;padding:1px 6px;margin:8px 0 2px;font-weight:600}
+.facts{list-style:none;padding:0;margin:0}
+.facts li{font-size:13.5px;line-height:1.5;padding:3px 0}
+.src{font-family:var(--mono);font-size:11.5px;color:var(--blue);white-space:nowrap}
+table.reg{width:100%;border-collapse:collapse;font-size:13px}
+table.reg td{border-top:1px solid var(--line);padding:5px 4px;vertical-align:top}
+table.reg td:last-child{text-align:right}
+.ok{color:var(--green);font-weight:600;font-size:12.5px}
+.no{color:var(--red);font-weight:600;font-size:12.5px}
+.vu{display:block;width:100%;text-align:left;background:var(--bg2);border:1px solid var(--line);border-radius:8px;padding:7px 10px;margin:5px 0;cursor:pointer;font-size:13.5px}
+.vu:hover{border-color:var(--muted)}
+.vu .bar{display:inline-block;width:14px;height:4px;border-radius:2px;vertical-align:middle;margin-right:6px}
+ol.stops{list-style:none;padding:0;margin:6px 0}
+ol.stops li button{display:flex;gap:10px;align-items:flex-start;width:100%;text-align:left;background:none;border:1px solid transparent;border-radius:8px;padding:6px 8px;cursor:pointer}
+ol.stops li button:hover{border-color:var(--line2)}
+ol.stops li.now button{background:var(--bg3);border-color:var(--line2)}
+ol.stops .n{flex:none;width:24px;height:24px;border-radius:50%;border:3px solid;display:grid;place-items:center;font-size:11px;font-weight:800}
+ol.stops .t{font-size:14px;font-weight:600;line-height:1.3}
+ol.stops .t small{display:block;font-weight:400;color:var(--muted);font-size:12.5px}
+.endpt{font-size:13.5px;background:var(--bg2);border:1px solid var(--line);border-radius:8px;padding:8px 10px;margin:6px 0;line-height:1.45}
+.endpt b{color:var(--green)}
+.endpt.out b{color:var(--amber)}
+.branch{border-left:3px solid var(--red);padding:4px 10px;margin:8px 0;font-size:13.5px;line-height:1.45;background:var(--bg2);border-radius:0 6px 6px 0}
+.branch.soft{border-left-color:var(--amber)}
+details.tm{display:inline-block;margin:4px 0}
+details.tm summary{cursor:pointer;font-size:11px;color:#c4b5fd;border:1px solid rgba(167,139,250,.45);border-radius:4px;padding:1px 6px;list-style:none;display:inline-block}
+details.tm summary::-webkit-details-marker{display:none}
+details.tm[open] summary{margin-bottom:4px}
+details.tm div{font-size:12.5px;color:var(--muted);line-height:1.45;border-left:2px solid rgba(167,139,250,.45);padding-left:8px}
+.qmap{font-size:13px;line-height:1.5;margin:0;padding-left:0;list-style:none}
+.qmap li{padding:3px 0}
+.qmap b{display:inline-block;width:28px;color:var(--yellow)}
+.btn{display:inline-block;background:var(--bg3);border:1px solid var(--line2);border-radius:8px;padding:7px 12px;cursor:pointer;font-size:13.5px;margin:6px 0}
+.btn:hover{border-color:var(--muted)}
+#strip{display:none}
+
+/* phone */
+@media (max-width:900px){
+  body{display:block;height:auto;overflow:auto}
+  #top{padding:10px 16px}
+  #pitch{font-size:14.5px}
+  .pitchrow{flex-direction:column;gap:6px}
+  #panel ol.stops{display:none}
+  #stage{border-right:0}
+  #canvaswrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
+  #plan{width:1040px;height:auto}
+  #swipe{display:block;font-size:12px;color:var(--faint);padding:6px 16px;border-bottom:1px solid var(--line)}
+  #player{position:sticky;bottom:0;z-index:5;height:auto;min-height:58px;padding:8px 12px}
+  #strip{display:block;padding:8px 16px 4px;border-top:1px solid var(--line)}
+  #panel{padding:16px 16px 60px;border-top:1px solid var(--line)}
+}
+@media (prefers-reduced-motion:reduce){ .line,.st .halo{transition:none} }
+</style>
+</head>
+<body>
+<header id="top">
+  <div class="brand"><b>Umbra</b><span>/ watchdog</span><span>· maquette A — Ligne de métro</span></div>
+  <div class="pitchrow"><span class="qtag">Ce que fait ce projet</span><p id="pitch"></p></div>
+  <div id="chips" role="group" aria-label="Lignes du projet"><span class="lab">Lignes :</span></div>
+</header>
+
+<main id="stage">
+  <div id="swipe">← Faites glisser le plan sur le côté. La ligne allumée est aussi listée sous le lecteur. →</div>
+  <div id="canvaswrap">
+    <svg id="plan" viewBox="0 0 1040 700" preserveAspectRatio="xMidYMin meet" role="img" aria-label="Plan du projet en lignes de métro">
+      <defs>
+        <marker id="arrow-grey" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#75818f"/></marker>
+      </defs>
+      <g id="plan-layer"></g>
+      <g id="particle-layer"><circle id="particle" r="7" cx="-20" cy="-20" opacity="0"/></g>
+    </svg>
+  </div>
+  <div id="player" aria-live="polite">
+    <button id="btn-prev" aria-label="Étape précédente" title="Étape précédente (←)">◀</button>
+    <button id="btn-play" aria-label="Lire la ligne" title="Lire / pause (espace)">▶</button>
+    <button id="btn-next" aria-label="Étape suivante" title="Étape suivante (→)">▶|</button>
+    <div id="ptext"></div>
+  </div>
+  <ol id="strip" class="stops" aria-label="La ligne allumée, en liste"></ol>
+</main>
+
+<aside id="panel" aria-live="polite"></aside>
+
+<script type="application/json" id="model-data">{
+ "pitch": "Watchdog est un outil, encore en tout début de construction, pour les équipes qui font tourner des assistants d'intelligence artificielle : il doit surveiller ces assistants, repérer leurs dérives et aider à les arrêter. Pour l'instant, il sait seulement recevoir et garder en mémoire les comptes rendus que ces assistants lui envoient.",
+ "resume": "Watchdog s'adresse aux équipes techniques qui exploitent des agents d'IA en production. La vision complète prévoit la détection d'anomalies, une enquête faite par plusieurs agents, des propositions de correction et un arrêt d'urgence. Le code actuel est une petite application FastAPI (Phase 1) avec une seule route : POST /api/v1/events. Une requête passe d'abord par un middleware qui exige l'en-tête X-Tenant-ID. Pydantic valide ensuite le corps selon le schéma EventIn. L'événement est enfin ajouté, avec le tenant et l'heure de réception, à une liste Python en mémoire, puis renvoyé avec le code 201. Il n'y a encore ni base de données, ni appel à un modèle d'IA, ni JWT.",
+ "blocs": [
+  {
+   "id": "agent-surveille",
+   "nom": "Assistant d'IA surveillé",
+   "type": "user",
+   "role": "Un agent d'IA client, ou un script de test comme curl, qui envoie par HTTP un événement de télémétrie pour chaque appel à un modèle.",
+   "en_bref": "Envoie le compte rendu de chaque appel",
+   "importance": "coeur",
+   "zone": "utilise",
+   "entre": [
+    "La réponse avec l'événement enregistré",
+    "Un refus si l'envoi est incomplet"
+   ],
+   "sort": [
+    "Le compte rendu d'un appel au modèle",
+    "Le nom du client"
+   ],
+   "techno": "HTTP / JSON",
+   "code": [
+    {
+     "chemin": "README.md",
+     "element": "README.md"
+    }
+   ],
+   "indices": "README.md l.41-48 : exemple curl avec l'en-tête X-Tenant-ID ; VISION.md l.53 : définition de « Monitored Agent »."
+  },
+  {
+   "id": "operateur",
+   "nom": "Personne qui installe et lance",
+   "type": "user",
+   "role": "Le développeur qui installe le paquet, copie .env.example puis lance uvicorn à la main.",
+   "en_bref": "Installe et démarre le service à la main",
+   "importance": "secondaire",
+   "zone": "utilise",
+   "entre": [
+    "Les instructions d'installation"
+   ],
+   "sort": [
+    "Le service démarré"
+   ],
+   "techno": "pip, uvicorn",
+   "code": [
+    {
+     "chemin": "README.md",
+     "element": "README.md"
+    },
+    {
+     "chemin": ".env.example",
+     "element": ".env.example"
+    }
+   ],
+   "indices": "README.md l.31-39 : section « Quick start »."
+  },
+  {
+   "id": "api",
+   "nom": "Porte d'entrée du service",
+   "type": "backend",
+   "role": "L'application FastAPI : elle filtre chaque requête sur X-Tenant-ID, valide l'événement avec Pydantic et le confie au stockage.",
+   "en_bref": "Reçoit, contrôle et range les comptes rendus",
+   "importance": "coeur",
+   "zone": "recoit",
+   "entre": [
+    "Les comptes rendus envoyés",
+    "Le nom du client"
+   ],
+   "sort": [
+    "L'événement enregistré",
+    "Un refus si le nom du client manque",
+    "Un refus si les données sont invalides"
+   ],
+   "techno": "Python 3.13, FastAPI, Starlette, Pydantic v2, uvicorn",
+   "code": [
+    {
+     "chemin": "watchdog_ai/main.py",
+     "element": "watchdog_ai/main.py"
+    },
+    {
+     "chemin": "watchdog_ai/api",
+     "element": "dir:watchdog_ai/api"
+    },
+    {
+     "chemin": "watchdog_ai/ingestion",
+     "element": "dir:watchdog_ai/ingestion"
+    }
+   ],
+   "indices": "main.py l.14-21 crée l'app, ajoute le middleware et branche le routeur."
+  },
+  {
+   "id": "memoire",
+   "nom": "Mémoire temporaire des événements",
+   "type": "database",
+   "role": "Une liste Python au niveau du module (_events) qui garde les EventOut en mémoire. Tout est perdu au redémarrage. Elle doit être remplacée plus tard par PostgreSQL.",
+   "en_bref": "Garde les événements tant que le service tourne",
+   "importance": "coeur",
+   "zone": "range",
+   "entre": [
+    "Les événements validés, avec le nom du client"
+   ],
+   "sort": [
+    "L'événement enregistré",
+    "Les événements d'un client, mais pas encore exposés"
+   ],
+   "techno": "Liste Python en mémoire, PostgreSQL prévu",
+   "code": [
+    {
+     "chemin": "watchdog_ai/storage/events.py",
+     "element": "watchdog_ai/storage/events.py"
+    }
+   ],
+   "indices": "storage/events.py l.1-9 : « In-memory storage », TODO PostgreSQL + SQLAlchemy async."
+  },
+  {
+   "id": "docs",
+   "nom": "Documents de vision",
+   "type": "docs",
+   "role": "README et VISION.md décrivent les 8 couches visées, les scénarios S1-S13 et la feuille de route. La plupart ne sont pas encore codés.",
+   "en_bref": "Décrivent le produit visé et le planning",
+   "importance": "secondaire",
+   "zone": "traite",
+   "entre": [
+    "Les idées du porteur du projet"
+   ],
+   "sort": [
+    "Le plan du produit",
+    "Les étapes à venir"
+   ],
+   "techno": "Markdown",
+   "code": [
+    {
+     "chemin": "README.md",
+     "element": "README.md"
+    },
+    {
+     "chemin": "VISION.md",
+     "element": "VISION.md"
+    }
+   ],
+   "indices": "README.md l.71-79 : tableau des phases, Phase 1 « In progress »."
+  },
+  {
+   "id": "outillage",
+   "nom": "Outils de contrôle du code",
+   "type": "infra",
+   "role": "pyproject.toml déclare les dépendances, et les outils de développement pyright (mode strict) et ruff.",
+   "en_bref": "Vérifient le style et les types",
+   "importance": "secondaire",
+   "zone": "traite",
+   "entre": [
+    "Le code source"
+   ],
+   "sort": [
+    "Les erreurs de style ou de types"
+   ],
+   "techno": "setuptools, pyright, ruff",
+   "code": [
+    {
+     "chemin": "pyproject.toml",
+     "element": "pyproject.toml"
+    }
+   ],
+   "indices": "pyproject.toml l.17-39."
+  }
+ ],
+ "composants": [
+  {
+   "id": "app",
+   "nom": "Assemblage de l'application",
+   "en_bref": "Monte le service et branche ses morceaux",
+   "bloc": "api",
+   "role": "Crée l'instance FastAPI, installe TenantAuthMiddleware et inclut le routeur des événements.",
+   "responsabilites": [
+    "Créer l'app FastAPI (titre, version)",
+    "Ajouter le middleware de tenant",
+    "Brancher le routeur /api/v1"
+   ],
+   "expose": [
+    {
+     "quoi": "objet ASGI app (watchdog_ai.main:app)",
+     "fichier": "watchdog_ai/main.py",
+     "lignes": [
+      14,
+      21
+     ],
+     "verifie": true
+    }
+   ],
+   "utilise": [
+    "auth-tenant",
+    "route-events"
+   ],
+   "fichiers": [
+    "watchdog_ai/main.py"
+   ]
+  },
+  {
+   "id": "auth-tenant",
+   "nom": "Contrôle du nom du client",
+   "en_bref": "Refuse les requêtes sans nom de client",
+   "bloc": "api",
+   "role": "Middleware Starlette qui lit X-Tenant-ID sur toutes les requêtes. Si l'en-tête manque, il renvoie 401. Sinon, il place la valeur dans request.state.tenant_id.",
+   "responsabilites": [
+    "Exiger l'en-tête X-Tenant-ID sur toutes les requêtes, y compris /docs",
+    "Passer le tenant à la route via request.state"
+   ],
+   "expose": [
+    {
+     "quoi": "TenantAuthMiddleware.dispatch",
+     "fichier": "watchdog_ai/api/middleware/tenant_auth.py",
+     "lignes": [
+      25,
+      40
+     ],
+     "verifie": true
+    }
+   ],
+   "utilise": [],
+   "fichiers": [
+    "watchdog_ai/api/middleware/tenant_auth.py"
+   ]
+  },
+  {
+   "id": "route-events",
+   "nom": "Réception des comptes rendus",
+   "en_bref": "Point d'arrivée des comptes rendus d'appels",
+   "bloc": "api",
+   "role": "Route POST /api/v1/events : reçoit un EventIn validé, lit le tenant et appelle append_event, puis renvoie 201.",
+   "responsabilites": [
+    "Déclarer POST /api/v1/events",
+    "Lire tenant_id depuis request.state",
+    "Renvoyer EventOut avec le code 201"
+   ],
+   "expose": [
+    {
+     "quoi": "POST /api/v1/events (create_event)",
+     "fichier": "watchdog_ai/api/routes/events.py",
+     "lignes": [
+      13,
+      23
+     ],
+     "verifie": true
+    }
+   ],
+   "utilise": [
+    "schemas",
+    "stockage-events"
+   ],
+   "fichiers": [
+    "watchdog_ai/api/routes/events.py"
+   ]
+  },
+  {
+   "id": "schemas",
+   "nom": "Forme attendue d'un compte rendu",
+   "en_bref": "Décrit et vérifie les champs d'un événement",
+   "bloc": "api",
+   "role": "Modèles Pydantic : EventIn (identité, horaire, fournisseur, modèle, prompt, sortie, jetons, coût, statut, métadonnées) et EventOut (EventIn plus tenant_id et received_at).",
+   "responsabilites": [
+    "Imposer les champs obligatoires et leurs bornes (longueurs, valeurs ≥ 0)",
+    "Limiter status à success, error, timeout, content_filter ou rate_limit"
+   ],
+   "expose": [
+    {
+     "quoi": "EventIn",
+     "fichier": "watchdog_ai/ingestion/schemas.py",
+     "lignes": [
+      10,
+      36
+     ],
+     "verifie": true
+    },
+    {
+     "quoi": "EventOut",
+     "fichier": "watchdog_ai/ingestion/schemas.py",
+     "lignes": [
+      39,
+      41
+     ],
+     "verifie": true
+    }
+   ],
+   "utilise": [],
+   "fichiers": [
+    "watchdog_ai/ingestion/schemas.py"
+   ]
+  },
+  {
+   "id": "stockage-events",
+   "nom": "Rangement des événements",
+   "en_bref": "Ajoute et relit les événements par client",
+   "bloc": "memoire",
+   "role": "Fonctions qui ajoutent un EventOut à la liste _events et filtrent cette liste par tenant_id.",
+   "responsabilites": [
+    "Construire l'EventOut avec tenant_id et received_at (UTC)",
+    "Ajouter l'événement à la liste en mémoire",
+    "Lister les événements d'un tenant (fonction pas encore appelée)"
+   ],
+   "expose": [
+    {
+     "quoi": "append_event(event, tenant_id)",
+     "fichier": "watchdog_ai/storage/events.py",
+     "lignes": [
+      12,
+      20
+     ],
+     "verifie": true
+    },
+    {
+     "quoi": "list_events(tenant_id)",
+     "fichier": "watchdog_ai/storage/events.py",
+     "lignes": [
+      23,
+      25
+     ],
+     "verifie": true
+    }
+   ],
+   "utilise": [
+    "schemas",
+    "memoire"
+   ],
+   "fichiers": [
+    "watchdog_ai/storage/events.py"
+   ]
+  }
+ ],
+ "modules": {
+  "watchdog_ai/main.py": "Point d'entrée ASGI : crée l'app FastAPI, ajoute TenantAuthMiddleware et inclut le routeur des événements.",
+  "watchdog_ai/api/middleware/tenant_auth.py": "Middleware Starlette qui exige X-Tenant-ID (sinon 401) et le place dans request.state.tenant_id.",
+  "watchdog_ai/api/routes/events.py": "Routeur /api/v1 avec POST /events (create_event), qui stocke l'événement validé et renvoie 201.",
+  "watchdog_ai/ingestion/schemas.py": "Schémas Pydantic EventIn (télémétrie d'un appel LLM) et EventOut (EventIn plus tenant_id et received_at).",
+  "watchdog_ai/storage/events.py": "Stockage en mémoire (liste _events) avec append_event et list_events filtré par tenant.",
+  "pyproject.toml": "Manifeste du paquet : dépendances FastAPI, Pydantic et uvicorn, outils pyright strict et ruff.",
+  ".env.example": "Modèle de variables d'environnement : APP_ENV, APP_PORT et LOG_LEVEL, plus des sections DB, JWT, Azure OpenAI et Langfuse commentées. Le code ne les lit pas encore.",
+  "README.md": "Présentation du produit, démarrage rapide, architecture en 8 couches et état des phases.",
+  "VISION.md": "Vision complète : glossaire, architecture cible, scénarios S1-S13, stack, feuille de route et non-objectifs."
+ },
+ "dossiers": {
+  "watchdog_ai": "Paquet Python de l'application Watchdog.",
+  "watchdog_ai/api": "Couche HTTP : routes et middlewares.",
+  "watchdog_ai/api/middleware": "Middlewares transverses, pour l'instant l'authentification par tenant.",
+  "watchdog_ai/api/routes": "Routeurs FastAPI, pour l'instant l'ingestion des événements.",
+  "watchdog_ai/ingestion": "Contrats de données de la télémétrie entrante (schémas Pydantic).",
+  "watchdog_ai/storage": "Persistance des événements, en mémoire en attendant PostgreSQL."
+ },
+ "incertitudes": [
+  "Le produit décrit dans README et VISION n'existe pas encore dans le code. Ce qui manque : détection d'anomalies, agents Watcher, Investigator, Mitigator et Alerter (LangGraph), évaluation, kill switch, MCP, PostgreSQL/TimescaleDB/pgvector, JWT, Azure OpenAI, Mistral, Langfuse. Ces services extérieurs ne sont donc pas représentés comme blocs.",
+  "list_events n'est appelée nulle part : aucune route ne permet de relire les événements stockés.",
+  "Le stockage est une liste globale en mémoire, sans verrou ni persistance. Avec plusieurs workers uvicorn, chaque processus aurait sa propre liste. Ce comportement est déduit du code, pas testé.",
+  "L'exemple curl du README ne contient pas plusieurs champs obligatoires d'EventIn. Il devrait donc recevoir 422. C'est déduit du schéma, la requête n'a pas été exécutée.",
+  "Aucun fichier Docker, compose, CI ou test n'est présent dans cette copie. Le fichier LICENSE cité est absent."
+ ],
+ "parcours": [
+  {
+   "id": "demarrage",
+   "nom": "Installer et démarrer le service",
+   "declencheur": "Une personne suit le « Quick start » du README",
+   "depart": "Une personne veut faire tourner le service sur sa machine.",
+   "fin": "Le service écoute et attend les comptes rendus.",
+   "etapes": [
+    {
+     "texte": "Installation manuelle : git clone, pip install -e \".[dev]\", puis cp .env.example .env. Le code ne lit aucune variable d'environnement pour l'instant.",
+     "action": "Installe le projet",
+     "simple": "La personne récupère le projet, installe ce qu'il faut et copie le fichier de réglages.",
+     "composant": "app",
+     "touche": [
+      "operateur"
+     ],
+     "conditions": [
+      "Python 3.13 ou plus (requires-python)"
+     ],
+     "manuel": true,
+     "fichier": "README.md",
+     "lignes": [
+      33,
+      37
+     ],
+     "verifie": true
+    },
+    {
+     "texte": "Lancement manuel : uvicorn watchdog_ai.main:app --reload --port 8000.",
+     "action": "Lance le service",
+     "simple": "La personne lance le service à la main.",
+     "composant": "app",
+     "touche": [
+      "operateur",
+      "api"
+     ],
+     "conditions": [
+      "Le paquet est installé"
+     ],
+     "manuel": true,
+     "fichier": "README.md",
+     "lignes": [
+      38,
+      38
+     ],
+     "verifie": true
+    },
+    {
+     "texte": "À l'import de main.py : création de FastAPI(title=\"Watchdog\"), app.add_middleware(TenantAuthMiddleware), puis app.include_router(events_router). La liste _events démarre vide à l'import de storage/events.py.",
+     "action": "Monte le service",
+     "simple": "Le service se monte : il installe le contrôle du nom du client et branche le point d'arrivée des comptes rendus.",
+     "composant": "app",
+     "touche": [
+      "api",
+      "memoire"
+     ],
+     "conditions": [],
+     "manuel": false,
+     "fichier": "watchdog_ai/main.py",
+     "lignes": [
+      14,
+      21
+     ],
+     "verifie": true
+    }
+   ],
+   "resultat": "Un serveur HTTP sur le port 8000 qui expose POST /api/v1/events, avec un stockage vide.",
+   "branches": [
+    {
+     "quand": "Le service redémarre (par exemple avec --reload après une modification)",
+     "alors": "La liste _events est recréée vide : tous les événements reçus sont perdus.",
+     "fichier": "watchdog_ai/storage/events.py",
+     "lignes": [
+      9,
+      9
+     ],
+     "verifie": true
+    }
+   ]
+  },
+  {
+   "id": "envoi-evenement",
+   "nom": "Recevoir et garder le compte rendu d'un appel d'IA",
+   "declencheur": "Un agent surveillé envoie POST /api/v1/events",
+   "depart": "Un assistant d'IA envoie le compte rendu d'un de ses appels.",
+   "fin": "Le compte rendu est gardé en mémoire et renvoyé, complété, à l'expéditeur.",
+   "etapes": [
+    {
+     "texte": "TenantAuthMiddleware.dispatch lit request.headers['X-Tenant-ID']. Si l'en-tête est présent, il le copie dans request.state.tenant_id puis appelle call_next. Il s'exécute avant le routage et la validation du corps.",
+     "action": "Vérifie le nom du client",
+     "simple": "Le service vérifie d'abord que la demande indique le nom du client, et le note.",
+     "composant": "auth-tenant",
+     "touche": [
+      "agent-surveille",
+      "api"
+     ],
+     "conditions": [
+      "L'en-tête X-Tenant-ID est présent et non vide (sa valeur n'est pas vérifiée)"
+     ],
+     "manuel": false,
+     "fichier": "watchdog_ai/api/middleware/tenant_auth.py",
+     "lignes": [
+      28,
+      40
+     ],
+     "verifie": true
+    },
+    {
+     "texte": "FastAPI aiguille vers create_event, puis Pydantic valide le corps JSON selon EventIn. Champs obligatoires : event_id (UUID), agent_id, timestamp_start, latency_ms ≥ 0, provider, model, prompt, output, prompt_tokens, completion_tokens, total_tokens, cost_usd ≥ 0 et status parmi 5 valeurs. Champs facultatifs : schema_version='1.0' et metadata={}.",
+     "action": "Contrôle le compte rendu",
+     "simple": "Le service contrôle que le compte rendu contient bien tous les renseignements attendus, au bon format.",
+     "composant": "schemas",
+     "touche": [
+      "api"
+     ],
+     "conditions": [
+      "La requête a passé le contrôle du nom du client",
+      "Méthode POST sur /api/v1/events"
+     ],
+     "manuel": false,
+     "fichier": "watchdog_ai/ingestion/schemas.py",
+     "lignes": [
+      10,
+      36
+     ],
+     "verifie": true
+    },
+    {
+     "texte": "create_event lit tenant_id dans request.state et appelle append_event(event, tenant_id=tenant_id).",
+     "action": "Transmet au rangement",
+     "simple": "Le point d'arrivée reprend le nom du client et passe le compte rendu au rangement.",
+     "composant": "route-events",
+     "touche": [
+      "api"
+     ],
+     "conditions": [
+      "Le corps est valide"
+     ],
+     "manuel": false,
+     "fichier": "watchdog_ai/api/routes/events.py",
+     "lignes": [
+      16,
+      23
+     ],
+     "verifie": true
+    },
+    {
+     "texte": "append_event construit un EventOut (event.model_dump(), tenant_id, received_at=datetime.now(UTC)), l'ajoute à la liste _events en mémoire puis le renvoie.",
+     "action": "Garde le compte rendu",
+     "simple": "Le compte rendu reçoit le nom du client et l'heure d'arrivée, puis il est gardé en mémoire.",
+     "composant": "stockage-events",
+     "touche": [
+      "memoire"
+     ],
+     "conditions": [],
+     "manuel": false,
+     "fichier": "watchdog_ai/storage/events.py",
+     "lignes": [
+      12,
+      20
+     ],
+     "verifie": true
+    },
+    {
+     "texte": "FastAPI sérialise la valeur renvoyée selon response_model=EventOut et répond 201 Created. La réponse traverse ensuite le middleware.",
+     "action": "Confirme la réception",
+     "simple": "Le service répond à l'assistant que tout est bien reçu, et lui renvoie le compte rendu complété.",
+     "composant": "route-events",
+     "touche": [
+      "agent-surveille"
+     ],
+     "conditions": [],
+     "manuel": false,
+     "fichier": "watchdog_ai/api/routes/events.py",
+     "lignes": [
+      16,
+      20
+     ],
+     "verifie": true
+    }
+   ],
+   "resultat": "L'événement, avec tenant_id et received_at, est ajouté à la liste en mémoire. L'expéditeur reçoit 201 avec l'EventOut.",
+   "branches": [
+    {
+     "quand": "L'en-tête X-Tenant-ID manque ou est vide",
+     "alors": "Le middleware renvoie tout de suite 401 {\"detail\": \"Missing X-Tenant-ID header\"}. Le corps n'est pas lu et rien n'est stocké.",
+     "fichier": "watchdog_ai/api/middleware/tenant_auth.py",
+     "lignes": [
+      33,
+      38
+     ],
+     "verifie": true
+    },
+    {
+     "quand": "Le corps ne respecte pas EventIn (champ manquant, valeur négative, status inconnu...)",
+     "alors": "FastAPI renvoie 422 avec le détail des erreurs, et rien n'est stocké. L'exemple curl du README n'a pas event_id, timestamp_start, latency_ms ni provider : il reçoit donc 422.",
+     "fichier": "watchdog_ai/ingestion/schemas.py",
+     "lignes": [
+      13,
+      35
+     ],
+     "verifie": true
+    },
+    {
+     "quand": "Le même event_id est envoyé deux fois",
+     "alors": "Aucun contrôle de doublon : l'événement est ajouté une deuxième fois.",
+     "fichier": "watchdog_ai/storage/events.py",
+     "lignes": [
+      12,
+      20
+     ],
+     "verifie": true
+    }
+   ]
+  },
+  {
+   "id": "acces-sans-client",
+   "nom": "Toute requête sans nom de client est refusée",
+   "declencheur": "Une requête HTTP sur n'importe quelle adresse du service",
+   "depart": "Quelqu'un appelle le service, même juste pour lire sa documentation.",
+   "fin": "Sans nom de client, la personne reçoit un refus.",
+   "etapes": [
+    {
+     "texte": "Le middleware est global (app.add_middleware). Il s'applique donc à toutes les routes, y compris /docs, /openapi.json et les adresses inconnues.",
+     "action": "Filtre toutes les demandes",
+     "simple": "Le contrôle du nom du client vaut pour toutes les adresses du service.",
+     "composant": "app",
+     "touche": [
+      "api"
+     ],
+     "conditions": [],
+     "manuel": false,
+     "fichier": "watchdog_ai/main.py",
+     "lignes": [
+      20,
+      20
+     ],
+     "verifie": true
+    },
+    {
+     "texte": "dispatch renvoie un JSONResponse 401 au lieu de lever HTTPException. Le module explique qu'une exception levée dans un BaseHTTPMiddleware donnerait une erreur 500.",
+     "action": "Refuse sans nom de client",
+     "simple": "Le service répond poliment « nom du client manquant » au lieu de planter.",
+     "composant": "auth-tenant",
+     "touche": [
+      "agent-surveille"
+     ],
+     "conditions": [
+      "L'en-tête X-Tenant-ID est absent ou vide"
+     ],
+     "manuel": false,
+     "fichier": "watchdog_ai/api/middleware/tenant_auth.py",
+     "lignes": [
+      33,
+      38
+     ],
+     "verifie": true
+    }
+   ],
+   "resultat": "Aucune requête n'atteint le service sans X-Tenant-ID. N'importe quelle valeur suffit, car il n'y a ni JWT ni liste de tenants.",
+   "branches": [
+    {
+     "quand": "L'en-tête est présent mais l'adresse n'existe pas",
+     "alors": "La requête passe le middleware, puis FastAPI répond 404.",
+     "fichier": "watchdog_ai/api/middleware/tenant_auth.py",
+     "lignes": [
+      39,
+      40
+     ],
+     "verifie": true
+    }
+   ]
+  }
+ ],
+ "flux": [
+  {
+   "de": "operateur",
+   "vers": "api",
+   "quoi": "Lancement du serveur avec uvicorn watchdog_ai.main:app",
+   "verbe": "démarre"
+  },
+  {
+   "de": "agent-surveille",
+   "vers": "api",
+   "quoi": "POST /api/v1/events avec l'en-tête X-Tenant-ID et un corps JSON",
+   "verbe": "envoie ses comptes rendus à"
+  },
+  {
+   "de": "api",
+   "vers": "memoire",
+   "quoi": "EventOut (l'événement, plus tenant_id et received_at)",
+   "verbe": "range l'événement dans"
+  },
+  {
+   "de": "api",
+   "vers": "agent-surveille",
+   "quoi": "201 avec l'EventOut, 401 si l'en-tête manque, ou 422 si le corps est invalide",
+   "verbe": "répond à"
+  },
+  {
+   "de": "outillage",
+   "vers": "api",
+   "quoi": "Contrôle des types et du style",
+   "verbe": "vérifie"
+  }
+ ]
+}</script>
+<script>
+"use strict";
+/* ---------- data (watchdog-model.json, embedded verbatim) ---------- */
+const M = JSON.parse(document.getElementById("model-data").textContent);
+const BLOC = Object.fromEntries(M.blocs.map(b => [b.id, b]));
+const COMP = Object.fromEntries(M.composants.map(c => [c.id, c]));
+const JOUR = Object.fromEntries(M.parcours.map(p => [p.id, p]));
+const REDUCED = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+/* main line = journey with the most distinct composants (until a 'principal' flag exists) */
+const distinctComps = p => new Set(p.etapes.map(e => e.composant).filter(Boolean)).size;
+const MAIN = M.parcours.reduce((a, p) => (distinctComps(p) > distinctComps(a) ? p : a));
+const OTHER_COLORS = ["#a78bfa", "#f87171", "#34d399", "#38bdf8"];
+const COLOR = {};
+{ let k = 0; M.parcours.forEach(p => { COLOR[p.id] = p === MAIN ? "#facc15" : OTHER_COLORS[k++ % OTHER_COLORS.length]; }); }
+
+/* hand-placed positions for this mockup; order, numbers, labels and rings are computed from the model */
+const LAYOUT = {
+  comp: { "auth-tenant": [340, 230], "schemas": [500, 230], "route-events": [660, 230], "stockage-events": [910, 230], "app": [340, 450] },
+  reply: { "envoi-evenement": { "route-events": [560, 150] } },
+  bloc: { "agent-surveille": [90, 230], "operateur": [90, 450] },
+  frames: { "api": [250, 54, 510, 494], "memoire": [815, 150, 190, 300] },
+  shelf: { "docs": [36, 618], "outillage": [318, 618] },
+  start: { "envoi-evenement": [112, 230], "demarrage": [114, 450] },
+  via: { "envoi-evenement": { 4: [[660, 150]] }, "acces-sans-client": { 1: [[300, 410], [300, 270]] } },
+  paths: {
+    "envoi-evenement": { data: "M112,230 L896,230", reply: "M660,230 L660,150 L90,150 L90,202" },
+    "demarrage": { data: "M114,450 L326,450" },
+    "acces-sans-client": { data: "M340,450 L300,410 L300,270 L330,240", reply: "M340,230 L322,248 L112,248" }
+  }
+};
+
+/* facts NOT in the model, read in the Watchdog source (verified, file:line) */
+const W = "watchdog_ai/";
+const FACTS = {
+  "auth-tenant": {
+    recoit: [{ t: "L'en-tête de la requête", code: "X-Tenant-ID", src: W + "api/middleware/tenant_auth.py:33" }],
+    rend: [
+      { t: "Le nom du client, noté pour la suite", code: "request.state.tenant_id", src: W + "api/middleware/tenant_auth.py:39" },
+      { t: "ou un refus", code: "401", src: W + "api/middleware/tenant_auth.py:36" },
+      { t: "avec le message", code: "{\"detail\": \"Missing X-Tenant-ID header\"}", src: W + "api/middleware/tenant_auth.py:37" }
+    ],
+    reglages: [
+      { nom: "Nom de l'en-tête", code: "X-Tenant-ID", src: W + "api/middleware/tenant_auth.py:33" },
+      { nom: "Code du refus", code: "401", src: W + "api/middleware/tenant_auth.py:36" },
+      { nom: "Message du refus", code: "Missing X-Tenant-ID header", src: W + "api/middleware/tenant_auth.py:37" },
+      { nom: "Valeur contrôlée ? non, toute valeur non vide passe", code: "if not tenant_id", src: W + "api/middleware/tenant_auth.py:34" },
+      { nom: "Portée : globale, /docs compris", code: "app.add_middleware", src: W + "main.py:20" }
+    ]
+  },
+  "schemas": {
+    recoit: [{ t: "Le corps JSON de la requête", code: "event: EventIn", src: W + "api/routes/events.py:21" }],
+    rend: [
+      { t: "Un compte rendu validé", code: "EventIn", src: W + "ingestion/schemas.py:10" },
+      { t: "ou un refus 422 envoyé par FastAPI (pas écrit dans ce fichier)", code: "422", src: "modèle : branche l.13-35" }
+    ],
+    reglages: [
+      { nom: "Longueur de agent_id", code: "1 à 128", src: W + "ingestion/schemas.py:15" },
+      { nom: "Version par défaut", code: "schema_version = \"1.0\"", src: W + "ingestion/schemas.py:16" },
+      { nom: "Durée minimale", code: "latency_ms ≥ 0", src: W + "ingestion/schemas.py:20" },
+      { nom: "Longueur de provider", code: "1 à 64", src: W + "ingestion/schemas.py:23" },
+      { nom: "Longueur de model", code: "1 à 128", src: W + "ingestion/schemas.py:24" },
+      { nom: "Jetons", code: "≥ 0", src: W + "ingestion/schemas.py:29-31" },
+      { nom: "Coût", code: "cost_usd ≥ 0", src: W + "ingestion/schemas.py:32" },
+      { nom: "Statuts permis", code: "success · error · timeout · content_filter · rate_limit", src: W + "ingestion/schemas.py:35" },
+      { nom: "Métadonnées par défaut", code: "{}", src: W + "ingestion/schemas.py:36" }
+    ]
+  },
+  "route-events": {
+    recoit: [
+      { t: "Le compte rendu validé", code: "EventIn", src: W + "api/routes/events.py:21" },
+      { t: "Le nom du client noté plus tôt", code: "request.state.tenant_id", src: W + "api/routes/events.py:22" }
+    ],
+    rend: [
+      { t: "Le compte rendu complété, avec le code 201", code: "EventOut", src: W + "api/routes/events.py:18-19" },
+      { t: "en passant par le rangement", code: "append_event(...)", src: W + "api/routes/events.py:23" }
+    ],
+    reglages: [
+      { nom: "Début de l'adresse", code: "/api/v1", src: W + "api/routes/events.py:13" },
+      { nom: "Fin de l'adresse", code: "/events", src: W + "api/routes/events.py:17" },
+      { nom: "Forme de la réponse", code: "EventOut", src: W + "api/routes/events.py:18" },
+      { nom: "Code de succès", code: "201", src: W + "api/routes/events.py:19" }
+    ]
+  },
+  "stockage-events": {
+    recoit: [{ t: "Le compte rendu et le nom du client", code: "event: EventIn, tenant_id: str", src: W + "storage/events.py:12" }],
+    rend: [{ t: "Le compte rendu gardé", code: "EventOut", src: W + "storage/events.py:20" }],
+    reglages: [
+      { nom: "Où c'est gardé : une liste en mémoire", code: "_events", src: W + "storage/events.py:9" },
+      { nom: "Heure d'arrivée", code: "datetime.now(UTC)", src: W + "storage/events.py:17" },
+      { nom: "Ajout simple, sans contrôle de doublon", code: "_events.append", src: W + "storage/events.py:19" }
+    ]
+  },
+  "app": {
+    recoit: [{ t: "Rien : tout se fait à l'import, lancé par", code: "uvicorn watchdog_ai.main:app", src: "README.md:38" }],
+    rend: [{ t: "L'application montée", code: "app", src: W + "main.py:14" }],
+    reglages: [
+      { nom: "Titre", code: "\"Watchdog\"", src: W + "main.py:15" },
+      { nom: "Version", code: "\"0.1.0\"", src: W + "main.py:17" },
+      { nom: "Contrôle installé", code: "TenantAuthMiddleware", src: W + "main.py:20" },
+      { nom: "Routeur branché", code: "events_router", src: W + "main.py:21" },
+      { nom: "Port (ligne de commande)", code: "--port 8000", src: "README.md:38" },
+      { nom: "APP_ENV, APP_PORT, LOG_LEVEL : non lus par le code", code: ".env.example", src: ".env.example:2-4" }
+    ]
+  }
+};
+const DATA_ALIAS = { word: "compte rendu", code: "EventIn", src: W + "ingestion/schemas.py:10" };
+
+/* ---------- derived structures ---------- */
+const isUser = id => BLOC[id] && BLOC[id].type === "user";
+function stopsOf(p) {
+  const out = [], seen = new Set(); let prev = null;
+  p.etapes.forEach((e, i) => {
+    const c = e.composant;
+    const backHop = !!c && c !== prev && seen.has(c) && (e.touche || []).some(isUser);
+    out.push({ i, comp: c, reply: backHop, key: backHop ? "reply:" + p.id + ":" + c : c });
+    if (c) seen.add(c);
+    prev = c;
+  });
+  return out;
+}
+const STOPS = Object.fromEntries(M.parcours.map(p => [p.id, stopsOf(p)]));
+const LINES_BY_COMP = {}, LINES_BY_BLOC = {};
+M.parcours.forEach(p => p.etapes.forEach(e => {
+  if (!e.composant || !COMP[e.composant]) return;
+  (LINES_BY_COMP[e.composant] = LINES_BY_COMP[e.composant] || new Set()).add(p.id);
+  const b = COMP[e.composant].bloc;
+  (LINES_BY_BLOC[b] = LINES_BY_BLOC[b] || new Set()).add(p.id);
+}));
+const ON_A_LINE = new Set(Object.keys(LINES_BY_BLOC));
+M.parcours.forEach(p => p.etapes.forEach(e => (e.touche || []).forEach(b => { if (isUser(b)) ON_A_LINE.add(b); })));
+const SHELF = M.blocs.filter(b => !ON_A_LINE.has(b.id));
+function posOf(pid, stop) {
+  if (!stop || !stop.comp) return null;
+  if (stop.reply) return (LAYOUT.reply[pid] || {})[stop.comp] || null;
+  return LAYOUT.comp[stop.comp] || null;
+}
+function branchComp(b) { return M.composants.find(c => (c.fichiers || []).includes(b.fichier)); }
+function countWord(re) { return (JSON.stringify(M).match(re) || []).length; }
+const ENTRY = (() => { const t = MAIN.etapes[0].touche || []; return t.find(isUser) || null; })();
+const EXIT = (() => {
+  for (let i = MAIN.etapes.length - 1; i >= 0; i--) {
+    const c = COMP[MAIN.etapes[i].composant];
+    if (c && BLOC[c.bloc] && BLOC[c.bloc].type === "database") return c.bloc;
+  }
+  return null;
+})();
+const MISSING_LAYOUT = [
+  ...M.composants.filter(c => LINES_BY_COMP[c.id] && !LAYOUT.comp[c.id]).map(c => c.id),
+  ...M.parcours.filter(p => !LAYOUT.paths[p.id]).map(p => p.id)
+];
+
+/* ---------- helpers ---------- */
+const $ = s => document.querySelector(s);
+const esc = s => String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#39;" }[c]));
+function wrap(t, n) {
+  const words = String(t).split(/\s+/), L = []; let cur = "";
+  for (const w of words) { if ((cur + " " + w).trim().length > n && cur) { L.push(cur); cur = w; } else cur = (cur + " " + w).trim(); }
+  if (cur) L.push(cur);
+  return L;
+}
+function txt(x, y, lines, cls, lh, anchor) {
+  return lines.map((l, i) => `<text x="${x}" y="${y + i * lh}" class="${cls}" text-anchor="${anchor || "middle"}">${esc(l)}</text>`).join("");
+}
+const shortSrc = s => s.replace(/^.*\//, "");
+const lines = (e) => e.lignes ? (e.lignes[0] === e.lignes[1] ? "l." + e.lignes[0] : "l." + e.lignes[0] + "-" + e.lignes[1]) : "";
+const stepNums = (pid, key) => STOPS[pid].filter(s => s.key === key).map(s => s.i + 1);
+const numLabel = ns => ns.length === 0 ? "" : ns.length === 1 ? String(ns[0]) : ns[0] + "–" + ns[ns.length - 1];
+const tm = (note) => `<details class="tm"><summary>texte du modèle</summary><div>${esc(note)}</div></details>`;
+
+/* ---------- state ---------- */
+const S = { jid: MAIN.id, step: -1, playing: false, timer: null, view: { kind: "line" } };
+
+/* ---------- plan rendering ---------- */
+function personGlyph(x, y, color) {
+  return `<circle cx="${x}" cy="${y - 13}" r="8" fill="${color}"/>` +
+    `<path d="M${x - 15},${y + 18} Q${x - 15},${y - 2} ${x},${y - 2} Q${x + 15},${y - 2} ${x + 15},${y + 18} Z" fill="${color}"/>`;
+}
+function badge(x, y, label, fg, bg) {
+  const w = label.length * 7 + 14;
+  return `<g><rect x="${x - w / 2}" y="${y - 12}" width="${w}" height="20" rx="4" fill="${bg}"/>` +
+    `<text x="${x}" y="${y + 2}" text-anchor="middle" style="font-size:11px;font-weight:800;fill:${fg};stroke-width:0;letter-spacing:.05em">${esc(label)}</text></g>`;
+}
+function renderPlan() {
+  const lit = JOUR[S.jid], litStops = STOPS[S.jid];
+  const curKey = S.step >= 0 ? litStops[S.step].key : null;
+  const doneKeys = new Set(litStops.filter(s => s.i < S.step).map(s => s.key));
+  let g = "";
+
+  // columns
+  g += txt(110, 34, ["D'OÙ ÇA VIENT"], "coltitle", 0);
+  g += txt(505, 34, ["PAR OÙ ÇA ENTRE ET CE QUI CONTRÔLE"], "coltitle", 0);
+  g += txt(910, 34, ["OÙ ÇA FINIT"], "coltitle", 0);
+  g += `<line x1="230" y1="48" x2="230" y2="560" stroke="var(--line)"/><line x1="790" y1="48" x2="790" y2="560" stroke="var(--line)"/>`;
+
+  // service frames (backend) and storage cylinders (database)
+  for (const [bid, r] of Object.entries(LAYOUT.frames)) {
+    const b = BLOC[bid]; if (!b) continue;
+    const [x, y, w, h] = r, n = LINES_BY_BLOC[bid] ? LINES_BY_BLOC[bid].size : 0;
+    const here = lit.etapes.filter(e => COMP[e.composant] && COMP[e.composant].bloc === bid).length;
+    if (b.type === "database") {
+      const ry = 16;
+      g += `<g class="clickable" data-bloc="${bid}" tabindex="0" role="button" aria-label="${esc(b.nom)}">`;
+      g += `<path d="M${x},${y} L${x},${y + h} A${w / 2},${ry} 0 0 0 ${x + w},${y + h} L${x + w},${y} Z" fill="rgba(251,191,36,.07)" stroke="var(--amber)" stroke-width="2"/>`;
+      g += `<ellipse cx="${x + w / 2}" cy="${y}" rx="${w / 2}" ry="${ry}" fill="#1c1a12" stroke="var(--amber)" stroke-width="2"/>`;
+      g += txt(x + w / 2, y + h + 40, wrap(b.nom, 24), "blocname", 16);
+      g += txt(x + w / 2, y + h + 76, wrap(b.en_bref, 30), "sub", 14);
+      g += `</g>`;
+      if (bid === EXIT) {
+        g += badge(x + w / 2, y - 30, "SORTIE ■", "#1a1300", "var(--amber)");
+        const lost = (b.role.match(/[^.]*redémarrage[^.]*\./) || [])[0];
+        if (lost) g += `<text x="${x + w / 2}" y="${y + h + 118}" text-anchor="middle" style="font-size:12px;fill:var(--amber);font-style:italic">« ${esc(lost.trim())} »</text>`;
+      }
+    } else {
+      if (n >= 2) g += `<rect x="${x - 5}" y="${y - 5}" width="${w + 10}" height="${h + 10}" rx="16" class="ring" opacity=".55"/>`;
+      g += `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="12" fill="rgba(96,165,250,.035)" stroke="var(--blue)" stroke-width="1.5" stroke-dasharray="7 5"/>`;
+      g += `<rect x="${x}" y="${y + 12}" width="6" height="${h - 24}" rx="3" fill="var(--blue)"/>`;
+      g += `<g class="clickable" data-bloc="${bid}" tabindex="0" role="button" aria-label="${esc(b.nom)}">`;
+      g += txt(x + 20, y + 24, [b.nom], "blocname", 0, "start");
+      g += txt(x + 20, y + 40, [b.en_bref], "sub", 0, "start");
+      g += `</g>`;
+      if (n >= 2) g += txt(x + w - 14, y + 24, ["correspondance · " + n + " lignes"], "tiny", 0, "end");
+      if (here) g += txt(x + w - 14, y + 40, [here + " étapes de la ligne allumée ici"], "tiny", 0, "end");
+    }
+  }
+
+  // people
+  for (const [bid, [x, y]] of Object.entries(LAYOUT.bloc)) {
+    const b = BLOC[bid]; if (!b) continue;
+    g += `<g class="clickable" data-bloc="${bid}" tabindex="0" role="button" aria-label="${esc(b.nom)}">`;
+    g += personGlyph(x, y, "var(--green)");
+    g += txt(x, y + 44, wrap(b.nom, 22), "blocname", 16);
+    g += txt(x, y + 44 + 16 * wrap(b.nom, 22).length + 2, wrap(b.en_bref, 26), "sub", 14);
+    g += `</g>`;
+    if (bid === ENTRY) g += badge(x, y + 112, "▶ ENTRÉE", "#04210f", "var(--green)");
+  }
+
+  // atelier shelf (blocs touched by no journey)
+  g += `<rect x="16" y="584" width="590" height="104" rx="10" fill="var(--bg2)" stroke="var(--line)"/>`;
+  g += txt(32, 604, ["ATELIER — à côté du flux : aucune ligne ne passe ici"], "coltitle", 0, "start");
+  SHELF.forEach((b, i) => {
+    const [x, y] = LAYOUT.shelf[b.id] || [36 + i * 282, 618];
+    g += `<g class="clickable" data-bloc="${b.id}" tabindex="0" role="button" aria-label="${esc(b.nom)}">`;
+    g += `<rect x="${x}" y="${y}" width="262" height="58" rx="7" fill="var(--bg3)" stroke="var(--line2)"/>`;
+    g += txt(x + 12, y + 22, [b.nom], "lbl", 0, "start");
+    g += txt(x + 12, y + 40, [b.en_bref], "sub", 0, "start");
+    g += `</g>`;
+  });
+
+  // control flux (thin grey): from the model's flux list, verbs that do not carry data
+  M.flux.forEach(f => {
+    if (f.de === "outillage" && LAYOUT.shelf[f.de]) {
+      const [x, y] = LAYOUT.shelf[f.de];
+      g += `<path d="M${x + 200},${y} L${x + 200},550" stroke="#75818f" stroke-width="1.2" stroke-dasharray="3 4" fill="none" marker-end="url(#arrow-grey)"><title>${esc(f.quoi)}</title></path>`;
+      g += txt(x + 208, 574, [f.verbe], "verb", 0, "start");
+    }
+  });
+
+  // journey lines (lit on top)
+  const order = M.parcours.filter(p => p.id !== S.jid).concat([lit]);
+  order.forEach(p => {
+    const P = LAYOUT.paths[p.id]; if (!P) return;
+    const dim = p.id !== S.jid ? " dim" : "";
+    const wData = p === MAIN ? 9 : 6;
+    g += `<g class="line${dim}" data-line="${p.id}">`;
+    g += `<path d="${P.data}" stroke="${COLOR[p.id]}" stroke-width="${wData}" fill="none" stroke-linecap="round" stroke-linejoin="round"/>`;
+    if (P.reply) g += `<path d="${P.reply}" stroke="${COLOR[p.id]}" stroke-width="3" fill="none" stroke-dasharray="9 7" stroke-linecap="round"/>`;
+    g += `</g>`;
+  });
+
+  // flux labels attached to the lines
+  const fl = (de, vers) => M.flux.find(f => f.de === de && f.vers === vers);
+  const fIn = fl("agent-surveille", "api"), fOut = fl("api", "memoire"), fBack = fl("api", "agent-surveille"), fStart = fl("operateur", "api");
+  const mainLit = S.jid === MAIN.id;
+  if (fIn) g += `<g opacity="${mainLit ? 1 : .35}">` + txt(124, 222, [fIn.verbe], "verb", 0, "start") + `</g>`;
+  if (fOut) g += `<g opacity="${mainLit ? 1 : .35}">` + txt(785, 222, [fOut.verbe], "verb", 0) + `</g>`;
+  if (fBack) g += `<g opacity="${mainLit ? 1 : .35}">` + txt(100, 142, [fBack.verbe + " — " + fBack.quoi], "verb", 0, "start") + `</g>`;
+  if (fStart) g += `<g opacity="${S.jid === "demarrage" ? 1 : .4}">` + txt(220, 440, [fStart.verbe], "verb", 0) + `</g>`;
+
+  // data chip on the main line
+  {
+    const x = 118, y = 166, op = mainLit ? 1 : .35;
+    g += `<g opacity="${op}"><title>Le nom vient du parcours « ${esc(MAIN.nom)} ». « EventIn » est lu dans ${esc(DATA_ALIAS.src)} : il n'est pas encore dans le modèle (pas de champ « donnee »).</title>`;
+    g += `<rect x="${x}" y="${y}" width="196" height="40" rx="7" fill="#1f1b08" stroke="var(--yellow)"/>`;
+    g += `<text x="${x + 10}" y="${y + 16}" style="font-size:12px;fill:var(--text);font-weight:700">${esc(DATA_ALIAS.word)} <tspan style="font-weight:400;fill:var(--muted)">(dans le code : ${esc(DATA_ALIAS.code)})</tspan></text>`;
+    g += `<text x="${x + 10}" y="${y + 32}" style="font-size:10px;fill:var(--amber);font-weight:600">pas encore dans le modèle</text></g>`;
+  }
+
+  // spurs (branches) of the lit line
+  const usedSpur = {};
+  (lit.branches || []).forEach((b, bi) => {
+    const c = branchComp(b); if (!c || !LAYOUT.comp[c.id]) return;
+    const [x, y] = LAYOUT.comp[c.id];
+    const k = usedSpur[c.id] = (usedSpur[c.id] || 0) + 1;
+    const top = y + 98 + (k - 1) * 84;
+    const code = (b.alors.match(/\b(4\d\d)\b/) || [])[1];
+    const cond = "Si " + b.quand.charAt(0).toLowerCase() + b.quand.slice(1);
+    const short = cond.split(" (")[0] + (cond.includes(" (") ? "…" : "");
+    const col = code ? "var(--red)" : "var(--amber)";
+    g += `<g class="clickable" data-branch="${bi}" tabindex="0" role="button" aria-label="${esc(cond)}"><title>${esc(b.quand)} → ${esc(b.alors)}</title>`;
+    g += `<line x1="${x}" y1="${y + 16}" x2="${x}" y2="${top}" stroke="${col}" stroke-width="3" stroke-dasharray="${code ? "0" : "4 4"}"/>`;
+    if (code) g += `<rect x="${x - 7}" y="${top}" width="14" height="14" fill="var(--redd)"/>` + `<text x="${x + 13}" y="${top + 12}" style="font-size:13px;font-weight:800;fill:var(--red)">→ ${code}</text>`;
+    else g += `<circle cx="${x}" cy="${top + 6}" r="6" fill="none" stroke="${col}" stroke-width="2.5"/>`;
+    g += txt(x, top + 32, wrap(short, 26), "sub", 13);
+    g += `</g>`;
+  });
+
+  // stations
+  const seenKeys = new Set(), stations = [];
+  M.parcours.forEach(p => STOPS[p.id].forEach(s => {
+    if (!s.comp || seenKeys.has(s.key)) return;
+    const pos = posOf(p.id, s); if (!pos) return;
+    seenKeys.add(s.key); stations.push({ key: s.key, comp: s.comp, reply: s.reply, pid: p.id, pos });
+  }));
+  stations.forEach(st => {
+    const [x, y] = st.pos, c = COMP[st.comp];
+    const nums = stepNums(S.jid, st.key), onLit = nums.length > 0;
+    const color = onLit ? COLOR[S.jid] : "var(--line2)";
+    const nLines = st.reply ? 1 : (LINES_BY_COMP[st.comp] ? LINES_BY_COMP[st.comp].size : 0);
+    const cls = ["st", onLit ? "" : "off", st.key === curKey ? "now" : "", doneKeys.has(st.key) && st.key !== curKey ? "done" : "",
+      S.view.kind === "comp" && S.view.id === st.comp ? "sel" : ""].join(" ");
+    const actions = onLit ? STOPS[S.jid].filter(s => s.key === st.key).map(s => lit.etapes[s.i].action) : [];
+    const head = actions.length ? wrap(actions.join(" → "), 22) : [];
+    const subl = wrap(c.nom, 26);
+    const top = st.reply ? y + 26 : y + 38;
+    const boxW = Math.max(...head.concat(subl).map(l => l.length)) * 6.6 + 14;
+    const boxH = head.length * 15 + subl.length * 13 + 8;
+    g += `<g class="${cls}" data-key="${esc(st.key)}" data-comp="${st.comp}" tabindex="0" role="button" style="color:${onLit ? COLOR[S.jid] : "var(--line2)"}" aria-label="${esc((actions[0] || c.nom) + " — " + c.nom)}">`;
+    g += `<rect class="lblbox" x="${x - boxW / 2}" y="${top - 13}" width="${boxW}" height="${boxH}" rx="5"/>`;
+    g += txt(x, top, head, "lbl", 15);
+    g += txt(x, top + head.length * 15, subl, "sub", 13);
+    if (nLines >= 2) g += `<circle class="ring" cx="${x}" cy="${y}" r="21"/>`;
+    g += `<circle class="halo" cx="${x}" cy="${y}" r="27"/>`;
+    g += `<circle class="dot" cx="${x}" cy="${y}" r="14" stroke="${color}" ${st.reply ? 'stroke-dasharray="4 3"' : ""}/>`;
+    g += `<text class="num" x="${x}" y="${y + 4}" text-anchor="middle">${esc(numLabel(nums) || "·")}</text>`;
+    g += `</g>`;
+  });
+
+  // key (only kinds present)
+  {
+    const types = new Set(M.blocs.map(b => b.type));
+    let kx = 630, ky = 600, items = [];
+    if (types.has("user")) items.push(["person", "Personne"]);
+    if (types.has("backend")) items.push(["service", "Service"]);
+    if (types.has("database")) items.push(["db", "Stockage"]);
+    if (SHELF.length) items.push(["shelf", "Atelier (hors flux)"]);
+    items.push(["data", "Donnée"], ["reply", "Réponse"], ["ctrl", "Contrôle"], ["stop", "Refus"], ["ring", "Correspondance"]);
+    g += `<rect x="618" y="584" width="406" height="104" rx="10" fill="var(--bg2)" stroke="var(--line)"/>`;
+    g += txt(632, 604, ["LÉGENDE"], "coltitle", 0, "start");
+    items.forEach((it, i) => {
+      const col = i % 3, row = Math.floor(i / 3), x = kx + 6 + col * 132, y = ky + 26 + row * 22;
+      const [kind, label] = it;
+      if (kind === "person") g += `<circle cx="${x + 8}" cy="${y - 7}" r="3.5" fill="var(--green)"/><path d="M${x + 2},${y + 3} Q${x + 2},${y - 3} ${x + 8},${y - 3} Q${x + 14},${y - 3} ${x + 14},${y + 3} Z" fill="var(--green)"/>`;
+      if (kind === "service") g += `<rect x="${x}" y="${y - 10}" width="18" height="13" rx="3" fill="none" stroke="var(--blue)" stroke-dasharray="3 2"/><rect x="${x}" y="${y - 9}" width="3" height="11" fill="var(--blue)"/>`;
+      if (kind === "db") g += `<path d="M${x + 1},${y - 8} L${x + 1},${y + 2} A8,3 0 0 0 ${x + 17},${y + 2} L${x + 17},${y - 8}" fill="none" stroke="var(--amber)"/><ellipse cx="${x + 9}" cy="${y - 8}" rx="8" ry="3" fill="none" stroke="var(--amber)"/>`;
+      if (kind === "shelf") g += `<rect x="${x}" y="${y - 10}" width="18" height="12" rx="2" fill="var(--bg3)" stroke="var(--line2)"/>`;
+      if (kind === "data") g += `<line x1="${x}" y1="${y - 4}" x2="${x + 18}" y2="${y - 4}" stroke="var(--yellow)" stroke-width="6" stroke-linecap="round"/>`;
+      if (kind === "reply") g += `<line x1="${x}" y1="${y - 4}" x2="${x + 18}" y2="${y - 4}" stroke="var(--yellow)" stroke-width="2.5" stroke-dasharray="5 3"/>`;
+      if (kind === "ctrl") g += `<line x1="${x}" y1="${y - 4}" x2="${x + 18}" y2="${y - 4}" stroke="#75818f" stroke-width="1.2" stroke-dasharray="3 3"/>`;
+      if (kind === "stop") g += `<line x1="${x + 9}" y1="${y - 12}" x2="${x + 9}" y2="${y - 4}" stroke="var(--red)" stroke-width="2.5"/><rect x="${x + 4}" y="${y - 5}" width="10" height="9" fill="var(--redd)"/>`;
+      if (kind === "ring") g += `<circle cx="${x + 9}" cy="${y - 4}" r="8" fill="none" stroke="#dfe6ee" stroke-width="2.5"/><circle cx="${x + 9}" cy="${y - 4}" r="4.5" fill="var(--bg)" stroke="var(--yellow)" stroke-width="2"/>`;
+      g += txt(x + 24, y, [label], "sub", 0, "start");
+    });
+  }
+
+  $("#plan-layer").innerHTML = g;
+}
+
+/* ---------- particle ---------- */
+let anim = 0;
+function hideParticle() { cancelAnimationFrame(anim); $("#particle").setAttribute("opacity", "0"); }
+function moveParticle(from, to) {
+  const el = $("#particle");
+  if (REDUCED) { el.setAttribute("opacity", "0"); return; }
+  const stops = STOPS[S.jid], end = posOf(S.jid, stops[to]);
+  if (!end) { hideParticle(); return; }
+  const start = from < 0 ? (LAYOUT.start[S.jid] || end) : (posOf(S.jid, stops[from]) || end);
+  const vias = LAYOUT.via[S.jid] || {};
+  let mid = [];
+  if (to === from + 1) mid = vias[to] || [];
+  else if (to === from - 1) mid = (vias[from] || []).slice().reverse();
+  const pts = [start, ...mid, end];
+  const seg = []; let total = 0;
+  for (let i = 1; i < pts.length; i++) { const d = Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]); seg.push(d); total += d; }
+  el.setAttribute("fill", COLOR[S.jid]); el.style.color = COLOR[S.jid]; el.setAttribute("opacity", "1");
+  cancelAnimationFrame(anim);
+  const t0 = performance.now(), dur = Math.min(1100, 350 + total * 1.4);
+  const frame = now => {
+    let t = Math.min(1, (now - t0) / dur); t = t < .5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+    let d = t * total, i = 0;
+    while (i < seg.length - 1 && d > seg[i]) { d -= seg[i]; i++; }
+    const f = seg[i] ? Math.min(1, d / seg[i]) : 1, a = pts[i], b = pts[i + 1] || pts[i];
+    el.setAttribute("cx", a[0] + (b[0] - a[0]) * f); el.setAttribute("cy", a[1] + (b[1] - a[1]) * f);
+    if (t < 1) anim = requestAnimationFrame(frame);
+  };
+  anim = requestAnimationFrame(frame);
+}
+
+/* ---------- player ---------- */
+function renderPlayer() {
+  const p = JOUR[S.jid], N = p.etapes.length;
+  $("#btn-play").textContent = S.playing ? "❚❚" : "▶";
+  $("#btn-play").setAttribute("aria-label", S.playing ? "Pause" : "Lire la ligne");
+  if (S.step < 0) {
+    $("#ptext").innerHTML = `<span class="n">Ligne « ${esc(p.nom)} » · ${N} étapes.</span> Appuyez sur ▶ ou cliquez une station pour suivre la donnée.`;
+    return;
+  }
+  const e = p.etapes[S.step];
+  $("#ptext").innerHTML = `<span class="n">étape ${S.step + 1} sur ${N} ·</span> <b>${esc(e.action)}</b> — ${esc(e.simple)} <span class="n">·</span> <code title="${esc(e.fichier)}">${esc(e.fichier)} ${lines(e)}</code>${e.manuel ? '<span class="manual">à la main</span>' : ""}`;
+}
+function stopTimer() { S.playing = false; clearInterval(S.timer); S.timer = null; }
+function goStep(n, keepPlaying) {
+  const N = JOUR[S.jid].etapes.length;
+  n = Math.max(0, Math.min(N - 1, n));
+  if (!keepPlaying) stopTimer();
+  const prev = S.step; S.step = n;
+  renderAll(); moveParticle(prev, n);
+}
+function play() {
+  const N = JOUR[S.jid].etapes.length;
+  if (S.step >= N - 1) S.step = -1;
+  S.playing = true; clearInterval(S.timer);
+  goStep(S.step + 1, true);
+  S.timer = setInterval(() => {
+    if (S.step >= JOUR[S.jid].etapes.length - 1) { stopTimer(); renderPlayer(); return; }
+    goStep(S.step + 1, true);
+  }, 3400);
+}
+function selectLine(pid) { stopTimer(); hideParticle(); S.jid = pid; S.step = -1; S.view = { kind: "line" }; renderAll(); }
+
+/* ---------- panel ---------- */
+const crumb = (parts) => `<div class="crumb"><button data-act="back">‹ Plan</button>${parts.map(p => "<span>›</span><span>" + esc(p) + "</span>").join("")}</div>`;
+const KIND = { user: ["Personne", "var(--green)"], backend: ["Service", "var(--blue)"], database: ["Stockage", "var(--amber)"], docs: ["Atelier", "var(--faint)"], infra: ["Atelier", "var(--faint)"] };
+const kindTag = t => { const k = KIND[t] || [t, "var(--faint)"]; return `<span class="kind" style="color:var(--bg);background:${k[1]}">${esc(k[0])}</span>`; };
+function factList(items) {
+  return `<ul class="facts">${items.map(f => `<li>${esc(f.t)} <span class="code">${esc(f.code)}</span> <span class="src" title="${esc(f.src)}">${esc(shortSrc(f.src))}</span></li>`).join("")}</ul>`;
+}
+function panelLine() {
+  const p = JOUR[S.jid], stops = STOPS[p.id];
+  const notes = [];
+  const sameComp = p.etapes.filter((e, i) => i > 0 && e.composant === p.etapes[i - 1].composant).length;
+  const manual = p.etapes.filter(e => e.manuel).length;
+  if (sameComp) notes.push(`${sameComp + 1} étapes de suite sur le même composant, donc la même station${manual ? " ; " + manual + " sont faites à la main (manuel: true) mais restent rattachées à « " + (COMP[p.etapes[0].composant] || {}).nom + " »" : ""}.`);
+  if (!(p.etapes[0].touche || []).some(isUser)) notes.push("La 1re étape ne touche aucune personne : le modèle ne dit pas d'où vient la requête (pas de pièce de départ).");
+  const nCR = countWord(/comptes? rendus?/gi), nEv = countWord(/[ée]v[ée]nements?/gi);
+  let h = `<div class="crumb"><span>Plan</span><span>›</span><span>ligne allumée</span></div>`;
+  h += `<h2><span class="bar" style="display:inline-block;width:22px;height:6px;border-radius:3px;background:${COLOR[p.id]};vertical-align:middle;margin-right:8px"></span>${esc(p.nom)}</h2>`;
+  if (p === MAIN) h += `<p class="small muted">Ligne principale : c'est celle qui passe par le plus de composants (${distinctComps(p)}). Le modèle n'a pas encore de champ « principal ».</p>`;
+  h += `<p class="small muted">Déclencheur : ${esc(p.declencheur)}</p>`;
+  h += `<div class="endpt"><b>▶ Départ</b> — ${esc(p.depart)}</div>`;
+  h += `<ol class="stops">${p.etapes.map((e, i) => {
+    const c = COMP[e.composant];
+    return `<li class="${i === S.step ? "now" : ""}"><button data-step="${i}"><span class="n" style="border-color:${COLOR[p.id]}">${i + 1}</span><span class="t">${esc(e.action)}${e.manuel ? '<span class="manual">à la main</span>' : ""}<small>${esc(c ? c.nom : "—")}${stops[i].reply ? " · retour vers l'expéditeur" : ""}</small></span></button></li>`;
+  }).join("")}</ol>`;
+  h += `<div class="endpt out"><b>■ Arrivée</b> — ${esc(p.fin)}</div>`;
+  h += `<button class="btn" data-act="play">▶ Suivre cette ligne</button>`;
+  notes.forEach(n => { h += "<div>" + tm(n) + "</div>"; });
+  if (p.branches && p.branches.length) {
+    h += `<h3>Cas particuliers (${p.branches.length})</h3>`;
+    p.branches.forEach((b, bi) => {
+      const code = /\b4\d\d\b/.test(b.alors);
+      h += `<div class="branch ${code ? "" : "soft"}"><b>${esc(b.quand)}</b><br><span class="muted">${esc(b.alors)}</span><br><span class="src">${esc(b.fichier)} ${lines(b)}</span></div>`;
+    });
+    h += tm("Ces textes sont écrits pour un développeur (ex. « 401 {\"detail\": … } »). Le modèle n'a pas encore de version simple (quand_simple / alors_simple).");
+  }
+  if (p === MAIN) h += `<div>${tm(`La même donnée a deux noms dans le modèle : « compte(s) rendu(s) » ${nCR} fois, « événement(s) » ${nEv} fois. La pastille du plan garde « compte rendu », le nom du parcours principal.`)}</div>`;
+  h += `<h3>Où lire les 5 réponses</h3><ul class="qmap">
+    <li><b>Q1</b>la phrase en haut : ce que fait le projet, pour qui.</li>
+    <li><b>Q2</b>les badges ▶ ENTRÉE et SORTIE ■, les titres de colonnes, la pastille « compte rendu ».</li>
+    <li><b>Q3</b>les stations et cadres sur les lignes, les anneaux de correspondance, et l'Atelier (ce qui n'est pas dans le flux).</li>
+    <li><b>Q4</b>▶ en bas : les stations s'allument une par une, avec le fichier.</li>
+    <li><b>Q5</b>cliquez une station : sa fiche donne les réglages avec fichier:ligne.</li></ul>`;
+  h += `<h3>Limites de cette maquette</h3><p class="small muted">Les positions sont posées à la main ; l'ordre, les numéros, les étiquettes, les anneaux et les embranchements sont calculés depuis le modèle.${MISSING_LAYOUT.length ? " Sans position : " + esc(MISSING_LAYOUT.join(", ")) + "." : ""}</p>`;
+  h += `<p class="small muted">Risque d'échelle : sur JusticIA, la ligne « Poser une question juridique et recevoir l'analyse » a 16 étapes sur 8 composants, avec des allers-retours. Il faudra des « phases » pour la plier en 9 stations au plus.</p>`;
+  return h;
+}
+function panelComp(id) {
+  const c = COMP[id], b = BLOC[c.bloc], F = FACTS[id];
+  let h = crumb([b ? b.nom : c.bloc, c.nom]);
+  h += `<h2>${esc(c.nom)}</h2>`;
+  h += `<div class="slot"><div class="k">Fait</div><div class="fait">${esc(c.en_bref)}</div><p class="small muted">${esc(c.role)}</p></div>`;
+  h += `<div class="notyet"><span class="badge-notyet">pas encore dans le modèle — lu dans le code</span>`;
+  if (F) {
+    h += `<div class="slot" style="border:0"><div class="k">Reçoit</div>${factList(F.recoit)}</div>`;
+    h += `<div class="slot"><div class="k">Rend</div>${factList(F.rend)}</div>`;
+    h += `<div class="slot"><div class="k">Réglages</div><table class="reg">${F.reglages.map(r => `<tr><td>${esc(r.nom)}<br><span class="code">${esc(r.code)}</span></td><td><span class="src" title="${esc(r.src)}">${esc(shortSrc(r.src))}</span></td></tr>`).join("")}</table></div>`;
+  } else h += `<p class="small muted">Rien de relevé pour ce composant.</p>`;
+  h += `</div>`;
+  h += `<div class="slot"><div class="k">Où</div>${(c.expose || []).map(x => `<div style="padding:3px 0;font-size:13.5px"><span class="code">${esc(x.quoi)}</span><br><span class="src">${esc(x.fichier)} ${lines(x)}</span> ${x.verifie ? '<span class="ok">✓ vérifié</span>' : '<span class="no">non vérifié</span>'}</div>`).join("")}`;
+  h += `<p class="small muted">Fichiers : ${(c.fichiers || []).map(f => `<span class="src">${esc(f)}</span>`).join(", ")}</p></div>`;
+  const seen = [];
+  M.parcours.forEach(p => p.etapes.forEach((e, i) => { if (e.composant === id) seen.push({ p, e, i }); }));
+  h += `<div class="slot"><div class="k">Vu dans</div>${seen.length ? seen.map(s => `<button class="vu" data-play="${s.p.id}" data-from="${s.i}"><span class="bar" style="background:${COLOR[s.p.id]}"></span>${esc(s.p.nom)} · étape ${s.i + 1} — ${esc(s.e.action)}</button>`).join("") : '<p class="small muted">Aucun parcours ne passe ici.</p>'}</div>`;
+  return h;
+}
+function panelBloc(id) {
+  const b = BLOC[id];
+  const comps = M.composants.filter(c => c.bloc === id);
+  let h = crumb([b.nom]);
+  h += `<h2>${esc(b.nom)}</h2><p>${kindTag(b.type)}<span class="muted small">${esc(b.techno)}</span></p>`;
+  h += `<div class="slot"><div class="k">Fait</div><div class="fait">${esc(b.en_bref)}</div><p class="small muted">${esc(b.role)}</p></div>`;
+  if (!ON_A_LINE.has(id)) h += `<p class="small" style="color:var(--amber)">Aucune ligne ne passe ici : cette pièce est à côté du flux de données.</p>`;
+  h += `<div class="slot"><div class="k">Reçoit</div><ul class="facts">${(b.entre || []).map(x => `<li>${esc(x)}</li>`).join("")}</ul></div>`;
+  h += `<div class="slot"><div class="k">Rend</div><ul class="facts">${(b.sort || []).map(x => `<li>${esc(x)}</li>`).join("")}</ul></div>`;
+  if (comps.length) h += `<div class="slot"><div class="k">Stations à l'intérieur (${comps.length})</div>${comps.map(c => `<button class="vu" data-comp-open="${c.id}">${esc(c.nom)} <span class="muted">— ${esc(c.en_bref)}</span></button>`).join("")}</div>`;
+  h += `<div class="slot"><div class="k">Où</div>${(b.code || []).map(x => `<div><span class="src">${esc(x.chemin)}</span></div>`).join("")}<p class="small muted">Indices : ${esc(b.indices)}</p></div>`;
+  return h;
+}
+function panelBranch(bi) {
+  const p = JOUR[S.jid], b = p.branches[bi], c = branchComp(b);
+  let h = crumb([p.nom, "cas particulier"]);
+  h += `<h2>${esc(b.quand)}</h2>`;
+  h += `<div class="branch ${/\b4\d\d\b/.test(b.alors) ? "" : "soft"}">${esc(b.alors)}</div>`;
+  h += tm("Texte écrit pour un développeur ; pas encore de version simple (alors_simple) dans le modèle.");
+  h += `<div class="slot"><div class="k">Où</div><span class="src">${esc(b.fichier)} ${lines(b)}</span> ${b.verifie ? '<span class="ok">✓ vérifié</span>' : '<span class="no">non vérifié</span>'}</div>`;
+  if (c) h += `<button class="vu" data-comp-open="${c.id}">Ouvrir la station « ${esc(c.nom)} »</button>`;
+  return h;
+}
+function renderPanel() {
+  const v = S.view;
+  let h = v.kind === "comp" && COMP[v.id] ? panelComp(v.id)
+    : v.kind === "bloc" && BLOC[v.id] ? panelBloc(v.id)
+    : v.kind === "branch" && JOUR[S.jid].branches[v.id] ? panelBranch(v.id)
+    : panelLine();
+  $("#panel").innerHTML = h;
+}
+
+/* ---------- phone strip (same line, as a vertical list) ---------- */
+function renderStrip() {
+  const p = JOUR[S.jid];
+  $("#strip").innerHTML = p.etapes.map((e, i) => {
+    const c = COMP[e.composant];
+    const br = (p.branches || []).filter(b => { const bc = branchComp(b); return bc && bc.id === e.composant && STOPS[p.id].find(s => s.comp === e.composant).i === i; });
+    return `<li class="${i === S.step ? "now" : ""}"><button data-step="${i}" data-open="${e.composant || ""}"><span class="n" style="border-color:${COLOR[p.id]}">${i + 1}</span><span class="t">${esc(e.action)}<small>${esc(c ? c.nom : "—")} · ${esc(e.fichier)} ${lines(e)}</small>${br.map(b => `<small style="color:var(--red)">↳ ${esc(b.quand)}</small>`).join("")}</span></button></li>`;
+  }).join("");
+}
+
+/* ---------- chips ---------- */
+function renderChips() {
+  const box = $("#chips");
+  box.querySelectorAll(".chip").forEach(n => n.remove());
+  [MAIN, ...M.parcours.filter(p => p !== MAIN)].forEach(p => {
+    const b = document.createElement("button");
+    b.className = "chip"; b.dataset.line = p.id; b.style.color = COLOR[p.id];
+    b.setAttribute("aria-pressed", String(p.id === S.jid));
+    b.innerHTML = `<span class="bar" style="background:${COLOR[p.id]}"></span><span style="color:var(--text)">${esc(p.nom)}</span>${p === MAIN ? '<span class="main">principale</span>' : ""}<small>${p.etapes.length} étapes</small>`;
+    box.appendChild(b);
+  });
+}
+
+function renderAll() { renderPlan(); renderPlayer(); renderPanel(); renderStrip(); renderChips(); }
+
+/* ---------- events ---------- */
+function openComp(id) { if (COMP[id]) { S.view = { kind: "comp", id }; renderAll(); } }
+function onStation(key, comp) {
+  const idx = STOPS[S.jid].findIndex(s => s.key === key);
+  S.view = { kind: "comp", id: comp };
+  if (idx >= 0) goStep(idx); else { stopTimer(); renderAll(); }
+}
+document.addEventListener("click", ev => {
+  const t = ev.target.closest("[data-key],[data-bloc],[data-branch],[data-line],[data-step],[data-act],[data-play],[data-comp-open]");
+  if (!t) return;
+  if (t.dataset.key) return onStation(t.dataset.key, t.dataset.comp);
+  if (t.dataset.bloc) { S.view = { kind: "bloc", id: t.dataset.bloc }; return renderAll(); }
+  if (t.dataset.branch !== undefined) { S.view = { kind: "branch", id: Number(t.dataset.branch) }; return renderAll(); }
+  if (t.classList.contains("chip")) return selectLine(t.dataset.line);
+  if (t.dataset.step !== undefined) {
+    if (t.dataset.open && window.matchMedia("(max-width:900px)").matches) S.view = { kind: "comp", id: t.dataset.open };
+    return goStep(Number(t.dataset.step));
+  }
+  if (t.dataset.compOpen) return openComp(t.dataset.compOpen);
+  if (t.dataset.play) { selectLine(t.dataset.play); S.step = Number(t.dataset.from) - 1; return play(); }
+  if (t.dataset.act === "back") { S.view = { kind: "line" }; return renderAll(); }
+  if (t.dataset.act === "play") return play();
+});
+document.addEventListener("keydown", ev => {
+  if (ev.key === "Enter" && ev.target.matches && ev.target.matches("g[tabindex]")) { ev.preventDefault(); ev.target.dispatchEvent(new MouseEvent("click", { bubbles: true })); return; }
+  if (ev.target.closest && ev.target.closest("button,summary") && (ev.key === " " || ev.key === "Enter")) return;
+  if (ev.key === "ArrowRight") { ev.preventDefault(); goStep(S.step + 1); }
+  else if (ev.key === "ArrowLeft") { ev.preventDefault(); if (S.step > 0) goStep(S.step - 1); }
+  else if (ev.key === " ") { ev.preventDefault(); S.playing ? (stopTimer(), renderPlayer()) : play(); }
+  else if (ev.key === "Escape") { S.view = { kind: "line" }; renderAll(); }
+});
+$("#btn-play").addEventListener("click", ev => { ev.stopPropagation(); S.playing ? (stopTimer(), renderPlayer()) : play(); });
+$("#btn-next").addEventListener("click", ev => { ev.stopPropagation(); goStep(S.step + 1); });
+$("#btn-prev").addEventListener("click", ev => { ev.stopPropagation(); if (S.step > 0) goStep(S.step - 1); });
+
+$("#pitch").textContent = M.pitch;
+if (MISSING_LAYOUT.length) console.warn("Umbra mockup: no position for", MISSING_LAYOUT);
+renderAll();
+</script>
+</body>
+</html>

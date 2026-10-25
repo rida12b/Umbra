@@ -16,18 +16,31 @@ async function signIn(page: Page): Promise<string> {
   return project;
 }
 
-test("the parts in their zones; a click explains, « Entrer dedans » zooms in, Échap comes back", async ({ page, isMobile }) => {
+test("the factory floor: ENTRÉE to SORTIE, tools aside; a click explains, « Entrer dedans » zooms in, Échap comes back", async ({ page, isMobile }) => {
   const project = await signIn(page);
   await page.goto(`/#/p/${project}`);
   const trail = page.getByRole("navigation", { name: "Où vous êtes" });
-  await expect(trail).toContainText("Les pièces");
+  await expect(trail).toContainText("L'usine");
   if (isMobile) {
+    await expect(page.getByText("Autour du projet (ne tourne pas)")).toBeVisible();
     await page.getByRole("button", { name: /API commandes/ }).first().click();
   } else {
-    for (const zone of ["Qui l'utilise", "Ce qui reçoit", "Ce qui traite", "Où c'est rangé"])
-      await expect(page.getByText(zone, { exact: true })).toBeVisible();
-    await page.locator('.react-flow__node[data-id="api"]').click();
+    await expect(page.locator('[data-floor-id="user"]')).toContainText("ENTRÉE");
+    await expect(page.locator('[data-floor-id="db"]')).toContainText("SORTIE");
+    // The belt reads like text: left to right, then the next line.
+    const at = async (id: string) => {
+      const box = await page.locator(`[data-floor-id="${id}"]`).boundingBox();
+      return box ? box.y * 10_000 + box.x : Number.NaN;
+    };
+    const order = [await at("user"), await at("web"), await at("api"), await at("db")];
+    expect(order).toEqual([...order].sort((a, b) => a - b));
+    await expect(page.getByText("Autour du projet (ne tourne pas)")).toBeVisible();
+    await expect(page.locator('[data-floor-id="docs"]')).toBeVisible();
+    for (const shape of await page.locator("[data-shape]").evaluateAll((els) => [...new Set(els.map((e) => e.getAttribute("data-shape")))]))
+      await expect(page.locator(`[data-key-shape="${shape}"]`)).toBeVisible(); // every kind drawn is in the key
+    await page.locator('[data-floor-id="api"]').click();
   }
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true);
   const panel = page.getByLabel("Explication");
   await expect(panel.getByRole("heading", { name: "API commandes" })).toBeVisible();
   await panel.getByRole("button", { name: /Entrer dedans/ }).click();

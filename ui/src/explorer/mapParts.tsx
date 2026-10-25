@@ -2,9 +2,8 @@ import { BaseEdge, EdgeLabelRenderer, getBezierPath, Handle, Position, type Edge
 import { ChevronRight } from "lucide-react";
 import { roundedPath, type Point } from "../arch/archLayout";
 import type { Box } from "./levels";
-import type { RowLabel } from "./rowLayout";
 
-// The pieces the explorer map is drawn with: a box, a zone title, an arrow placed by ELK, and the
+// The pieces the explorer map is drawn with: a box, an arrow placed by ELK, and the
 // arrow of the step being played when the level has no arrow of its own between those boxes.
 
 export const BOX_WIDTH = 288;
@@ -15,14 +14,13 @@ export type BoxData = {
   box: Box;
   look: Look;
   selected: boolean;
-  vertical: boolean; // rows read top to bottom: arrows leave at the bottom, arrive at the top
   onSelect: (id: string) => void;
   onEnter: (box: Box) => void;
 };
 export type BoxFlowNode = Node<BoxData, "box">;
 
 export function BoxNode({ data }: NodeProps<BoxFlowNode>) {
-  const { box, look, selected, vertical, onSelect, onEnter } = data;
+  const { box, look, selected, onSelect, onEnter } = data;
   const tone =
     look === "lit" ? "border-lamp-line" : look === "dim" ? "border-line-soft opacity-40" : box.faded ? "border-line opacity-70" : "border-line";
   return (
@@ -34,7 +32,7 @@ export function BoxNode({ data }: NodeProps<BoxFlowNode>) {
       } ${box.faded ? "border-dashed" : ""}`}
       style={{ width: BOX_WIDTH, height: BOX_HEIGHT }}
     >
-      <Handle type="target" position={vertical ? Position.Top : Position.Left} />
+      <Handle type="target" position={Position.Left} />
       <button
         type="button"
         aria-pressed={selected}
@@ -63,22 +61,7 @@ export function BoxNode({ data }: NodeProps<BoxFlowNode>) {
         </button>
         )}
       </div>
-      <Handle type="source" position={vertical ? Position.Bottom : Position.Right} />
-    </div>
-  );
-}
-
-export type ZoneData = { title: string; width: number; height: number };
-export type ZoneFlowNode = Node<ZoneData, "zone">;
-
-/** The title of one zone's row (« Ce qui reçoit »), on its left. */
-export function ZoneNode({ data }: NodeProps<ZoneFlowNode>) {
-  return (
-    <div
-      className="flex items-center justify-end border-r-2 border-line pr-3 text-right text-[17px] leading-snug font-semibold text-faint"
-      style={{ width: data.width, height: data.height }}
-    >
-      {data.title}
+      <Handle type="source" position={Position.Right} />
     </div>
   );
 }
@@ -86,7 +69,7 @@ export function ZoneNode({ data }: NodeProps<ZoneFlowNode>) {
 export type ArrowData = {
   points: Point[] | null; // ELK's route; null: a plain curve between the two boxes (a played step)
   label: string | null; // shown on hover, selection or play only
-  labelAt: RowLabel | null; // where the layout keeps room for it; null: the middle of its longest part
+  labelAt: { at: Point } | null; // where the layout keeps room for it; null: the middle of its longest part
   look: Look;
   moving: boolean; // the step being played: a light runs along the arrow
 };
