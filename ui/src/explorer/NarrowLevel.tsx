@@ -71,7 +71,8 @@ function NarrowRoom({ level, selected, play, onSelect, onEnter, onOpenDoor }: Om
   const box = (id: string) => level.boxes.find((b) => b.id === id);
   const door = (d: (typeof room.doors)[number]) => (
     <li key={d.bloc}>
-      <button type="button" onClick={() => onOpenDoor(d.bloc)} className="w-full rounded-xl border-2 border-dashed border-line px-4 py-2.5 text-left text-[14px]">
+      <button type="button" onClick={() => onOpenDoor(d.bloc)} className={`fl-door flow w-full text-[14px] ${d.role === "entree" ? "in" : d.role === "sortie" ? "out" : ""}`}>
+        {d.role && <span className={`fl-badge ${d.role === "entree" ? "in" : "out"}`}>{d.role === "entree" ? "▶ ENTRÉE" : "SORTIE ■"}</span>}
         <span className="font-semibold">{d.side === "left" ? "depuis" : "vers"} {box(d.bloc)?.title ?? d.bloc}</span>
         {d.verb && <span className="block italic text-muted">{d.verb}</span>}
         {d.crossings.length > 0 && <span className="block text-[13px] text-faint">{d.crossings.length > 1 ? "étapes" : "étape"} {d.crossings.map((c) => c.step).join(", ")}</span>}
@@ -92,6 +93,9 @@ function NarrowRoom({ level, selected, play, onSelect, onEnter, onOpenDoor }: Om
                   <span className="block text-[16px] font-semibold">{machine.nom}</span>
                   <span className="block text-[14px] text-muted">{machine.words}</span>
                   {machine.steps.length > 0 && <span className="block text-[12.5px] text-faint">{machine.steps.length > 1 ? "étapes" : "étape"} {machine.steps.join(", ")}</span>}
+                  {/* What goes in and out, in full: a phone has room to wrap (V32). */}
+                  {machine.entre[0] && <span className="mt-1 block text-[13px] text-muted">→ reçoit {machine.entre.join(", ")}</span>}
+                  {machine.sort[0] && <span className="block text-[13px] text-muted">rend {machine.sort.join(", ")} →</span>}
                 </button>
                 {b && b.inside > 0 && (
                   <button type="button" onClick={() => onEnter(b)} className="mt-1 flex items-center gap-1 text-[13.5px] font-medium text-lamp-ink">
@@ -108,6 +112,14 @@ function NarrowRoom({ level, selected, play, onSelect, onEnter, onOpenDoor }: Om
           );
         })}
         {room.doors.filter((d) => d.side === "right").map(door)}
+        {room.reply && (
+          <li className="rounded-xl border-2 border-dashed border-fl-data px-4 py-2.5 text-[14px]">
+            <span className="font-semibold">
+              {room.reply.step} · {room.reply.verb} {box(room.reply.door)?.title ?? room.reply.door}
+            </span>
+            {room.reply.words && <span className="block text-[13px] text-muted">{room.reply.words}</span>}
+          </li>
+        )}
       </ul>
       {room.band.length > 0 && (
         <p className="mt-4 rounded-xl border border-dashed border-line px-4 py-2.5 text-[14px]">

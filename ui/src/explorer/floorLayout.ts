@@ -33,6 +33,7 @@ export interface FloorPlan {
 const WIDTH = { person: 180, room: 280, store: 230, outside: 200, tool: 200 } as const;
 const HEIGHT = 190; // a belt line; a room listing many machines makes its line taller (roomHeight)
 const TAG = { w: 230, h: 96 }; // a 2-line name and a 2-line link to its room
+const SIDE_W = 280; // a person or supplier hung on a room: one-line name, as wide as the mockup's (V8)
 const GAP = 130; // between two rooms: the action words above the belt, the data words below it
 const STACK = 44; // between a room and its tags, and between two tags: room for the reply line and a short verb
 const LINE_GAP = 52; // between two lines of the belt
@@ -40,7 +41,7 @@ const BAND = 44; // band titles and margins
 const LANE = 10; // right of the last room of a line: the lane the belt takes down to the next line
 
 /** `machines`: how many machines each room lists on its card (the mockup previews them, V14). */
-export function placeFloor(floor: Floor, available: number, machines: Record<string, number> = {}): FloorPlan {
+export function placeFloor(floor: Floor, available: number, machines: Record<string, number> = {}, settings = false): FloorPlan {
   const byId = new Map(floor.items.map((i) => [i.id, i]));
   const row = [...(floor.entree ? [floor.entree] : []), ...floor.belt];
   const widthOf = (id: string) => WIDTH[byId.get(id)?.shape ?? "room"];
@@ -89,7 +90,7 @@ export function placeFloor(floor: Floor, available: number, machines: Record<str
       const w = widthOf(id);
       rects.set(id, { x, y: beltY, w, h });
       // Tags are centred on their room, never wider than the room and its two half-gaps.
-      const tw = Math.min(TAG.w, w + GAP - 16);
+      const tw = Math.min(SIDE_W, w + GAP - 16);
       const tx = x + (w - tw) / 2;
       (above.get(id) ?? []).forEach((tag, k) => rects.set(tag, { x: tx, y: beltY - (k + 1) * (TAG.h + STACK), w: tw, h: TAG.h }));
       (below.get(id) ?? []).forEach((tag, k) => rects.set(tag, { x: tx, y: beltY + h + STACK + 40 + k * (TAG.h + STACK), w: tw, h: TAG.h }));
@@ -113,7 +114,7 @@ export function placeFloor(floor: Floor, available: number, machines: Record<str
     return rect;
   };
   const orphans = band(floor.items.filter((i) => i.role === "orphan").map((i) => i.id));
-  const strip = band(floor.strip);
+  const strip = band([...floor.strip, ...(settings ? ["settings"] : [])]); // the project's settings card sits in the strip (V18)
 
   const belt = floor.beltLinks.flatMap((link): Route[] => {
     const a = rects.get(link.from);

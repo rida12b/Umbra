@@ -11,6 +11,10 @@ import { buildRoom } from "./room";
 
 // Where the reader was on the floor before entering a room: Échap brings them back there, focus on that room.
 const remembered: { model: ProjectModel | null; top: number; entered: string | null } = { model: null, top: 0, entered: null };
+/** Going from room to room by a door: Échap then focuses the room the reader is in, not the first one entered. */
+export function rememberRoom(bloc: string) {
+  if (remembered.model) remembered.entered = bloc;
+}
 
 const PAD = 24; // around the floor; also room for the ENTRÉE badge and the wrap lane on the left
 
@@ -40,7 +44,8 @@ export function FloorCanvas({ model, floor, level, selected, play, onSelect, onE
   // Each working room previews its machines in data order (V14), and says what start-up wiring it has.
   const rooms = useMemo(() => new Map(floor.items.flatMap((i) => (i.role === "belt" || i.role === "orphan" ? [[i.id, buildRoom(model, i.id)] as const] : []))), [model, floor]);
   const counts = useMemo(() => Object.fromEntries([...rooms].map(([id, r]) => [id, r ? r.belt.length : 0])), [rooms]);
-  const plan = useMemo(() => placeFloor(floor, Math.max(width - 2 * PAD, 240), counts), [floor, width, counts]);
+  const settings = model.reglages_projet ?? [];
+  const plan = useMemo(() => placeFloor(floor, Math.max(width - 2 * PAD, 240), counts, settings.length > 0), [floor, width, counts, settings.length]);
   useLayoutEffect(() => {
     const el = screen.current;
     if (!el || remembered.model !== model) return;
@@ -62,6 +67,11 @@ export function FloorCanvas({ model, floor, level, selected, play, onSelect, onE
   const sortieStore = floor.sortie?.kind === "store" ? floor.sortie.id : null;
   // A tag whose line is drawn says it on the line (« démarre »); the card keeps its own words, as in the mockup (V8).
   const drawn = new Set(plan.routes.filter((r) => r.link.style !== "reply").flatMap((r) => [r.link.from, r.link.to]));
+  // A strip item's link to the floor, in words (V18): never drawn, never data.
+  const controls = (id: string) => {
+    const link = floor.stripLinks.find((l) => l.from === id || l.to === id);
+    return link ? `${link.verb || "→"} « ${name(link.from === id ? link.to : link.from)} » — contrôle, pas de donnée` : null;
+  };
   const lit = (from: string, to: string) => !!play && play.step.boxes.includes(from) && play.step.boxes.includes(to);
 
   return (
@@ -159,15 +169,15 @@ export function FloorCanvas({ model, floor, level, selected, play, onSelect, onE
                 preview={parts > 1 ? (room?.belt ?? []).map((m) => ({ num: m.steps[0] ?? null, nom: m.nom })) : []}
                 wiring={parts > 1 && room?.band.length ? room.band.map((id) => model.composants.find((c) => c.id === id)?.nom ?? id).join(", ") : null}
                 footer={footer || null}
-                relation={drawn.has(item.id) ? null : (floor.relations[item.id] ?? null)}
+                relation={drawn.has(item.id) ? null : (floor.relations[item.id] ?? controls(item.id))}
                 limit={item.id === sortieStore ? floor.limit : null}
                 onSelect={onSelect}
                 onEnter={enter}
               />
             );
           })}
-          {plan.strip && (model.reglages_projet?.length ?? 0) > 0 && (
-            <ProjectSettings rect={plan.strip} count={model.reglages_projet!.length} files={[...new Set(model.reglages_projet!.map((r) => r.fichier).filter(Boolean))] as string[]} />
+          {plan.rects.get("settings") && (
+            <ProjectSettings rect={plan.rects.get("settings")!} count={settings.length} files={[...new Set(settings.map((r) => r.fichier).filter(Boolean))] as string[]} />
           )}
         </div>
       </div>
@@ -191,12 +201,9 @@ function Band({ rect, title }: { rect: Rect; title: string }) {
 /** The project's settings (V18, third card): where the config files are, opened from the panel later (#79). */
 function ProjectSettings({ rect, count, files }: { rect: Rect; count: number; files: string[] }) {
   return (
-    <div
-      className="absolute flex flex-col justify-center rounded-lg border border-dashed border-fl-code bg-panel px-2.5 py-1.5"
-      style={{ left: rect.x + rect.w + 4, top: rect.y + 36, width: 200, height: 76 }}
-    >
+    <div className="absolute flex flex-col justify-center rounded-lg border border-dashed border-fl-code bg-panel px-2.5 py-1.5" style={{ left: rect.x, top: rect.y, width: rect.w, height: rect.h }}>
       <span className="text-[14px] font-semibold text-ink">Réglages du projet</span>
-      <span className="truncate text-[12px] text-muted" title={files.join(", ")}>
+      <span className="line-clamp-2 text-[12px] text-muted" title={files.join(", ")}>
         {count} réglage{count > 1 ? "s" : ""} · {files.join(", ")}
       </span>
     </div>

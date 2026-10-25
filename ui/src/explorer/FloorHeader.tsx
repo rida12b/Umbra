@@ -28,7 +28,8 @@ export function FloorHeader({ model, floor }: { model: ProjectModel; floor: Floo
           "aucun chemin de données dans le modèle."
         )}
       </p>
-      <FloorKey withCode={!data} outside={floor.items.some((i) => i.shape === "outside")} />
+      {/* « Lu dans le code » also explains the purple project-settings card (V7, V18). */}
+      <FloorKey withCode={!data || (model.reglages_projet?.length ?? 0) > 0} outside={floor.items.some((i) => i.shape === "outside")} />
     </header>
   );
 }

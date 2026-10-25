@@ -65,7 +65,7 @@ const SHAPE: Record<BlockType, Shape> = {
   infra: "tool",
   library: "room", // code that runs, called by a room (it hangs on it, see helper)
 };
-const LIMIT = /perdu|au plus|seulement|pas encore|limite/i;
+const LIMIT = /perdu|au plus|seulement|pas encore|limite|se vide|redémarr/i;
 
 const shapeOf = (block: ArchBlock): Shape => SHAPE[block.type] ?? "room";
 

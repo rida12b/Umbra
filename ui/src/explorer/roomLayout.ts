@@ -26,7 +26,7 @@ export interface RoomPlan {
   size: { width: number; height: number };
 }
 
-const MACHINE = { w: 180, h: 176 }; // number, name on up to 3 lines, words, then its two in/out chips
+const MACHINE = { w: 180, h: 150 }; // the least: number and name, words, one in/out chip each (machineHeight)
 const DOOR = { w: 130, h: 170 }; // the height grows with what it says (doorHeight)
 const LINE = 17; // a 12.5px line of a refusal or a door
 const PER_LINE = 23; // characters on one line of a 180px refusal (about 24-28 in practice)
@@ -34,7 +34,7 @@ const HUNG_H = 50;
 const GAP = 48; // between machines: room for the belt arrow
 const GUTTER = 30; // between a door and the frame: the belt arrow goes through it
 const PAD = 16; // inside the frame
-const TITLE = 34; // the frame's title line
+const TITLE = 46; // the frame's title, on up to 2 lines (V28)
 const STACK = 12; // between things stacked under a machine
 const LINE_GAP = 40;
 const BAND_H = 62;
@@ -44,9 +44,15 @@ const lines = (text: string, per = PER_LINE) => Math.max(1, Math.ceil(text.lengt
 /** A refusal: its title, its condition in full and up to five lines of what follows. */
 const chuteHeight = (c: { quand: string; alors: string; technical: boolean }) =>
   40 + LINE * (Math.min(lines(`Si ${c.quand}`), 4) + Math.min(lines(c.alors), 5)) + (c.technical ? 18 : 0);
-/** A door: its badge, « depuis / vers <name> — <verb> » on up to four lines, then one chip per crossing out. */
-const doorHeight = (d: Door, name: number): number =>
-  Math.max(DOOR.h, 44 + LINE * Math.min(lines("x".repeat(name + d.verb.length + 10), 17), 5) + 26 * Math.min(d.crossings.length, 3) + 26);
+const CHIP = (text: string) => 6 + 15 * Math.min(lines(text, 27), 2); // an in/out chip: 11px, up to 2 lines
+/** A machine: number and name (up to 3 lines), words (2), « aussi à l'étape », then its in/out chips in full (V31, V32). */
+const machineHeight = (m: Machine): number =>
+  Math.max(MACHINE.h, 22 + 18 * Math.min(lines(m.nom, 17), 3) + 17 * Math.min(lines(m.words, 25), 2) + (m.steps.length > 1 ? 16 : 0) + (m.entre[0] ? CHIP(`→ reçoit ${m.entre[0]}`) + 4 : 0) + (m.sort[0] ? CHIP(`rend ${m.sort[0]} →`) + 4 : 0));
+/** A door: its badge, « depuis / vers <name> — <verb> » on up to five lines, then (way out only) one chip per crossing. */
+const doorHeight = (d: Door, name: number): number => {
+  const chips = d.side === "right" ? d.crossings.filter((c) => c.dir === "out").slice(0, 3) : [];
+  return Math.max(DOOR.h, 50 + LINE * Math.min(lines("x".repeat(name + d.verb.length + 10), 17), 5) + chips.reduce((h, c) => h + 6 + 15 * Math.min(lines(`${c.step} · ${c.machine}`, 19), 2) + 6, 0) + 22);
+};
 
 export function placeRoom(room: Room, available: number, nameLength: (bloc: string) => number = () => 24): RoomPlan {
   const rects = new Map<string, Rect>();
@@ -79,11 +85,12 @@ export function placeRoom(room: Room, available: number, nameLength: (bloc: stri
   const top = y;
   const gapBelow = new Map<string, number>();
   lines_.forEach((line, n) => {
-    let lineBottom = y + MACHINE.h;
+    const rowH = Math.max(...line.map(machineHeight)); // one height per line: the belt runs straight through
+    let lineBottom = y + rowH;
     line.forEach((machine, i) => {
       const x = x0 + i * (MACHINE.w + GAP);
-      rects.set(machine.id, { x, y, w: MACHINE.w, h: MACHINE.h });
-      let under = y + MACHINE.h + 26; // the dashed tie to the refusal (V35)
+      rects.set(machine.id, { x, y, w: MACHINE.w, h: rowH });
+      let under = y + rowH + 26; // the dashed tie to the refusal (V35)
       machine.chutes.forEach((chute, k) => {
         const h = chuteHeight(chute);
         rects.set(`chute:${machine.id}:${k}`, { x, y: under, w: MACHINE.w, h });

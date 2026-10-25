@@ -40,9 +40,12 @@ export function MachineCard({ machine, rect, look, selected, onSelect }: { machi
   );
 }
 
-export function DoorCard({ door, name, rect, enterable, onOpen }: { door: Door; name: string; rect: Rect; enterable: boolean; onOpen: (bloc: string) => void }) {
+export function DoorCard({ door, name, person, rect, enterable, onOpen }: {
+  door: Door; name: string; person: boolean; rect: Rect; enterable: boolean; onOpen: (bloc: string) => void;
+}) {
   const into = door.side === "left";
-  const crossings = door.crossings.filter((c) => c.dir === (into ? "in" : "out"));
+  // Only the way out lists its steps (V36); the way in says who sends, as in the mockup (V27).
+  const crossings = into ? [] : door.crossings.filter((c) => c.dir === "out");
   return (
     <button
       type="button"
@@ -57,7 +60,7 @@ export function DoorCard({ door, name, rect, enterable, onOpen }: { door: Door; 
     >
       {door.role === "entree" && (
         <span className="flex items-center gap-1.5">
-          <User size={18} className="text-fl-person" aria-hidden="true" />
+          {person && <User size={18} className="text-fl-person" aria-hidden="true" />}
           <span className="fl-badge in">▶ ENTRÉE</span>
         </span>
       )}
@@ -71,7 +74,7 @@ export function DoorCard({ door, name, rect, enterable, onOpen }: { door: Door; 
           {c.step} · {c.machine}
         </span>
       ))}
-      <span className="mt-auto text-[12.5px] text-fl-service">{door.role === "entree" ? "Voir la fiche ›" : enterable ? "Entrer dans cette pièce ›" : "Voir la fiche ›"}</span>
+      {door.role !== "sortie" && <span className="mt-auto text-[12.5px] text-fl-service">{enterable && door.role !== "entree" ? "Entrer ›" : "Voir la fiche ›"}</span>}
     </button>
   );
 }

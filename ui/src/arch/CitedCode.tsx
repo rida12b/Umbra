@@ -25,7 +25,7 @@ export function CitedCode({ projectId, cited, open: openAtFirst = false }: { pro
   return (
     <button
       type="button"
-      className="mt-1 block max-w-full truncate font-mono text-[12px] text-faint hover:text-ink"
+      className="mt-1 block max-w-full text-left font-mono text-[12px] break-all text-fl-service hover:underline" // blue and whole, as in mockup B (V45)
       onClick={(event) => {
         event.stopPropagation();
         setOpen(true);

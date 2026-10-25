@@ -91,6 +91,7 @@ test("a room opened in place: its machine in data order, the door data comes in 
   const project = await signIn(page);
   await page.goto(`/#/p/${project}?node=x%3Apart%3Aapi`);
   await expect(page.locator('[data-room-item="door:web"]')).toContainText("depuis Site web");
+  await expect(page.locator(":focus")).toContainText("API commandes"); // the keyboard lands in the room, on its title
   await expect(page.locator('[data-room-item="hung:db"]')).toContainText("Base PostgreSQL"); // what the machine writes to
   await page.locator('[data-room-item="orders"]').click();
   await page.getByLabel("Explication").getByRole("button", { name: /Entrer dedans/ }).click();

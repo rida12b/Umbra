@@ -127,12 +127,13 @@
 .fl-machine { position: absolute; display: flex; flex-direction: column; gap: 2px; border-radius: 10px; border: 1px solid var(--u-line); background: var(--u-panel); padding: 9px 10px; text-align: left; }
 .fl-machine.lit { border: 2px solid var(--fl-hl); box-shadow: 0 0 22px color-mix(in srgb, var(--fl-hl) 30%, transparent); }
 .fl-machine.dim { opacity: .45; }
-.fl-io { display: block; border: 1px dashed var(--u-line); border-radius: 5px; padding: 1px 6px; font-size: 11px; line-height: 1.35; color: var(--u-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.fl-io { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; border: 1px dashed var(--u-line); border-radius: 5px; padding: 1px 6px; font-size: 11px; line-height: 1.35; color: var(--u-muted); overflow: hidden; }
 .fl-io.out { text-align: right; }
 .fl-door { position: absolute; display: flex; flex-direction: column; gap: 6px; border-radius: 10px; border: 1.5px dashed var(--u-line); background: var(--u-bg); padding: 9px 10px; text-align: left; }
 .fl-door.in { border: 1.5px dotted var(--fl-person-line); background: var(--fl-person-bg); }
 .fl-door.out { border-color: var(--fl-store); background: var(--fl-store-bg); }
-.fl-refus { position: absolute; display: flex; flex-direction: column; gap: 3px; border-radius: 8px; border: 1px solid var(--fl-refus); background: var(--fl-refus-bg); padding: 7px 10px; font-size: 12px; line-height: 1.4; overflow: hidden; }
+.fl-door.flow { position: static; } /* the phone list: in the flow, not placed */
+.fl-refus { position: absolute; display: flex; flex-direction: column; gap: 3px; border-radius: 8px; border: 1px solid color-mix(in srgb, var(--fl-refus) 55%, transparent); border-left: 4px solid var(--fl-refus); background: var(--fl-refus-bg); padding: 7px 10px; font-size: 12px; line-height: 1.4; overflow: hidden; }
 
 /* A part opening in place: it grows from the floor (no motion when the reader asks for none). */
 @keyframes room-open {

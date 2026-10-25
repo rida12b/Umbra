@@ -24,7 +24,7 @@ export function LiveStatus() {
       <span
         className={`size-[7px] shrink-0 rounded-full ${live.connected ? "bg-ok shadow-[0_0_0_3px_color-mix(in_srgb,var(--u-ok)_22%,transparent)]" : "bg-faint"}`}
       />
-      <span className="shrink-0">{live.connected ? "Suivi en direct" : "Hors ligne"}</span>
+      <span className="shrink-0 max-sm:sr-only">{live.connected ? "Suivi en direct" : "Hors ligne"}</span>
       {detail.length > 0 && <span className="hidden truncate text-faint lg:inline">{detail.join(", ")}</span>}
     </span>
   );

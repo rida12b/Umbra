@@ -129,8 +129,11 @@ function FloorInfo({ model, level, floor, onEnter, onPlay }: {
             {others.map((journey) => (
               <li key={journey.id}>
                 <details className="rounded-lg border border-line-soft px-3 py-2.5 text-[13px]">
-                  <summary className="cursor-pointer text-[14px] font-bold">{journey.nom}</summary>
-                  <p className="mt-1 line-clamp-2 text-muted">{journey.depart || journey.declencheur}</p>
+                  <summary className="cursor-pointer">
+                    <span className="text-[14px] font-bold">{journey.nom}</span>
+                    {/* Shown while folded, as in the mockup (V24). */}
+                    <span className="mt-1 line-clamp-2 block text-muted">{journey.depart || journey.declencheur}</span>
+                  </summary>
                   <button type="button" onClick={() => onPlay(journey.id, 1)} aria-label={`Suivre le trajet : ${journey.nom}`} className="mt-1.5 inline-flex items-center gap-1.5 text-[13px] text-fl-data hover:underline">
                     <Play size={12} aria-hidden="true" /> Suivre ce trajet ({steps(journey.etapes.length)})
                   </button>

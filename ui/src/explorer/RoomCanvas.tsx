@@ -3,6 +3,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import type { ProjectModel } from "../api";
 import type { Play } from "./ExplorerCanvas";
 import { buildFloor } from "./floor";
+import { rememberRoom } from "./FloorCanvas";
 import { FloorHeader } from "./FloorHeader";
 import { Line, LineMarkers } from "./floorLines";
 import type { Room } from "./room";
@@ -52,7 +53,7 @@ export function RoomCanvas({ model, room, enterable, selected, play, onSelect, o
     const view = el.getBoundingClientRect();
     return [...el.querySelectorAll<HTMLElement>("[data-room-item]")].filter((item) => {
       const box = item.getBoundingClientRect();
-      return box.top < view.top - 1 || box.bottom > view.bottom + 1 || box.left < view.left - 1 || box.right > view.right + 1;
+      return box.bottom > view.bottom + 1 || box.right > view.right + 1; // below or right: the button only goes forward, never loops
     });
   }, []);
   useEffect(() => {
@@ -69,8 +70,17 @@ export function RoomCanvas({ model, room, enterable, selected, play, onSelect, o
   }, [plan, outOfSight]);
   const showNext = () => {
     const next = outOfSight().sort((a, b) => a.getBoundingClientRect().top - b.getBoundingClientRect().top)[0];
-    next?.scrollIntoView({ block: "nearest", behavior: STILL ? "auto" : "smooth" });
+    next?.scrollIntoView({ block: "start", behavior: STILL ? "auto" : "smooth" });
   };
+
+  // On entering (the canvas is keyed by room): keyboard focus on the room's title, the page at its top.
+  const title = useRef<HTMLParagraphElement>(null);
+  useLayoutEffect(() => title.current?.focus({ preventScroll: true }), []);
+  const openDoor = (bloc: string) => {
+    if (enterable.has(bloc)) rememberRoom(bloc);
+    onOpenDoor(bloc);
+  };
+  const strip = floor.strip.map((id) => model.blocs.find((b) => b.id === id)).filter((b) => b !== undefined);
 
   const look = (id: string) => (play ? (play.step.boxes.includes(id) ? "lit" : "dim") : "normal");
   const bare = (id: string) => id.replace(/^door:/, "");
@@ -84,7 +94,7 @@ export function RoomCanvas({ model, room, enterable, selected, play, onSelect, o
       <div className={STILL ? "" : "room-open"} style={{ position: "relative", width: plan.size.width + 2 * PAD, height: plan.size.height + 2 * PAD }}>
         <div className="absolute" style={{ left: PAD, top: PAD, width: plan.size.width, height: plan.size.height }}>
           <div className="fl-frame" style={{ left: f.x, top: f.y, width: f.w, height: f.h }} aria-hidden="true" />
-          <p className="absolute truncate text-[13px] text-muted" style={{ left: f.x + 16, top: f.y + 9, width: f.w - 32 }}>
+          <p ref={title} tabIndex={-1} className="absolute line-clamp-2 text-[13px] leading-snug text-muted outline-none" style={{ left: f.x + 16, top: f.y + 8, width: f.w - 32 }}>
             <strong className="font-bold text-ink">{block?.nom ?? room.bloc}</strong>
             {block?.en_bref && ` — ${block.en_bref}`}
             <span className="text-[11.5px] text-faint"> · pièce ouverte, la donnée va de gauche à droite</span>
@@ -145,7 +155,15 @@ export function RoomCanvas({ model, room, enterable, selected, play, onSelect, o
             </p>
           )}
           {room.doors.map((door) => (
-            <DoorCard key={door.bloc} door={door} name={name(door.bloc)} rect={plan.rects.get(`door:${door.bloc}`)!} enterable={enterable.has(door.bloc)} onOpen={onOpenDoor} />
+            <DoorCard
+              key={door.bloc}
+              door={door}
+              name={name(door.bloc)}
+              person={["user", "device"].includes(model.blocs.find((b) => b.id === door.bloc)?.type ?? "")}
+              rect={plan.rects.get(`door:${door.bloc}`)!}
+              enterable={enterable.has(door.bloc)}
+              onOpen={openDoor}
+            />
           ))}
           {room.belt.map((machine) => (
             <MachineCard key={machine.id} machine={machine} rect={plan.rects.get(machine.id)!} look={look(machine.id)} selected={selected === machine.id} onSelect={onSelect} />
@@ -156,6 +174,22 @@ export function RoomCanvas({ model, room, enterable, selected, play, onSelect, o
           )}
         </div>
       </div>
+      {strip.length > 0 && (
+        // The floor's strip stays under the room (V39): the same « Autour du projet », after a scroll.
+        <section className="mx-6 mb-6 rounded-xl border border-dashed border-line px-3 pt-2 pb-3" aria-label="Autour du projet (ne tourne pas)">
+          <p className="text-[12px] font-semibold tracking-wide text-faint uppercase">Autour du projet (ne tourne pas)</p>
+          <ul className="mt-2 flex flex-wrap gap-3">
+            {strip.map((b) => (
+              <li key={b.id} className="w-[230px] rounded-lg border border-dashed border-line px-2.5 py-1.5 text-[12.5px]">
+                <span className="block font-semibold text-ink">{b.nom}</span>
+                <span className="line-clamp-2 text-muted">{b.en_bref || b.role}</span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+      {/* Room for the « hors champ » button: it never sits on a door or a machine. */}
+      <div className="h-14" aria-hidden="true" />
       {hidden > 0 && (
         <button
           type="button"

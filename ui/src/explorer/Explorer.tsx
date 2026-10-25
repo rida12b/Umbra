@@ -164,7 +164,7 @@ export function Explorer({ project, route, theme, narrow }: Props) {
           {level.floor ? (
             <FloorCanvas model={model} floor={level.floor} level={level} selected={route.select ?? null} play={playState} onSelect={select} onEnter={enter} />
           ) : level.room ? (
-            <RoomCanvas model={model} room={level.room} enterable={rooms} selected={route.select ?? null} play={playState} onSelect={select} onOpenDoor={openDoor} />
+            <RoomCanvas key={level.room.bloc} model={model} room={level.room} enterable={rooms} selected={route.select ?? null} play={playState} onSelect={select} onOpenDoor={openDoor} />
           ) : (
             <ExplorerCanvas level={level} theme={theme} selected={route.select ?? null} play={playState} onSelect={select} onEnter={enter} />
           )}
@@ -179,7 +179,7 @@ export function Explorer({ project, route, theme, narrow }: Props) {
   return (
     <div className="flex h-full min-h-0 flex-col">
       <MethodBanner projectId={project.id} state={state} />
-      <nav className="flex flex-wrap items-center gap-1 border-b border-line-soft px-5 py-2.5 text-[15px]" aria-label="Où vous êtes">
+      <nav className="flex min-h-[51px] flex-wrap items-center gap-1 border-b border-line-soft px-5 py-2 text-[15px]" aria-label="Où vous êtes">
         {crumbs.map((crumb, index) => {
           const last = index === crumbs.length - 1;
           const code = "code" in crumb;
