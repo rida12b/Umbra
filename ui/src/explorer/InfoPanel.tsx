@@ -24,36 +24,37 @@ interface Props {
   onOpenCode: OpenCode;
   oldMethod: boolean; // the model was written by a method before v1.7: its empty slots are not « nothing there »
   projectSettings: boolean; // the floor's « Réglages du projet » card is selected
+  row: string | null; // a search landed on this settings row (#80): lit on the plate
 }
 
 /** The fixed panel: what the selected box is, or the step being played, or where you are. */
-export function InfoPanel({ projectId, model, level, box, playing, onEnter, onPlay, onStep, onOpenMachine, onOpenCode, oldMethod, projectSettings }: Props) {
+export function InfoPanel({ projectId, model, level, box, playing, onEnter, onPlay, onStep, onOpenMachine, onOpenCode, oldMethod, projectSettings, row }: Props) {
   // A selected machine or part opens its plate (#79): the same slots, in the same order, every time.
   const enter = box && box.inside > 0 ? () => onEnter(box) : null;
-  if (box?.target.kind === "component") return <MachinePlateView model={model} id={box.target.id} oldMethod={oldMethod} onPlay={onPlay} onOpenCode={onOpenCode} onEnter={enter} />;
+  if (box?.target.kind === "component") return <MachinePlateView model={model} id={box.target.id} oldMethod={oldMethod} row={row} onPlay={onPlay} onOpenCode={onOpenCode} onEnter={enter} />;
   if (box?.target.kind === "block") return <RoomPlateView model={model} bloc={box.target.id} oldMethod={oldMethod} onPlay={onPlay} onOpenMachine={onOpenMachine} onEnter={enter} />;
   if (box) return <FileInfo box={box} onEnter={onEnter} />;
-  if (projectSettings) return <ProjectPlateView model={model} onOpenCode={onOpenCode} />;
+  if (projectSettings) return <ProjectPlateView model={model} row={row} onOpenCode={onOpenCode} />;
   // In a room, its own journey keeps the room's step cards, the step played framed in yellow (V53).
   if (playing && level.room && level.room.journey?.id === playing.journey.id)
     return <RoomInfo projectId={projectId} model={model} level={level} onPlay={onPlay} active={playing.step} />;
   if (playing) return <StepInfo projectId={projectId} model={model} journey={playing.journey} number={playing.step} onStep={onStep} />;
   if (level.room) return <RoomInfo projectId={projectId} model={model} level={level} onPlay={onPlay} />;
-  if (level.floor) return <FloorInfo model={model} level={level} floor={level.floor} onEnter={onEnter} onPlay={onPlay} />;
+  if (level.floor) return <FloorInfo model={model} level={level} floor={level.floor} onEnter={onEnter} onPlay={onPlay} row={row} />;
   return (
     <Panel>
       <p className="text-[13px] font-semibold text-faint">Vous êtes ici</p>
       <h2 className="mt-1 text-[22px] leading-tight font-semibold">{level.title}</h2>
       <p className="mt-2 text-[15px] leading-relaxed text-muted">{level.hint}</p>
       <Journeys model={model} onPlay={onPlay} />
-      <Doubts model={model} />
+      <Doubts model={model} row={row} />
     </Panel>
   );
 }
 
 /** The panel of the factory floor (V19-V24): the belt's journey first, then the rooms, then the other journeys. */
-function FloorInfo({ model, level, floor, onEnter, onPlay }: {
-  model: ProjectModel; level: Level; floor: Floor; onEnter: (box: Box) => void; onPlay: (id: string, step: number) => void;
+function FloorInfo({ model, level, floor, onEnter, onPlay, row }: {
+  model: ProjectModel; level: Level; floor: Floor; onEnter: (box: Box) => void; onPlay: (id: string, step: number) => void; row: string | null;
 }) {
   const main = floor.journey;
   const others = model.parcours.filter((j) => j !== main);
@@ -158,19 +159,25 @@ function FloorInfo({ model, level, floor, onEnter, onPlay }: {
           </ul>
         </section>
       )}
-      <Doubts model={model} />
+      <Doubts model={model} row={row} />
     </Panel>
   );
 }
 
-function Doubts({ model }: { model: ProjectModel }) {
+/** The study's doubts; a search that landed on one (#80, `row=doute:N`) opens the list with that line lit and in view. */
+function Doubts({ model, row = null }: { model: ProjectModel; row?: string | null }) {
+  const lit = row?.startsWith("doute:") ? Number(row.slice(6)) : null;
+  const here = useRef<HTMLLIElement>(null);
+  useLayoutEffect(() => here.current?.scrollIntoView({ block: "center" }), [lit]);
   if (model.incertitudes.length === 0) return null;
   return (
-    <details className="mt-6 text-[13px]">
+    <details className="mt-6 text-[13px]" open={lit !== null || undefined}>
       <summary className="cursor-pointer text-muted hover:text-ink">Ce que Claude n'a pas pu vérifier ({model.incertitudes.length})</summary>
       <ul className="mt-2 list-disc space-y-1.5 pl-5 text-muted">
         {model.incertitudes.map((item, index) => (
-          <li key={index}>{item}</li>
+          <li key={index} ref={index === lit ? here : undefined} aria-current={index === lit ? "true" : undefined} className={index === lit ? "rounded px-1 text-ink ring-2 ring-fl-hl" : ""}>
+            {item}
+          </li>
         ))}
       </ul>
     </details>

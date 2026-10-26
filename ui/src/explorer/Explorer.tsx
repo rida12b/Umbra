@@ -78,7 +78,7 @@ export function Explorer({ project, route, theme, narrow }: Props) {
   const [codeView, setCodeView] = useState<MapView | null>(null);
 
   const go = useCallback(
-    (change: Partial<Route>) => navigate({ ...route, projectId: project.id, expand: false, ...change }),
+    (change: Partial<Route>) => navigate({ ...route, projectId: project.id, expand: false, row: null, ...change }),
     [route, project.id],
   );
   const openLevel = useCallback((key: LevelKey) => go({ node: levelNode(key), select: null }), [go]);
@@ -224,6 +224,7 @@ export function Explorer({ project, route, theme, narrow }: Props) {
         onOpenCode={openCode}
         oldMethod={!!state?.methode_ancienne}
         projectSettings={settings}
+        row={route.row ?? null}
       />
     );
     const panel = panelFor(box, settingsPlate);
