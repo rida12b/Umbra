@@ -1,47 +1,34 @@
-import type { Journey, ProjectModel } from "../api";
-import { stepActors, stepLabel } from "../arch/story";
-import type { Level, Target } from "./levels";
+import type { Journey } from "../api";
+import { stepLabel } from "../arch/story";
+import type { Level } from "./levels";
+import type { Station } from "./stations";
 
 /** Where one step of a journey shows on the current level. */
 export interface StepOnMap {
-  boxes: string[]; // the boxes lit: where it happens, what it acts on, and anything else it reaches
-  link: string | null; // the arrow it runs along, if the level has one between those boxes
-  elsewhere: { id: string; title: string } | null; // the step happens inside this box: « entrer pour la voir »
-  words: string; // the step's short action, on its arrow
-  arrow: boolean; // false: the step works on what came in (a check, a reply being built), no data moves yet
+  boxes: string[]; // the station: the box of its machine at this zoom (the machine, its room, its file)
+  touched: string[]; // the parts it reaches: a faint ring
+  link: string | null; // the arrow from the step before's station, if the level has one
+  words: string; // the step's short action
 }
 
 /**
- * Each step of a journey, placed on a level: the step's parts (see stepActors) are mapped to the
- * boxes that contain them at this zoom (the whole system, a part, a component).
+ * Each station of a journey (see journeyStations), placed on a level: its machine is mapped to the box that
+ * holds it at this zoom (the room on the floor, the machine in a room, the step's file in a machine).
  */
-export function trackJourney(model: ProjectModel, journey: Journey, level: Level): StepOnMap[] {
-  const boxOf = (kind: Target["kind"], id?: string) =>
-    level.boxes.find((b) => b.target.kind === kind && (id === undefined || ("id" in b.target && b.target.id === id)))?.id ?? null;
-  const componentBlock = new Map(model.composants.map((c) => [c.id, c.bloc]));
-  const atThisLevel = (blockId: string, componentId: string | null): string | null =>
-    (componentId ? boxOf("component", componentId) : null) ?? // inside the part being looked at
-    boxOf("block", blockId);
-
-  const last = journey.etapes.length - 1;
-  const person = new Set(model.blocs.filter((b) => b.type === "user" || b.type === "device").map((b) => b.id));
-  return journey.etapes.map((step, index) => {
-    const [doer, target] = stepActors(model, step);
-    // The step's component belongs to one of the two (the target when the step is done by hand).
-    const componentOf = (blockId: string | undefined) => (step.composant && componentBlock.get(step.composant) === blockId ? step.composant : null);
-    const from = doer ? atThisLevel(doer.id, componentOf(doer.id)) : null;
-    const to = target ? atThisLevel(target.id, componentOf(target.id)) : null;
-    const also = step.touche.filter((id) => id !== doer?.id && id !== target?.id).map((id) => atThisLevel(id, null));
-    const boxes = [...new Set([from, to, ...also].filter((id): id is string => id !== null))];
-    // Mid-path, a step that « reaches » the person who asked is working on their request (checking
-    // it, reading their history): the answer only travels back to them at the end.
-    const arrow = !(target && person.has(target.id) && !step.manuel && index < last);
-    const link =
-      arrow && from && to && from !== to
-        ? (level.links.find((l) => l.from === from && l.to === to)?.id ?? null) // an answer going back gets its own arrow
-        : null;
-    const single = boxes.length === 1 ? level.boxes.find((b) => b.id === boxes[0]) : undefined;
-    const elsewhere = single && single.inside > 0 ? { id: single.id, title: single.title } : null;
-    return { boxes, link, elsewhere, words: stepLabel(step), arrow };
+export function trackJourney(journey: Journey, stations: Station[], level: Level): StepOnMap[] {
+  const ids = new Set(level.boxes.map((b) => b.id));
+  const here = (id: string | null) => (id && ids.has(id) ? id : null);
+  const boxOf = (s: Station, n: number) =>
+    here(s.machine) ?? here(s.room) ?? here(s.person) ?? here(journey.etapes[n]?.fichier ? `file:${journey.etapes[n]!.fichier}` : null);
+  return stations.map((station, i) => {
+    const box = boxOf(station, i);
+    const before = i > 0 ? boxOf(stations[i - 1]!, i - 1) : null;
+    const link = box && before && box !== before ? (level.links.find((l) => (l.from === before && l.to === box) || (l.from === box && l.to === before))?.id ?? null) : null;
+    return {
+      boxes: box ? [box] : [],
+      touched: station.touches.flatMap((id) => (ids.has(id) && id !== box ? [id] : [])),
+      link,
+      words: stepLabel(journey.etapes[i]!),
+    };
   });
 }

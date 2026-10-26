@@ -126,6 +126,7 @@ Règle générale : **B est la base** ; de A on garde seulement le mouvement de 
 - Conflits 2, 3, 4, 6, 8, 9, 11, 13, 14, 15 : réglés par la règle « B est la base ».
 - Conflit 12 (pointillé à plusieurs sens), 16 (jaune de « texte du modèle »), 17 (bleu) : gardés comme dans B.
 - V35 : le texte coupé de « refus 422 » est un défaut de la maquette, pas à recopier.
+- V55 (2026-10-26, #77) : **OK Rida** — pendant la lecture, « Échap : arrêter le chemin » remplace « ‹ Remonter (Échap) » (Échap arrête le trajet, ticket #77 point 8). Écran réel validé côte à côte (« oui »).
 
 ## Attribution
 

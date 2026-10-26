@@ -17,7 +17,7 @@ const KIND_NAME: Record<Shape, string> = {
   tool: "Autour du projet",
 };
 
-export type Look = "normal" | "lit" | "dim";
+export type Look = "normal" | "lit" | "touched" | "dim"; // touched: a part the step reaches, not its station
 
 interface PieceProps {
   box: Box;
@@ -40,7 +40,7 @@ interface PieceProps {
 export function FloorPiece(props: PieceProps) {
   const { box, shape, rect, tag, look, selected, badge, kindLine, preview, wiring, footer, relation, limit, onSelect, onEnter } = props;
   const Icon = ICON[shape];
-  const lit = look === "lit" ? "lit" : look === "dim" ? "dim" : "";
+  const lit = look === "normal" ? "" : look;
   const person = shape === "person";
   return (
     <div

@@ -30,6 +30,11 @@ export function NarrowLevel({ model, level, selected, play, onSelect, onEnter: e
       card.scrollIntoView({ block: "center" });
     }
   }, [model, level.floor]);
+  // While a journey plays, its station is scrolled into view: the bar under the list takes part of a phone's height.
+  const station = play?.step.boxes[0];
+  useLayoutEffect(() => {
+    if (station) document.querySelector<HTMLElement>(`[data-narrow-id="${CSS.escape(station)}"]`)?.scrollIntoView({ block: "nearest" });
+  }, [station, level.key]);
   const onEnter = (box: Box) => {
     if (level.floor) enteredRoom(model, box.id, 0);
     enter(box);
@@ -118,13 +123,14 @@ function NarrowRoom({ model, level, selected, play, onSelect, onEnter, onOpenDoo
         {room.belt.map((machine) => {
           const b = box(machine.id);
           const lit = play?.step.boxes.includes(machine.id);
+          const numbers = play ? play.stations.filter((s) => s.machine === machine.id).map((s) => s.n) : machine.steps; // the journey played
           return (
-            <li key={machine.id} className="flex flex-col gap-1.5">
+            <li key={machine.id} data-narrow-id={machine.id} className="flex flex-col gap-1.5">
               <div className={`rounded-xl border-2 border-l-[6px] border-l-kind-room bg-panel px-4 py-3 ${lit ? "border-lamp-line" : machine.id === selected ? "border-ink/40" : "border-line"}`}>
                 <button type="button" className="block w-full text-left" onClick={() => onSelect(machine.id)}>
                   <span className="block text-[16px] font-semibold">{machine.nom}</span>
                   <span className="block text-[14px] text-muted">{machine.words}</span>
-                  {machine.steps.length > 0 && <span className="block text-[12.5px] text-faint">{machine.steps.length > 1 ? "étapes" : "étape"} {machine.steps.join(", ")}</span>}
+                  {numbers.length > 0 && <span className="block text-[12.5px] text-faint">{numbers.length > 1 ? "étapes" : "étape"} {numbers.join(", ")}</span>}
                   {/* What goes in and out, in full: a phone has room to wrap (V32). */}
                   {machine.entre[0] && <span className="mt-1 block text-[13px] text-muted">→ reçoit {machine.entre.join(", ")}</span>}
                   {machine.sort[0] && <span className="block text-[13px] text-muted">rend {machine.sort.join(", ")} →</span>}
