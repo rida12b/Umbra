@@ -160,3 +160,12 @@ test("short round of #80: a filler word and one letter is no search; a question 
   assert.ok(group(find(model, "règles"), "machine").length > 0, "« règles » finds what talks about rules");
   assert.deepEqual(find(model, "changer").map((g) => g.kind), [], "a bare verb is not « je veux changer »");
 });
+
+test("dry run of #81: « combien d'articles » and « température » reach JusticIA's intentions through their settings", () => {
+  const model = load("watchdog-v17");
+  const keys = (q: string) => find(model, q).flatMap((g) => g.results.map((r) => r.key));
+  assert.deepEqual(keys("combien de relevés"), keys("relevés"));
+  // An intention is found by its setting's code words, not only by its own sentence.
+  const lever = model.pour_changer!.find((l) => l.reglage.includes("X-Tenant-ID"))!;
+  assert.ok(group(find(model, "headers"), "changer").some((r) => r.label === lever.intention));
+});

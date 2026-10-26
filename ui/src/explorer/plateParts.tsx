@@ -66,6 +66,8 @@ export function SettingRow({ nom, code, cited, onOpenCode, children, lit = false
         <span className="text-[14px] text-ink">{nom}</span>
         <CodeLink cited={cited} onOpenCode={onOpenCode} short />
       </span>
+      {/* The whole path (dry run of #81): « config.py » alone does not say which of the project's config files. */}
+      {cited.fichier && <span className="-mt-0.5 font-mono text-[11.5px] text-faint [overflow-wrap:anywhere]">{cited.fichier}</span>}
       <code className="fl-codechip self-start">{code}</code>
       {children}
       <Check cited={cited} />

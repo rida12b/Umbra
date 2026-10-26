@@ -75,3 +75,11 @@ test("the project's settings say which ones the code never reads", () => {
   const env = rows.find((r) => r.code === "APP_ENV=development")!;
   assert.deepEqual([env.fichier, env.lignes, env.notRead], [".env.example", [2, 2], true]);
 });
+
+test("dry run of #81: a machine's file list holds every file its settings and functions cite", () => {
+  const model = load("watchdog-v17");
+  for (const c of model.composants) {
+    const plate = machinePlate(model, c.id)!;
+    for (const r of c.reglages ?? []) if (r.fichier) assert.ok(plate.fichiers.includes(r.fichier), `${c.id}: ${r.fichier}`);
+  }
+});
