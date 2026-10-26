@@ -96,6 +96,22 @@ Fond général : quasi noir (≈ #0d1117), texte principal blanc, texte secondai
 | room · lecture | 9 (V47–V55) |
 | line (A, ligne numérotée seulement) | 11 (V56–V66) |
 
+## Fiche machine (#79) — ajout 2026-10-26
+
+Références : `ref-plate-watchdog.png` (haut de la fiche) et `ref-plate-watchdog-bottom.png` (bas), maquette A, clic sur la station ① « Contrôle du nom du client ». B n'a pas de fiche : la fiche de A est posée dans le panneau de B (« B est la base » pour le reste de l'écran).
+
+| id | écran-état | élément | forme, couleur, taille, place | source | ticket | écart accepté |
+|---|---|---|---|---|---|---|
+| V67 | plate | Chemin au-dessus du titre | Ligne grise ≈ 13 px : la pièce « Porte d'entrée du service › », puis le nom de la machine. Le bouton « ‹ Plan » de A n'est pas repris : « ‹ Remonter » et le fil d'Ariane du haut (V1) le font déjà. | modèle | #79 | |
+| V68 | plate | Titre | Nom de la machine, **gras blanc ≈ 20 px**. | modèle | #79 | |
+| V69 | plate | Cases fixes | Six cases toujours dans cet ordre : FAIT, REÇOIT, REND, RÉGLAGES, OÙ, VU DANS. Libellé en **petites capitales grises ≈ 11 px, espacées**, filet gris fin entre deux cases. | fixe | #79 | |
+| V70 | plate | Fait | `en_bref` en **gras blanc ≈ 16 px**, puis `role` en gris ≈ 13 px. | modèle | #79 | |
+| V71 | plate | Cadre « pas encore dans le modèle — lu dans le code » | Cadre pointillé ambre autour de Reçoit / Rend / Réglages, puce ambre en haut. | — | #79 | Sans objet : depuis v1.7 ces cases viennent du modèle. Une case vide dit « pas encore dans le modèle — relancer l'étude (nouvelle méthode) » (ticket #79). |
+| V72 | plate | Reçoit, Rend | Une ligne blanche ≈ 14 px par élément. Dans A, une puce de code et un lien fichier:ligne suivent : le modèle v1.7 n'en donne pas pour `entre`/`sort`, rien n'est inventé. Un refus (« ou un refus… ») est en rouge (ticket). | v1.7 | #79 | |
+| V73 | plate | Réglages | Une ligne par réglage, filet entre deux : nom blanc ≈ 14 px à gauche, lien **bleu monospace fichier:ligne** à droite, puis le code exact dans une **puce monospace** sombre, puis l'effet en gris ≈ 12.5 px et la marque ✓ vérifié / ? hypothèse. | v1.7 `reglages` | #79 | Choix Rida 2026-10-26 : ligne de la maquette A, pas le tableau à 6 colonnes du ticket. |
+| V74 | plate | Où | Pour chaque `expose` : nom en puce monospace, puis chemin **bleu monospace** + « l.a-b » et **« ✓ vérifié » vert** (sinon « ? non vérifié »). Puis « Fichiers : » gris et les chemins en bleu. | modèle | #79 | |
+| V75 | plate | Vu dans | Un bouton à bord gris par étape faite ici : petite barre de couleur à gauche, « nom du trajet · étape N — action ». Clic : le trajet joue depuis cette étape. | calculé | #79 | La barre est jaune pour tous les trajets : le jaune ne veut dire que « donnée » (conflit 1). |
+
 ## Conflits entre les maquettes A et B
 
 1. **Jaune = donnée ou trajet ?** Dans B, le jaune veut dire « la donnée sur le tapis » (et l'étape allumée). Dans A, le jaune est la **couleur d'une ligne** (le trajet principal) ; les autres trajets sont violet et rouge. Le jaune garde-t-il le seul sens « donnée / étape allumée » (et la ligne numérotée est toujours jaune, quel que soit le trajet) ? oui / non

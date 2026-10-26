@@ -13,7 +13,7 @@ import { FloorCanvas } from "./FloorCanvas";
 import { RoomCanvas } from "./RoomCanvas";
 import { enterable } from "./room";
 import { InfoPanel } from "./InfoPanel";
-import { buildLevel, levelOf, trail, type Box, type Level, type LevelKey } from "./levels";
+import { buildLevel, levelOf, PROJECT_SETTINGS, trail, type Box, type Level, type LevelKey } from "./levels";
 import { NarrowLevel } from "./NarrowLevel";
 import { PlayerBar } from "./PlayerBar";
 import { followedRoom, groupOf, journeyStations, stepGroups, type Station } from "./stations";
@@ -90,6 +90,8 @@ export function Explorer({ project, route, theme, narrow }: Props) {
     [go, openLevel],
   );
   const select = useCallback((id: string | null) => go({ select: id }), [go]);
+  // A cited file opens its code, the function holding the cited line selected (see CodeLevel, « line:N »).
+  const openCode = useCallback((path: string, line: number | null) => go({ node: path, select: line ? `line:${line}` : null }), [go]);
   const rooms = useMemo(() => (model ? enterable(model) : new Set<string>()), [model]);
   // A door opens the room behind it (a history entry: Back returns here), or explains a part without machines.
   const openDoor = useCallback((bloc: string) => (rooms.has(bloc) ? openLevel(`part:${bloc}`) : select(bloc)), [rooms, openLevel, select]);
@@ -163,7 +165,7 @@ export function Explorer({ project, route, theme, narrow }: Props) {
       group={groupOf(groups, stepNumber)}
       onStep={onStep}
       onStop={stop}
-      onOpenFile={(path) => go({ node: path, select: null })}
+      onOpenFile={openCode}
     />
   );
   let barUnderMap = false; // on a wide screen the bar sits under the map only, the panel runs to the bottom (V65)
@@ -202,24 +204,41 @@ export function Explorer({ project, route, theme, narrow }: Props) {
     );
   else {
     barUnderMap = !narrow;
-    const panel = (
+    const settingsPlate = route.select === PROJECT_SETTINGS;
+    const panelFor = (selected: Box | null, settings: boolean) => (
       <InfoPanel
         projectId={project.id}
         model={model}
         level={level}
-        box={box}
+        box={selected}
         playing={journey ? { journey, step: stepNumber } : null}
         onEnter={enter}
         onPlay={play}
         onStep={onStep}
+        onSelect={select}
+        onOpenCode={openCode}
+        projectSettings={settings}
       />
     );
+    const panel = panelFor(box, settingsPlate);
+    const sheet = box || settingsPlate;
     body = narrow ? (
       <div key={level.room?.bloc ?? "level"} className="h-full overflow-y-auto">
         <NarrowLevel model={model} level={level} selected={route.select ?? null} play={playState} onSelect={select} onEnter={enter} onOpenDoor={openDoor} />
         <section className="border-t border-line-soft" aria-label="Explication">
-          {panel}
+          {sheet ? panelFor(null, false) : panel}
         </section>
+        {sheet && (
+          // On a phone a plate is a bottom sheet over the list (#79): its close button stays at hand, Échap closes it too.
+          <div className="fixed inset-x-0 bottom-0 z-30 flex max-h-[78dvh] flex-col rounded-t-2xl border-t border-line bg-panel shadow-2xl" role="dialog" aria-label="Fiche">
+            <div className="flex shrink-0 justify-end px-3 pt-2">
+              <button type="button" onClick={() => select(null)} className="rounded-lg border border-line px-3 py-1.5 text-[14px]" aria-label="Fermer la fiche">
+                Fermer
+              </button>
+            </div>
+            <div className="min-h-0 overflow-y-auto pb-[env(safe-area-inset-bottom,0px)]">{panel}</div>
+          </div>
+        )}
       </div>
     ) : (
       <div className="grid h-full min-h-0 grid-cols-[minmax(0,1fr)_400px]">

@@ -124,6 +124,8 @@
 .fl-chip.ctl { color: var(--fl-control); }
 .fl-chip.reply { border-style: dashed; border-color: var(--fl-data-dim); }
 .fl-tech { display: inline-block; font-size: 10.5px; color: var(--fl-data); border: 1px solid var(--fl-data-dim); border-radius: 4px; padding: 0 5px; white-space: nowrap; font-weight: 500; }
+/* V73, V74: the exact code a plate cites, in a dark monospace chip that wraps instead of being cut. */
+.fl-codechip { display: inline-block; max-width: 100%; font-family: var(--font-mono, ui-monospace, monospace); font-size: 12px; line-height: 1.45; color: var(--u-ink); background: var(--u-raised); border: 1px solid var(--u-line-soft); border-radius: 4px; padding: 0 5px; overflow-wrap: anywhere; }
 .fl-mtm { display: inline-block; font-size: 10.5px; color: var(--u-muted); border: 1px dashed var(--u-muted); border-radius: 4px; padding: 0 5px; white-space: nowrap; }
 
 /* An open room (mockup B, V27-V38): its frame, machines, doors outside the frame, red refusals. */
@@ -293,3 +295,6 @@
   stroke: var(--u-lamp-ink);
   stroke-width: 2;
 }
+
+/* Code is shown as it is written: the monospace font draws no ligature (« >= » stays « >= », never « ≥ »). */
+code, pre, kbd, samp, .font-mono, .excerpt { font-variant-ligatures: none; font-feature-settings: "liga" 0, "calt" 0; }

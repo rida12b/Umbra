@@ -34,7 +34,7 @@ export function CodeLevel({ projectId, node, expand, select, theme, narrow, onVi
         if (!current) return;
         setView(found);
         onView(found);
-        const picked = select && !selectApplied.current ? found.nodes.find((n) => n.key === select) : undefined;
+        const picked = select && !selectApplied.current ? (pickLine(found.nodes, select) ?? found.nodes.find((n) => n.key === select)) : undefined;
         if (picked) {
           selectApplied.current = true;
           setSelection({ type: "node", node: picked });
@@ -95,4 +95,13 @@ export function CodeLevel({ projectId, node, expand, select, theme, narrow, onVi
       </aside>
     </div>
   );
+}
+
+/** « line:33 » (a plate's or the player's file:line link): the smallest element of the file that holds that line. */
+function pickLine(nodes: MapNode[], select: string): MapNode | undefined {
+  const line = /^line:(\d+)$/.exec(select)?.[1];
+  if (!line) return undefined;
+  const n = Number(line);
+  const size = (x: MapNode) => (x.lines ? x.lines[1] - x.lines[0] : Infinity);
+  return nodes.filter((x) => x.lines && x.lines[0] <= n && n <= x.lines[1]).sort((a, b) => size(a) - size(b))[0];
 }

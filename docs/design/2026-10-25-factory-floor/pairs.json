@@ -1,6 +1,7 @@
 [
-  { "name": "floor", "ref": "ref-floor-watchdog.png", "path": "#/p/watchdog-f5e3ba9d42f5" },
-  { "name": "room", "ref": "ref-room-api.png", "path": "#/p/watchdog-f5e3ba9d42f5?node=x%3Apart%3Aapi" },
-  { "name": "room-playing", "ref": "ref-room-api-playing.png", "path": "#/p/watchdog-f5e3ba9d42f5?node=x%3Apart%3Aapi&journey=envoi-evenement&step=1" },
-  { "name": "line", "ref": "ref-line-watchdog.png", "path": "#/p/watchdog-f5e3ba9d42f5?journey=envoi-evenement&step=1" }
+  {"name": "floor", "ref": "ref-floor-watchdog.png", "path": "#/p/watchdog-f5e3ba9d42f5"},
+  {"name": "room", "ref": "ref-room-api.png", "path": "#/p/watchdog-f5e3ba9d42f5?node=x%3Apart%3Aapi"},
+  {"name": "room-playing", "ref": "ref-room-api-playing.png", "path": "#/p/watchdog-f5e3ba9d42f5?node=x%3Apart%3Aapi&journey=envoi-evenement&step=1"},
+  {"name": "line", "ref": "ref-line-watchdog.png", "path": "#/p/watchdog-f5e3ba9d42f5?journey=envoi-evenement&step=1"},
+  {"name": "plate", "ref": "ref-plate-watchdog.png", "path": "#/p/watchdog-f5e3ba9d42f5?node=x%3Apart%3Aapi&select=porte-client"}
 ]

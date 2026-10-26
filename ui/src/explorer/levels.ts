@@ -24,6 +24,8 @@ export const KIND: Record<BlockType, string> = {
   infra: "Infrastructure",
 };
 
+export const PROJECT_SETTINGS = "reglages-projet"; // `select` of the floor's « Réglages du projet » card: its plate (#79)
+
 export type LevelKey = "parts" | `part:${string}` | `component:${string}`;
 
 /** What a box stands for: entering it shows the next level down (or the code). */

@@ -47,7 +47,10 @@ MODEL = {
     "composants": [
         {"id": "orders", "nom": "Commandes", "bloc": "api", "role": "Crée les commandes.",
          "expose": [{"quoi": "create_order", "fichier": "api/app/orders.py", "lignes": [8, 10]}],
-         "fichiers": ["api/app/orders.py"]},
+         "fichiers": ["api/app/orders.py"],
+         "entre": ["la commande envoyée par le site"], "sort": ["la commande enregistrée", "ou un refus si elle est vide"],
+         "reglages": [{"nom": "Contrôle de la commande", "code": "validate(order)", "sorte": "branchement", "valeur": "validate",
+                       "effet": "Refuse une commande vide", "fichier": "api/app/orders.py", "lignes": [9, 9]}]},
     ],
     "parcours": [
         {"id": "order", "nom": "Passer une commande", "declencheur": "Le client clique sur Commander.",
