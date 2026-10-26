@@ -42,7 +42,8 @@ export function useProjectModel(projectId: string | null): PageModelState | null
         changed: [],
         message: error.message,
         failure: failureOf(error),
-        retry: () => setAttempt((n) => n + 1),
+        // A failed read is kept by the engine (it is asked on every live event): ask it to read again, then follow.
+        retry: () => void api.retryRead(projectId).catch(() => undefined).finally(() => setAttempt((n) => n + 1)),
       });
     const ask = () => api.model(projectId).then((found) => (found.state === "missing" || found.state === "stale" ? api.study(projectId) : found));
     const follow = (found: ModelState) => {

@@ -44,6 +44,7 @@ class ProjectModelState(BaseModel):
 
 class StudyRequest(BaseModel):
     relancer: bool = False  # the user clicked « Relancer l'étude »: the only way to restudy an old model
+    relire: bool = False  # the user clicked « Réessayer » after a failed read: read the Project again now
 
 
 def add_model_routes(
@@ -54,7 +55,7 @@ def add_model_routes(
     graph_of: Callable[[str], ProjectGraph],
     explainer: Explainer,
     study: Study,
-    ensure_indexed: Callable[[str], bool],
+    ensure_indexed: Callable[..., bool],
 ) -> Callable[[str], ModelState]:
     """Adds the routes; returns `refresh_model(project_id)`: study or update when needed."""
 
@@ -120,7 +121,7 @@ def add_model_routes(
     def request_model(project_id: str, body: StudyRequest | None = None) -> ProjectModelState:
         """Study the Project when it has no model, update it when the code changed since, or study it
         again with the current method when the user asks (`relancer`)."""
-        if not ensure_indexed(project_id):
+        if not ensure_indexed(project_id, retry=body is not None and body.relire):
             return ProjectModelState(state="indexing")
         refresh_model(project_id, relaunch=body is not None and body.relancer)
         return current(project_id)[0]

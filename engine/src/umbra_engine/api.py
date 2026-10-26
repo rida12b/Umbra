@@ -37,6 +37,7 @@ MAX_PAGE = 1000
 MODEL_FOLLOW_UP_S = 60.0
 JOURNAL_POLL_S = 0.5
 READ_JOIN_S = 10.0  # at shutdown, how long to wait for a project being read
+READ_RETRY_S = 30.0  # a read that failed is tried again by itself at most this often
 
 
 class ProjectIn(BaseModel):
@@ -105,7 +106,7 @@ def create_app(
     index_locks: dict[str, threading.Lock] = {}
     index_guard = threading.Lock()
     indexing: set[str] = set()
-    index_errors: dict[str, str] = {}  # a failed read: said once to the page, then the next ask reads again
+    index_errors: dict[str, tuple[str, float]] = {}  # a failed read and when: a steady state, retried slowly
     readers: list[threading.Thread] = []  # background reads, waited for at shutdown
 
     def lock_of(project_id: str) -> threading.Lock:
@@ -122,7 +123,7 @@ def create_app(
                 index_now(project)
             except Exception as error:  # noqa: BLE001 — a background read must report, never vanish
                 with index_guard:
-                    index_errors[project.id] = f"{type(error).__name__}: {error}"
+                    index_errors[project.id] = (f"{type(error).__name__}: {error}", time.monotonic())
                 return
             finally:
                 with index_guard:
@@ -148,13 +149,19 @@ def create_app(
         readers.append(reader)
         reader.start()
 
-    def ensure_indexed(project_id: str) -> bool:
-        """True when the index is current; otherwise start reading the Project and say False."""
+    def ensure_indexed(project_id: str, retry: bool = False) -> bool:
+        """True when the index is current; otherwise start reading the Project and say False. A failed read
+        stays said (500) to every ask: the page asks on each live event. It is tried again by itself after
+        READ_RETRY_S, or at once on `retry` (« Réessayer », adding the folder again)."""
         project = known_project(project_id)
         with index_guard:
             if project_id in indexing:
                 return False
-            failed = index_errors.pop(project_id, None)  # one failed attempt, not a state: next ask retries
+            error = index_errors.get(project_id)
+            if error and (retry or time.monotonic() - error[1] >= READ_RETRY_S):
+                del index_errors[project_id]
+                error = None
+            failed = error[0] if error else None
         if failed:
             detail = f"reading the project failed: {failed}"
             raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, detail)
@@ -200,10 +207,7 @@ def create_app(
         except ProjectIdCollisionError as error:
             raise HTTPException(status.HTTP_409_CONFLICT, str(error)) from error
         if live_projects is not None:  # the running engine reads it at once, as at startup (#85)
-            try:
-                ensure_indexed(project.id)
-            except HTTPException:  # an earlier read failed: it is registered; this call started nothing new
-                start_indexing(project)
+            ensure_indexed(project.id, retry=True)  # adding the folder again is the user's own retry
         return ProjectOut.of(project)
 
     @app.get("/v1/projects", dependencies=authorized)

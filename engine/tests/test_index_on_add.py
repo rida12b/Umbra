@@ -162,3 +162,26 @@ def test_page_journey_on_an_added_project_studies_once(settings, auth, make_repo
         for t in threads:
             t.join()
         assert len(study.sessions) == 1
+
+
+def test_a_read_that_keeps_failing_is_not_read_again_on_every_ask(settings, auth, make_repo, monkeypatch):
+    """The page asks on every live event: a cause that stays gives one read and a steady error, not a read per
+    ask; « Réessayer » (relire) reads again at once (short round of #85)."""
+    root = write_repo(make_repo("locked"), FILES, git=False)
+    reads = {"n": 0}
+
+    def locked(project, store):
+        reads["n"] += 1
+        raise OSError("file locked")
+
+    monkeypatch.setattr("umbra_engine.api.index_project", locked)
+    app = create_app(settings, ask=lambda prompt: "{}", study=FakeStudy(), live=True)
+    with TestClient(app, base_url="http://127.0.0.1") as client:
+        project = client.post("/v1/projects", json={"path": str(root)}, headers=auth).json()["id"]
+        url = f"/v1/projects/{project}/model"
+        wait_for(lambda: client.get(url, headers=auth).status_code == 500)
+        seen = [client.get(url, headers=auth).status_code for _ in range(8)]
+        assert seen == [500] * 8 and reads["n"] == 1, (seen, reads)
+        retried = client.post(url, json={"relire": True}, headers=auth)
+        assert retried.status_code == 200 and retried.json()["state"] == "indexing", retried.text
+        wait_for(lambda: reads["n"] == 2)
