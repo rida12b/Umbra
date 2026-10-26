@@ -21,11 +21,18 @@ interface Props {
   labelOf: (key: string) => string;
   onOpen: (node: MapNode) => void;
   onClose: () => void;
+  cited?: { file: string; start: number; end: number } | null; // opened from a file:line link: those lines, shown first
 }
 
-export function DetailsPanel({ projectId, selection, level, labelOf, onOpen, onClose }: Props) {
+export function DetailsPanel({ projectId, selection, level, labelOf, onOpen, onClose, cited = null }: Props) {
   return (
     <div className="relative px-6 pt-5 pb-10">
+      {cited && (
+        <section className="mb-5" aria-label="Les lignes citées">
+          <p className="text-[12px] text-faint">Les lignes que vous avez ouvertes</p>
+          <EvidenceItem projectId={projectId} source={cited} />
+        </section>
+      )}
       {selection !== null && (
         <button type="button" className="absolute top-4 right-4 rounded p-1 text-faint hover:bg-raised hover:text-ink" onClick={onClose} aria-label="Fermer le détail">
           <X size={16} />

@@ -12,7 +12,7 @@ interface Props {
   group: StepGroup | null; // a long journey: the phase or room the step is in
   onStep: (step: number) => void;
   onStop: () => void;
-  onOpenFile: (path: string) => void;
+  onOpenFile: (path: string, lines: [number, number] | null) => void;
 }
 
 /** The data path being played (V65): its step in words, under the map, with previous and next. */
@@ -72,7 +72,7 @@ export function PlayerBar({ journey, step, station, group, onStep, onStop, onOpe
             {current.fichier && (
               <button
                 type="button"
-                onClick={() => onOpenFile(current.fichier!)}
+                onClick={() => onOpenFile(current.fichier!, current.lignes)}
                 title={`Ouvrir ${current.fichier}${lines}`}
                 aria-label={`${current.fichier}${lines}`}
                 className="flex max-w-full min-w-0 font-mono text-[12px] text-fl-service hover:underline"

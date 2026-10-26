@@ -16,13 +16,17 @@ interface Props {
   narrow: boolean; // a phone: the map above its explanation
   onView: (view: MapView | null) => void; // its breadcrumbs, for the explorer's trail
   onOpen: (node: string, expand: boolean) => void; // a group of small elements opens expanded, in place
+  onDrill: (node: string) => void; // a cited line sits inside an element: go into it, keeping the same « line:N » selection
 }
 
 /** The deepest levels: the code itself (folders, files, functions, calls), read from the index. */
-export function CodeLevel({ projectId, node, expand, select, theme, narrow, onView, onOpen }: Props) {
+export function CodeLevel({ projectId, node, expand, select, theme, narrow, onView, onOpen, onDrill }: Props) {
   const [view, setView] = useState<MapView | ApiError | null>(null);
   const [selection, setSelection] = useState<Selection>(null);
   const selectApplied = useRef(false);
+  // The parent passes a new function on each render: kept in a ref so the map is not fetched again for it.
+  const drill = useRef(onDrill);
+  drill.current = onDrill;
   const live = useLive();
   const model = useModel()?.model ?? null;
 
@@ -34,7 +38,14 @@ export function CodeLevel({ projectId, node, expand, select, theme, narrow, onVi
         if (!current) return;
         setView(found);
         onView(found);
-        const picked = select && !selectApplied.current ? found.nodes.find((n) => n.key === select) : undefined;
+        const cited = select ? citedLines(select) : null;
+        const picked = select && !selectApplied.current ? (pickLine(found.nodes, cited) ?? found.nodes.find((n) => n.key === select)) : undefined;
+        // The line is inside a class or a module's part: go down to the smallest element that holds it (#79 review).
+        if (picked && cited && picked.children > 0) {
+          selectApplied.current = true;
+          drill.current(picked.key);
+          return;
+        }
         if (picked) {
           selectApplied.current = true;
           setSelection({ type: "node", node: picked });
@@ -91,8 +102,22 @@ export function CodeLevel({ projectId, node, expand, select, theme, narrow, onVi
           labelOf={(key) => labels.get(key) ?? key}
           onOpen={open}
           onClose={() => setSelection(null)}
+          cited={citedLines(select) && view.parent.path ? { file: view.parent.path, ...citedLines(select)! } : null}
         />
       </aside>
     </div>
   );
+}
+
+/** « line:33 » or « line:35-38 » (a plate's or the player's file:line link): the lines a reader came to see. */
+export function citedLines(select: string | null): { start: number; end: number } | null {
+  const m = select ? /^line:(\d+)(?:-(\d+))?$/.exec(select) : null;
+  return m ? { start: Number(m[1]), end: Number(m[2] ?? m[1]) } : null;
+}
+
+/** The smallest element of this level that holds the first cited line. */
+function pickLine(nodes: MapNode[], cited: { start: number } | null): MapNode | undefined {
+  if (!cited) return undefined;
+  const size = (x: MapNode) => (x.lines ? x.lines[1] - x.lines[0] : Infinity);
+  return nodes.filter((x) => x.lines && x.lines[0] <= cited.start && cited.start <= x.lines[1]).sort((a, b) => size(a) - size(b))[0];
 }

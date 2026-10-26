@@ -13,8 +13,9 @@ import { FloorCanvas } from "./FloorCanvas";
 import { RoomCanvas } from "./RoomCanvas";
 import { enterable } from "./room";
 import { InfoPanel } from "./InfoPanel";
-import { buildLevel, levelOf, trail, type Box, type Level, type LevelKey } from "./levels";
+import { buildLevel, levelOf, PROJECT_SETTINGS, trail, type Box, type Level, type LevelKey } from "./levels";
 import { NarrowLevel } from "./NarrowLevel";
+import { PlateSheet } from "./PlateSheet";
 import { PlayerBar } from "./PlayerBar";
 import { followedRoom, groupOf, journeyStations, stepGroups, type Station } from "./stations";
 import { trackJourney } from "./track";
@@ -90,6 +91,11 @@ export function Explorer({ project, route, theme, narrow }: Props) {
     [go, openLevel],
   );
   const select = useCallback((id: string | null) => go({ select: id }), [go]);
+  // A cited file opens its code, the function holding the cited line selected (see CodeLevel, « line:N »).
+  const openCode = useCallback(
+    (path: string, lines: [number, number] | null) => go({ node: path, select: lines ? `line:${lines[0]}${lines[1] !== lines[0] ? `-${lines[1]}` : ""}` : null }),
+    [go],
+  );
   const rooms = useMemo(() => (model ? enterable(model) : new Set<string>()), [model]);
   // A door opens the room behind it (a history entry: Back returns here), or explains a part without machines.
   const openDoor = useCallback((bloc: string) => (rooms.has(bloc) ? openLevel(`part:${bloc}`) : select(bloc)), [rooms, openLevel, select]);
@@ -163,7 +169,7 @@ export function Explorer({ project, route, theme, narrow }: Props) {
       group={groupOf(groups, stepNumber)}
       onStep={onStep}
       onStop={stop}
-      onOpenFile={(path) => go({ node: path, select: null })}
+      onOpenFile={openCode}
     />
   );
   let barUnderMap = false; // on a wide screen the bar sits under the map only, the panel runs to the bottom (V65)
@@ -180,6 +186,7 @@ export function Explorer({ project, route, theme, narrow }: Props) {
         narrow={narrow}
         onView={setCodeView}
         onOpen={(node, expand) => go({ node, expand, select: null })}
+        onDrill={(node) => navigate({ ...route, projectId: project.id, node, expand: false }, { replace: true })}
       />
     );
   else if (level && level.room === null)
@@ -202,24 +209,36 @@ export function Explorer({ project, route, theme, narrow }: Props) {
     );
   else {
     barUnderMap = !narrow;
-    const panel = (
+    const settingsPlate = route.select === PROJECT_SETTINGS;
+    const panelFor = (selected: Box | null, settings: boolean) => (
       <InfoPanel
         projectId={project.id}
         model={model}
         level={level}
-        box={box}
+        box={selected}
         playing={journey ? { journey, step: stepNumber } : null}
         onEnter={enter}
         onPlay={play}
         onStep={onStep}
+        onOpenMachine={(bloc, machine) => go({ node: levelNode(`part:${bloc}`), select: machine })}
+        onOpenCode={openCode}
+        oldMethod={!!state?.methode_ancienne}
+        projectSettings={settings}
       />
     );
+    const panel = panelFor(box, settingsPlate);
+    const sheet = box || settingsPlate;
     body = narrow ? (
       <div key={level.room?.bloc ?? "level"} className="h-full overflow-y-auto">
         <NarrowLevel model={model} level={level} selected={route.select ?? null} play={playState} onSelect={select} onEnter={enter} onOpenDoor={openDoor} />
         <section className="border-t border-line-soft" aria-label="Explication">
-          {panel}
+          {sheet ? panelFor(null, false) : panel}
         </section>
+        {sheet && (
+          <PlateSheet from={route.select ?? ""} onClose={() => select(null)}>
+            {panel}
+          </PlateSheet>
+        )}
       </div>
     ) : (
       <div className="grid h-full min-h-0 grid-cols-[minmax(0,1fr)_400px]">

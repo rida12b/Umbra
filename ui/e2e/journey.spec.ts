@@ -44,7 +44,7 @@ test("the factory floor: ENTRÉE to SORTIE, tools aside; a click explains, « En
     await page.locator('[data-floor-id="api"]').click();
   }
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true);
-  const panel = page.getByLabel("Explication");
+  const panel = page.getByRole("region", { name: "API commandes", exact: true }); // the part's plate: side panel, or bottom sheet on a phone (#79)
   await expect(panel.getByRole("heading", { name: "API commandes" })).toBeVisible();
   await panel.getByRole("button", { name: /Entrer dedans/ }).click();
   await expect(page).toHaveURL(/node=x%3Apart%3Aapi/);
@@ -193,6 +193,76 @@ test("with reduced motion, a played journey moves without any animation (#77)", 
   await expect(page.locator(".fl-machine.lit")).toContainText("Commandes");
   expect(await floorSeen(page)).toBe(false); // straight into the room, no floor shown first
   await expect(page.locator(".room-open, animateMotion")).toHaveCount(0);
+});
+
+test("a machine's plate: six fixed slots, ✓ and ?, refusals in red, plays from « Vu dans », opens its code, Échap closes it first (#79)", async ({ page, isMobile }) => {
+  if (isMobile) await page.setViewportSize({ width: 375, height: 812 });
+  const project = await signIn(page);
+  await page.goto(`/#/p/${project}?node=x%3Apart%3Aapi`);
+  const machine = page.locator('[data-room-item="orders"], [data-narrow-id="orders"] button').first();
+  await machine.click();
+  const plate = page.getByRole("region", { name: "Commandes", exact: true });
+  await expect(plate).toBeVisible();
+  // Always the same slots, in the same order (V69).
+  const slots = await plate.locator("[data-slot] h3").allTextContents();
+  expect(slots.map((t) => t.toLowerCase())).toEqual(["fait", "reçoit", "rend", "réglages", "où", "vu dans"]);
+  await expect(plate.locator('[data-slot="Rend"] .text-fl-refus')).toHaveText("ou un refus si elle est vide");
+  // The check is the engine's: lines found in the file ✓, lines that are not there ?.
+  const settings = plate.locator('[data-slot="Réglages"] li');
+  await expect(settings.filter({ hasText: "validate(order)" })).toContainText("✓ vérifié");
+  await expect(settings.filter({ hasText: "save_to_disk(order)" })).toContainText("? hypothèse");
+  if (isMobile) {
+    // A bottom sheet: focus is in it, its close button on screen; closing gives the keyboard back to the machine.
+    const close = page.getByRole("button", { name: "Fermer la fiche" });
+    await expect(close).toBeFocused();
+    const box = await close.boundingBox();
+    expect(box && box.y >= 0 && box.y + box.height <= 812).toBe(true);
+    expect(await page.getByRole("dialog").evaluate((el) => el.scrollWidth <= el.clientWidth)).toBe(true);
+  }
+  // Échap closes the plate first: the room stays.
+  await page.keyboard.press("Escape");
+  await expect(plate).toHaveCount(0);
+  await expect(page).toHaveURL(/node=x%3Apart%3Aapi/);
+  if (isMobile) await expect(machine).toBeFocused();
+  // « Vu dans » plays the journey from that step.
+  await machine.click();
+  await page.getByRole("region", { name: "Commandes", exact: true }).getByRole("button", { name: /Passer une commande · étape 2/ }).click();
+  await expect(page).toHaveURL(/journey=order&step=2/);
+  // A cited file opens the code level at the lines, shown first.
+  await page.goto(`/#/p/${project}?node=x%3Apart%3Aapi&select=orders`);
+  await page.getByRole("region", { name: "Commandes", exact: true }).getByRole("button", { name: "api/app/orders.py l.8-10" }).click();
+  await expect(page).toHaveURL(/node=api%2Fapp%2Forders\.py.*select=line%3A8-10/);
+  await expect(page.getByLabel("Les lignes citées")).toContainText("def create_order");
+  // A line inside a class: the code goes down to the method, and one Back returns to the plate (review of #79).
+  await page.goto(`/#/p/${project}?node=x%3Apart%3Aapi&select=orders`);
+  await page.getByRole("region", { name: "Commandes", exact: true }).getByRole("button", { name: "api/app/limits.py:3" }).click();
+  await expect(page).toHaveURL(/node=api%2Fapp%2Flimits\.py%3A%3ALimits.*select=line%3A3/);
+  await expect(page.getByLabel("Les lignes citées")).toContainText("return len(order) < 100");
+  await page.goBack();
+  await expect(page.getByRole("region", { name: "Commandes", exact: true })).toBeVisible();
+});
+
+test("a room's plate opens its machines from the floor; the project's settings open from any settings card (#79)", async ({ page, isMobile }) => {
+  const project = await signIn(page);
+  await page.goto(`/#/p/${project}?select=api`);
+  await page.getByRole("region", { name: "API commandes", exact: true }).getByRole("button", { name: /^Commandes —/ }).click();
+  await expect(page).toHaveURL(/node=x%3Apart%3Aapi.*select=orders/);
+  await expect(page.getByRole("region", { name: "Commandes", exact: true })).toBeVisible();
+  await page.goto(`/#/p/${project}`);
+  await page.getByRole("button", { name: /Réglages du projet/ }).first().click();
+  const settings = page.getByRole("region", { name: "Réglages du projet" });
+  await expect(settings).toContainText("image: postgres:16");
+  await expect(settings).toContainText("lu par le code : non");
+  if (isMobile) {
+    // Closing the sheet gives the keyboard back to the card it was opened from.
+    await page.keyboard.press("Escape");
+    await expect(page.getByRole("button", { name: /Réglages du projet/ }).first()).toBeFocused();
+  }
+  if (!isMobile) {
+    await page.goto(`/#/p/${project}?node=x%3Apart%3Aapi`);
+    await page.getByRole("button", { name: /Réglages du projet/ }).click();
+    await expect(page.getByRole("region", { name: "Réglages du projet" })).toBeVisible();
+  }
 });
 
 test("old links open the parts with the path playing", async ({ page }) => {

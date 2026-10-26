@@ -6,7 +6,8 @@ import { LineMarkers, Line } from "./floorLines";
 import { placeFloor, type Rect } from "./floorLayout";
 import { FloorHeader } from "./FloorHeader";
 import { FloorPiece, type Look } from "./floorParts";
-import type { Box, Level } from "./levels";
+import { ProjectSettingsCard } from "./ProjectSettingsCard";
+import { PROJECT_SETTINGS, type Box, type Level } from "./levels";
 import type { Station } from "./stations";
 import { buildRoom } from "./room";
 import { enteredRoom, takeReturn } from "./roomMemory";
@@ -201,7 +202,13 @@ export function FloorCanvas({ model, floor, level, selected, play, onSelect, onE
             );
           })}
           {plan.rects.get("settings") && (
-            <ProjectSettings rect={plan.rects.get("settings")!} count={settings.length} files={[...new Set(settings.map((r) => r.fichier).filter(Boolean))] as string[]} />
+            <ProjectSettingsCard
+              model={model}
+              className="absolute"
+              style={(({ x, y, w, h }) => ({ left: x, top: y, width: w, height: h }))(plan.rects.get("settings")!)}
+              selected={selected === PROJECT_SETTINGS}
+              onOpen={() => onSelect(PROJECT_SETTINGS)}
+            />
           )}
         </div>
       </div>
@@ -218,18 +225,6 @@ function Band({ rect, title }: { rect: Rect; title: string }) {
   return (
     <div className="absolute rounded-xl border border-dashed border-line" style={{ left: rect.x, top: rect.y, width: rect.w, height: rect.h }}>
       <p className="px-3 pt-2 text-[12px] font-semibold tracking-wide text-faint uppercase">{title}</p>
-    </div>
-  );
-}
-
-/** The project's settings (V18, third card): where the config files are, opened from the panel later (#79). */
-function ProjectSettings({ rect, count, files }: { rect: Rect; count: number; files: string[] }) {
-  return (
-    <div className="absolute flex flex-col justify-center rounded-lg border border-dashed border-fl-code bg-panel px-2.5 py-1.5" style={{ left: rect.x, top: rect.y, width: rect.w, height: rect.h }}>
-      <span className="text-[14px] font-semibold text-ink">Réglages du projet</span>
-      <span className="line-clamp-2 text-[12px] text-muted" title={files.join(", ")}>
-        {count} réglage{count > 1 ? "s" : ""} · {files.join(", ")}
-      </span>
     </div>
   );
 }

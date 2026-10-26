@@ -8,6 +8,7 @@ import type { Box, Level } from "./levels";
 import type { Floor } from "./floor";
 import { mainJourney } from "./floor";
 import { buildRoom, stepRuns } from "./room";
+import { MachinePlateView, ProjectPlateView, RoomPlateView, type OpenCode } from "./Plate";
 import { stepGroups } from "./stations";
 
 interface Props {
@@ -19,11 +20,20 @@ interface Props {
   onEnter: (box: Box) => void;
   onPlay: (journeyId: string, step: number) => void;
   onStep: (step: number) => void;
+  onOpenMachine: (bloc: string, machine: string) => void;
+  onOpenCode: OpenCode;
+  oldMethod: boolean; // the model was written by a method before v1.7: its empty slots are not « nothing there »
+  projectSettings: boolean; // the floor's « Réglages du projet » card is selected
 }
 
 /** The fixed panel: what the selected box is, or the step being played, or where you are. */
-export function InfoPanel({ projectId, model, level, box, playing, onEnter, onPlay, onStep }: Props) {
-  if (box) return <BoxInfo projectId={projectId} model={model} box={box} onEnter={onEnter} onPlay={onPlay} />;
+export function InfoPanel({ projectId, model, level, box, playing, onEnter, onPlay, onStep, onOpenMachine, onOpenCode, oldMethod, projectSettings }: Props) {
+  // A selected machine or part opens its plate (#79): the same slots, in the same order, every time.
+  const enter = box && box.inside > 0 ? () => onEnter(box) : null;
+  if (box?.target.kind === "component") return <MachinePlateView model={model} id={box.target.id} oldMethod={oldMethod} onPlay={onPlay} onOpenCode={onOpenCode} onEnter={enter} />;
+  if (box?.target.kind === "block") return <RoomPlateView model={model} bloc={box.target.id} oldMethod={oldMethod} onPlay={onPlay} onOpenMachine={onOpenMachine} onEnter={enter} />;
+  if (box) return <FileInfo box={box} onEnter={onEnter} />;
+  if (projectSettings) return <ProjectPlateView model={model} onOpenCode={onOpenCode} />;
   // In a room, its own journey keeps the room's step cards, the step played framed in yellow (V53).
   if (playing && level.room && level.room.journey?.id === playing.journey.id)
     return <RoomInfo projectId={projectId} model={model} level={level} onPlay={onPlay} active={playing.step} />;
@@ -282,25 +292,25 @@ function Panel({ children }: { children: ReactNode }) {
   return <div className="px-6 pt-6 pb-10">{children}</div>;
 }
 
-function Journeys({ model, onPlay, only }: { model: ProjectModel; onPlay: (id: string, step: number) => void; only?: Map<string, number> }) {
-  const list = model.parcours.filter((j) => !only || only.has(j.id));
+function Journeys({ model, onPlay }: { model: ProjectModel; onPlay: (id: string, step: number) => void }) {
+  const list = model.parcours;
   if (list.length === 0) return null;
   return (
     <section className="mt-7">
-      <h3 className="text-[15px] font-semibold">{only ? "Les chemins qui passent par ici" : "Suivre un chemin de données"}</h3>
+      <h3 className="text-[15px] font-semibold">Suivre un chemin de données</h3>
       <ul className="mt-2 flex flex-col gap-2">
         {list.map((journey) => (
           <li key={journey.id}>
             <button
               type="button"
-              onClick={() => onPlay(journey.id, only?.get(journey.id) ?? 1)}
+              onClick={() => onPlay(journey.id, 1)}
               className="flex w-full items-start gap-3 rounded-xl border border-line bg-panel px-4 py-3 text-left hover:border-lamp-line"
             >
               <Play size={16} className="mt-1 shrink-0 text-lamp-ink" aria-hidden="true" />
               <span>
                 <span className="block text-[15px] font-semibold leading-snug">{journey.nom}</span>
                 <span className="block text-[13.5px] text-muted">
-                  {only ? `À partir de l'étape ${only.get(journey.id)}` : `${journey.depart || journey.declencheur}`}
+                  {journey.depart || journey.declencheur}
                 </span>
                 <span className="block text-[12.5px] text-faint">
                   {steps(journey.etapes.length)}
@@ -315,29 +325,8 @@ function Journeys({ model, onPlay, only }: { model: ProjectModel; onPlay: (id: s
   );
 }
 
-function BoxInfo({ projectId, model, box, onEnter, onPlay }: {
-  projectId: string; model: ProjectModel; box: Box; onEnter: (box: Box) => void; onPlay: (id: string, step: number) => void;
-}) {
-  const target = box.target;
-  const block = target.kind === "block" ? model.blocs.find((b) => b.id === target.id) : undefined;
-  const component = target.kind === "component" ? model.composants.find((c) => c.id === target.id) : undefined;
-  const ownComponent = (id: string) => model.composants.some((c) => c.id === id && c.bloc === block?.id);
-  // The journeys that go through this box, and their first step here.
-  const through = new Map<string, number>();
-  for (const journey of model.parcours)
-    journey.etapes.forEach((step, index) => {
-      const here = component
-        ? step.composant === component.id
-        : block !== undefined && (step.touche.includes(block.id) || (step.composant !== null && ownComponent(step.composant)));
-      if (here && !through.has(journey.id)) through.set(journey.id, index + 1);
-    });
-  const incoming = block ? model.flux.filter((f) => f.vers === block.id) : [];
-  const outgoing = block ? model.flux.filter((f) => f.de === block.id) : [];
-  const name = (id: string) => model.blocs.find((b) => b.id === id)?.nom ?? id;
-  const entre = block?.entre?.length ? block.entre : incoming.map((f) => `${name(f.de)} : ${f.quoi}`);
-  const sort = block?.sort?.length ? block.sort : outgoing.map((f) => `vers ${name(f.vers)} : ${f.quoi}`);
-  const files = component?.fichiers ?? block?.code.map((c) => c.chemin).filter(Boolean) ?? [];
-
+/** A file of a machine: what it is for, and the way into its code. */
+function FileInfo({ box, onEnter }: { box: Box; onEnter: (box: Box) => void }) {
   return (
     <Panel>
       <p className="text-[13px] font-semibold text-faint">{box.kind}</p>
@@ -349,42 +338,10 @@ function BoxInfo({ projectId, model, box, onEnter, onPlay }: {
           onClick={() => onEnter(box)}
           className="mt-4 flex items-center gap-1.5 rounded-lg bg-ink px-4 py-2 text-[15px] font-medium text-bg hover:opacity-90"
         >
-          Entrer dedans <ChevronRight size={16} aria-hidden="true" />
+          Voir le code <ChevronRight size={16} aria-hidden="true" />
         </button>
       )}
-      {entre.length > 0 && <List title="Ce qui entre" items={entre} />}
-      {sort.length > 0 && <List title="Ce qui sort" items={sort} />}
-      {through.size > 0 && <Journeys model={model} onPlay={onPlay} only={through} />}
-      {files.length > 0 && <Files title="Pour la modifier : ses fichiers" paths={files} />}
-      {(block || component) && (
-        <details className="mt-7 border-t border-line-soft pt-3 text-[14px]">
-          <summary className="cursor-pointer text-muted hover:text-ink">Détails pour développeur</summary>
-          <div className="mt-3 space-y-3 text-muted">
-            <p className="leading-relaxed">{block?.role ?? component?.role}</p>
-            {block?.techno && <p>Technologies : {block.techno}</p>}
-            {component?.expose.map((item, index) => (
-              <div key={index}>
-                {item.quoi}
-                <CitedCode projectId={projectId} cited={item} />
-              </div>
-            ))}
-          </div>
-        </details>
-      )}
     </Panel>
-  );
-}
-
-function List({ title, items }: { title: string; items: string[] }) {
-  return (
-    <section className="mt-6">
-      <h3 className="text-[15px] font-semibold">{title}</h3>
-      <ul className="mt-1.5 list-disc space-y-1 pl-5 text-[15px] leading-relaxed text-muted">
-        {items.map((item, index) => (
-          <li key={index}>{item}</li>
-        ))}
-      </ul>
-    </section>
   );
 }
 

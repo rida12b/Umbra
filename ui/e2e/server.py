@@ -26,6 +26,7 @@ FILES = {
         "def create_order(order):\n    validate(order)\n    return save(order)\n"
     ),
     "api/app/store.py": "def save(order):\n    return order\n",
+    "api/app/limits.py": "class Limits:\n    def check(self, order):\n        return len(order) < 100\n",
     "web/src/app.ts": "export function submit(order: string) {\n  return fetch('/orders', { body: order })\n}\n",
 }
 
@@ -47,7 +48,14 @@ MODEL = {
     "composants": [
         {"id": "orders", "nom": "Commandes", "bloc": "api", "role": "Crée les commandes.",
          "expose": [{"quoi": "create_order", "fichier": "api/app/orders.py", "lignes": [8, 10]}],
-         "fichiers": ["api/app/orders.py"]},
+         "fichiers": ["api/app/orders.py"],
+         "entre": ["la commande envoyée par le site"], "sort": ["la commande enregistrée", "ou un refus si elle est vide"],
+         "reglages": [{"nom": "Contrôle de la commande", "code": "validate(order)", "sorte": "branchement", "valeur": "validate",
+                       "effet": "Refuse une commande vide", "fichier": "api/app/orders.py", "lignes": [9, 9]},
+                      {"nom": "Rangement", "code": "save_to_disk(order)", "sorte": "branchement", "valeur": "disk",
+                       "effet": "Range la commande", "fichier": "api/app/orders.py", "lignes": [40, 41]},
+                      {"nom": "Taille maximale", "code": "return len(order) < 100", "sorte": "limite", "valeur": "100",
+                       "effet": "Refuse une commande trop longue", "fichier": "api/app/limits.py", "lignes": [3, 3]}]},
     ],
     "parcours": [
         {"id": "order", "nom": "Passer une commande", "declencheur": "Le client clique sur Commander.",
@@ -59,6 +67,8 @@ MODEL = {
          ],
          "resultat": "La commande est enregistrée."},
     ],
+    "reglages_projet": [{"nom": "Image de la base", "code": "image: postgres:16", "valeur": "postgres:16",
+                          "fichier": "compose.yml", "lignes": [6, 6], "lu_par_le_code": "non"}],
     "modules": {"api/app/orders.py": "Crée et valide les commandes.", "api/app/main.py": "Point d'entrée de l'API."},
     "dossiers": {"api/app": "Le code de l'API."},
     "incertitudes": [],

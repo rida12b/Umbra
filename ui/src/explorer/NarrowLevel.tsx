@@ -2,7 +2,8 @@ import { ChevronRight } from "lucide-react";
 import { useLayoutEffect, useRef } from "react";
 import type { ProjectModel } from "../api";
 import { lowerFirst } from "../arch/story";
-import type { Box, Level } from "./levels";
+import { PROJECT_SETTINGS, type Box, type Level } from "./levels";
+import { ProjectSettingsCard } from "./ProjectSettingsCard";
 import type { Play } from "./ExplorerCanvas";
 import { enteredRoom, rememberRoom, takeReturn } from "./roomMemory";
 
@@ -86,6 +87,9 @@ export function NarrowLevel({ model, level, selected, play, onSelect, onEnter: e
           </ul>
         </section>
       ))}
+      {level.floor && (
+        <ProjectSettingsCard model={model} className="w-full" selected={selected === PROJECT_SETTINGS} onOpen={() => onSelect(PROJECT_SETTINGS)} />
+      )}
     </div>
   );
 }
