@@ -24,16 +24,17 @@ interface Props {
   onOpenCode: OpenCode;
   oldMethod: boolean; // the model was written by a method before v1.7: its empty slots are not « nothing there »
   projectSettings: boolean; // the floor's « Réglages du projet » card is selected
+  row: string | null; // a search landed on this settings row (#80): lit on the plate
 }
 
 /** The fixed panel: what the selected box is, or the step being played, or where you are. */
-export function InfoPanel({ projectId, model, level, box, playing, onEnter, onPlay, onStep, onOpenMachine, onOpenCode, oldMethod, projectSettings }: Props) {
+export function InfoPanel({ projectId, model, level, box, playing, onEnter, onPlay, onStep, onOpenMachine, onOpenCode, oldMethod, projectSettings, row }: Props) {
   // A selected machine or part opens its plate (#79): the same slots, in the same order, every time.
   const enter = box && box.inside > 0 ? () => onEnter(box) : null;
-  if (box?.target.kind === "component") return <MachinePlateView model={model} id={box.target.id} oldMethod={oldMethod} onPlay={onPlay} onOpenCode={onOpenCode} onEnter={enter} />;
+  if (box?.target.kind === "component") return <MachinePlateView model={model} id={box.target.id} oldMethod={oldMethod} row={row} onPlay={onPlay} onOpenCode={onOpenCode} onEnter={enter} />;
   if (box?.target.kind === "block") return <RoomPlateView model={model} bloc={box.target.id} oldMethod={oldMethod} onPlay={onPlay} onOpenMachine={onOpenMachine} onEnter={enter} />;
   if (box) return <FileInfo box={box} onEnter={onEnter} />;
-  if (projectSettings) return <ProjectPlateView model={model} onOpenCode={onOpenCode} />;
+  if (projectSettings) return <ProjectPlateView model={model} row={row} onOpenCode={onOpenCode} />;
   // In a room, its own journey keeps the room's step cards, the step played framed in yellow (V53).
   if (playing && level.room && level.room.journey?.id === playing.journey.id)
     return <RoomInfo projectId={projectId} model={model} level={level} onPlay={onPlay} active={playing.step} />;

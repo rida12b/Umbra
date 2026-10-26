@@ -11,6 +11,7 @@ export interface Route {
   journey?: string | null; // on the architecture: the journey lit on the map, and its active step
   step?: number | null;
   select?: string | null; // on a map view: the element to select (from a search)
+  row?: string | null; // on a plate: the settings row a search landed on (its exact code), lit and in view
 }
 
 export const ARCHITECTURE_VIEW = "arch:"; // a Project opens on its architecture
@@ -37,6 +38,7 @@ export function parseRoute(hash: string): Route {
     journey: params.get("journey"),
     step: positive(params.get("step")),
     select: params.get("select"),
+    row: params.get("row"),
   };
 }
 
@@ -63,6 +65,7 @@ export function routeHash(route: Route): string {
   if (route.journey) params.set("journey", route.journey);
   if (route.step) params.set("step", String(route.step));
   if (route.select) params.set("select", route.select);
+  if (route.row) params.set("row", route.row);
   const query = params.toString();
   return `#/p/${encodeURIComponent(route.projectId)}${query ? `?${query}` : ""}`;
 }

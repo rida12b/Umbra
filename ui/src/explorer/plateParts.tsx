@@ -1,5 +1,5 @@
 import { ChevronRight } from "lucide-react";
-import { useId, type ReactNode } from "react";
+import { useId, useLayoutEffect, useRef, type ReactNode } from "react";
 import type { Cited } from "../api";
 import type { Item, Seen } from "./plateData";
 
@@ -48,9 +48,20 @@ export function Fait({ fait, detail }: { fait: string; detail: string }) {
 }
 
 /** V73: the setting's name and file:line, the exact code, then what the row adds, then the check. */
-export function SettingRow({ nom, code, cited, onOpenCode, children }: { nom: string; code: string; cited: Cited; onOpenCode: OpenCode; children: ReactNode }) {
+export function SettingRow({ nom, code, cited, onOpenCode, children, lit = false }: {
+  nom: string; code: string; cited: Cited; onOpenCode: OpenCode; children: ReactNode; lit?: boolean;
+}) {
+  // A search landed here (#80): the row is framed in yellow and brought into view.
+  const here = useRef<HTMLLIElement>(null);
+  useLayoutEffect(() => {
+    if (lit) here.current?.scrollIntoView({ block: "center" });
+  }, [lit]);
   return (
-    <li className="flex min-w-0 flex-col gap-1 border-t border-line-soft py-2 first:border-t-0 first:pt-0">
+    <li
+      ref={here}
+      aria-current={lit ? "true" : undefined}
+      className={`flex min-w-0 flex-col gap-1 border-t border-line-soft py-2 first:border-t-0 first:pt-0 ${lit ? "-mx-2 rounded-lg px-2 ring-2 ring-fl-hl" : ""}`}
+    >
       <span className="flex items-baseline justify-between gap-3">
         <span className="text-[14px] text-ink">{nom}</span>
         <CodeLink cited={cited} onOpenCode={onOpenCode} short />

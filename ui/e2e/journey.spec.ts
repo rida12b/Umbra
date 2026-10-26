@@ -278,9 +278,31 @@ test("search jumps to a function and selects it", async ({ page }) => {
   await expect(page.getByRole("navigation", { name: "Où vous êtes" })).toBeVisible(); // the shortcut exists once the page is up
   await page.keyboard.press("Control+k");
   await page.getByRole("combobox", { name: "Chercher dans le projet" }).fill("validate");
-  await page.getByRole("option", { name: /validate/ }).first().click();
+  await page.getByRole("group", { name: /Dans le code/ }).getByRole("option", { name: /validate/ }).first().click();
   await expect(page).toHaveURL(/select=api%2Fapp%2Forders\.py%3A%3Avalidate/);
   await expect(page.getByLabel("Explication et preuves")).toContainText("validate");
+});
+
+test("search with the reader's words: Ctrl K, type, Enter lands on the plate with the setting row lit (#80)", async ({ page, isMobile }) => {
+  const project = await signIn(page);
+  await page.goto(`/#/p/${project}`);
+  await expect(page.getByRole("navigation", { name: "Où vous êtes" })).toBeVisible();
+  await page.keyboard.press("Control+k");
+  // Accents and capitals do not count: « CONTROLE » finds « Contrôle de la commande ».
+  await page.getByRole("combobox", { name: "Chercher dans le projet" }).fill("CONTROLE commande");
+  await expect(page.getByRole("group", { name: "Réglages" })).toContainText("API commandes › Commandes › Réglage");
+  await page.keyboard.press("Enter");
+  await expect(page).toHaveURL(/node=x%3Apart%3Aapi.*select=orders.*row=validate/);
+  const row = page.getByRole("region", { name: "Commandes", exact: true }).locator('[data-slot="Réglages"] li[aria-current="true"]');
+  await expect(row).toContainText("validate(order)");
+  await expect(row).toBeInViewport();
+  // The project's settings, by a word of their value.
+  await page.keyboard.press("Escape");
+  await page.keyboard.press("Control+k");
+  await page.getByRole("combobox", { name: "Chercher dans le projet" }).fill("postgres");
+  await page.getByRole("option", { name: /Image de la base/ }).click();
+  await expect(page.getByRole("region", { name: "Réglages du projet" }).locator('li[aria-current="true"]')).toContainText("lu par le code : non");
+  if (isMobile) await expect(page.getByRole("dialog", { name: "Fiche" })).toBeVisible();
 });
 
 test("a person cannot be entered; a link to a part without machines says so and leads back", async ({ page, isMobile }) => {

@@ -1,13 +1,16 @@
 import { Command } from "cmdk";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { api, type ProjectModel, type SearchHit } from "../api";
 import { KIND_LABEL } from "../map/ElementNode";
-import { levelNode } from "../explorer/Explorer";
-import { ARCHITECTURE_VIEW, navigate } from "../route";
-import { steps } from "../ui";
+import { DEFAULT_LEVEL, levelNode } from "../explorer/Explorer";
+import { PROJECT_SETTINGS } from "../explorer/levels";
+import { enterable } from "../explorer/room";
+import { buildIndex, searchIndex, type Target } from "../explorer/searchIndex";
+import { followedRoom, journeyStations } from "../explorer/stations";
+import { navigate, type Route } from "../route";
 
 const WAIT_MS = 200;
-const MAX_LOCAL = 6;
+const PER_GROUP = 8; // more than this in a group: « +N » (#80)
 
 interface Props {
   projectId: string;
@@ -16,15 +19,34 @@ interface Props {
   onOpenChange: (open: boolean) => void;
 }
 
-/** Accents and case do not count: "etude" finds "Étude". */
-function plain(text: string): string {
-  return text.normalize("NFD").replace(/\p{Diacritic}/gu, "").toLowerCase();
+/** Where a result lands (#80): the room with the machine's plate open and the row lit, the journey at its step, the code. */
+function landing(model: ProjectModel, target: Target): Omit<Route, "projectId"> {
+  const floor = { node: levelNode(DEFAULT_LEVEL), expand: false, journey: null, step: null, select: null, row: null };
+  switch (target.kind) {
+    case "machine":
+      return { ...floor, node: levelNode(`part:${target.bloc}`), select: target.machine, row: target.row };
+    case "room":
+      return { ...floor, select: target.bloc };
+    case "projet":
+      return { ...floor, select: PROJECT_SETTINGS, row: target.row };
+    case "etape": {
+      const journey = model.parcours.find((j) => j.id === target.journey);
+      const room = journey ? followedRoom(journeyStations(model, journey)[target.step - 1], enterable(model)) : null;
+      return { ...floor, node: room ? levelNode(`part:${room}`) : floor.node, journey: target.journey, step: target.step };
+    }
+    case "code":
+      return { ...floor, node: target.path, select: target.lines ? `line:${target.lines[0]}-${target.lines[1]}` : null };
+    case "usine":
+      return floor;
+  }
 }
 
-/** Ctrl K: jump to a journey, a block of the architecture, or any file or function of the code. */
+/** Ctrl K: anything the study names, in the reader's own words, then any file or function of the code. */
 export function CommandPalette({ projectId, model, open, onOpenChange }: Props) {
   const [query, setQuery] = useState("");
   const [hits, setHits] = useState<SearchHit[]>([]);
+  const index = useMemo(() => (model ? buildIndex(model) : []), [model]);
+  const groups = useMemo(() => searchIndex(index, query), [index, query]);
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
@@ -50,27 +72,13 @@ export function CommandPalette({ projectId, model, open, onOpenChange }: Props) 
     };
   }, [projectId, query]);
 
-  const wanted = plain(query.trim());
-  const matches = (text: string) => wanted === "" || plain(text).includes(wanted);
-  // A path is found by its name, by the words of its steps (opened at that step) or of its other cases.
-  const journeys = (model?.parcours ?? [])
-    .flatMap((journey) => {
-      const step = journey.etapes.findIndex((s) => matches(`${s.action ?? ""} ${s.simple ?? ""} ${s.texte}`));
-      const other = (journey.branches ?? []).some((b) => matches(`${b.quand} ${b.alors}`));
-      if (matches(journey.nom)) return [{ journey, step: 1, why: "" }];
-      if (step >= 0) return [{ journey, step: step + 1, why: `étape ${step + 1}` }];
-      return other ? [{ journey, step: 1, why: "cas particulier" }] : [];
-    })
-    .slice(0, MAX_LOCAL);
-  const blocks = (model?.blocs ?? []).filter((b) => matches(`${b.nom} ${b.en_bref ?? ""} ${b.role}`)).slice(0, MAX_LOCAL);
-
-  const go = (target: Parameters<typeof navigate>[0]) => {
+  const go = (target: Omit<Route, "projectId">) => {
     onOpenChange(false);
     setQuery("");
-    navigate(target);
+    navigate({ projectId, ...target });
   };
   const group = "[&_[cmdk-group-heading]]:px-3 [&_[cmdk-group-heading]]:py-1.5 [&_[cmdk-group-heading]]:text-[12px] [&_[cmdk-group-heading]]:text-faint";
-  const item = "flex cursor-pointer items-center gap-3 rounded-md px-3 py-2 text-[13.5px] data-[selected=true]:bg-raised";
+  const item = "flex cursor-pointer flex-col gap-0.5 rounded-md px-3 py-2 text-[13.5px] data-[selected=true]:bg-raised";
 
   return (
     <Command.Dialog
@@ -80,55 +88,41 @@ export function CommandPalette({ projectId, model, open, onOpenChange }: Props) 
       shouldFilter={false}
       loop
       overlayClassName="fixed inset-0 z-40 bg-black/40"
-      contentClassName="fixed top-[12vh] left-1/2 z-50 w-[min(640px,calc(100vw-32px))] -translate-x-1/2 overflow-hidden rounded-xl border border-line bg-panel shadow-[0_24px_60px_rgba(0,0,0,0.35)]"
+      contentClassName="fixed top-[12vh] left-1/2 z-50 w-[min(680px,calc(100vw-32px))] -translate-x-1/2 overflow-hidden rounded-xl border border-line bg-panel shadow-[0_24px_60px_rgba(0,0,0,0.35)]"
     >
       <Command.Input
         value={query}
         onValueChange={setQuery}
-        placeholder="Un chemin, une pièce, un fichier, un mot (« erreur », « limite »)…"
+        placeholder="Vos mots : « nom du client », « port », « je veux changer »…"
         className="w-full border-b border-line-soft bg-transparent px-4 py-3.5 text-[15px] text-ink outline-none placeholder:text-faint"
       />
-      <Command.List className="max-h-[min(420px,60vh)] overflow-y-auto p-2">
+      <Command.List className="max-h-[min(480px,64vh)] overflow-y-auto p-2">
         <Command.Empty className="px-3 py-6 text-center text-[13px] text-muted">
-          {wanted.length < 2 ? "Tapez au moins deux lettres pour chercher dans le code." : "Rien trouvé sous ce nom."}
+          {query.trim().length < 2 ? "Tapez au moins deux lettres : un nom, un mot de l'interface, un mot du code." : "Rien trouvé avec ces mots."}
         </Command.Empty>
-        {journeys.length > 0 && (
-          <Command.Group heading="Chemins de données" className={group}>
-            {journeys.map(({ journey, step, why }) => (
-              <Command.Item
-                key={journey.id}
-                value={`parcours:${journey.id}`}
-                className={item}
-                onSelect={() => go({ projectId, node: ARCHITECTURE_VIEW, expand: false, journey: journey.id, step })}
-              >
-                <span className="flex-1 truncate">{journey.nom}</span>
-                <span className="text-[12px] text-faint">{why || steps(journey.etapes.length)}</span>
-              </Command.Item>
-            ))}
-          </Command.Group>
-        )}
-        {blocks.length > 0 && (
-          <Command.Group heading="Pièces du projet" className={group}>
-            {blocks.map((block) => (
-              <Command.Item
-                key={block.id}
-                value={`bloc:${block.id}`}
-                className={item}
-                onSelect={() => go({ projectId, node: levelNode(`part:${block.id}`), expand: false })} // inside the part: found even when grouped
-              >
-                <span className="flex-1 truncate">{block.nom}</span>
-              </Command.Item>
-            ))}
-          </Command.Group>
-        )}
+        {model &&
+          groups.map((g) => (
+            <Command.Group key={g.kind} heading={g.results.length > PER_GROUP ? `${g.title} (+${g.results.length - PER_GROUP})` : g.title} className={group}>
+              {g.results.slice(0, PER_GROUP).map((r) => (
+                <Command.Item key={r.key} value={r.key} className={item} onSelect={() => go(landing(model, r.target))}>
+                  <span className="flex min-w-0 items-baseline gap-2">
+                    <span className="line-clamp-2 text-ink">{r.label}</span>
+                    {r.note && <span className="shrink-0 text-[12px] text-lamp-ink">{r.note}</span>}
+                  </span>
+                  {r.detail && <span className={`truncate text-[12px] text-muted ${g.kind === "reglage" || g.kind === "changer" || g.kind === "code" ? "font-mono" : ""}`}>{r.detail}</span>}
+                  <span className="truncate text-[11.5px] text-faint">{r.address}</span>
+                </Command.Item>
+              ))}
+            </Command.Group>
+          ))}
         {hits.length > 0 && (
-          <Command.Group heading="Code" className={group}>
+          <Command.Group heading="Dans le code (noms exacts)" className={group}>
             {hits.map((hit) => (
               <Command.Item
                 key={hit.key}
                 value={`code:${hit.key}`}
-                className={item}
-                onSelect={() => go({ projectId, node: hit.level, expand: true, select: hit.key })}
+                className="flex cursor-pointer items-center gap-3 rounded-md px-3 py-2 text-[13.5px] data-[selected=true]:bg-raised"
+                onSelect={() => go({ node: hit.level, expand: true, select: hit.key, journey: null, step: null, row: null })}
               >
                 <span className="w-20 shrink-0 text-[12px] text-faint">{KIND_LABEL[hit.kind]}</span>
                 <span className="truncate">{hit.label}</span>

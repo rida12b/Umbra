@@ -11,8 +11,8 @@ export type { OpenCode } from "./plateParts";
 const empty = (oldMethod: boolean, found: string) =>
   oldMethod ? "pas encore dans le modèle — relancer l'étude (nouvelle méthode)" : found;
 
-export function MachinePlateView({ model, id, oldMethod, onPlay, onOpenCode, onEnter }: {
-  model: ProjectModel; id: string; oldMethod: boolean; onPlay: Play; onOpenCode: OpenCode; onEnter: (() => void) | null;
+export function MachinePlateView({ model, id, oldMethod, row, onPlay, onOpenCode, onEnter }: {
+  model: ProjectModel; id: string; oldMethod: boolean; row: string | null; onPlay: Play; onOpenCode: OpenCode; onEnter: (() => void) | null;
 }) {
   const plate = machinePlate(model, id);
   if (!plate) return null;
@@ -38,7 +38,7 @@ export function MachinePlateView({ model, id, oldMethod, onPlay, onOpenCode, onE
         {plate.reglages ? (
           <ul className="flex flex-col">
             {plate.reglages.map((r, i) => (
-              <SettingRow key={i} nom={r.nom} code={r.code} cited={r} onOpenCode={onOpenCode}>
+              <SettingRow key={i} nom={r.nom} code={r.code} cited={r} onOpenCode={onOpenCode} lit={r.code === row}>
                 {r.effet && <span className="text-[12.5px] leading-snug text-muted">{r.effet}</span>}
               </SettingRow>
             ))}
@@ -121,7 +121,7 @@ export function RoomPlateView({ model, bloc, oldMethod, onPlay, onOpenMachine, o
 }
 
 /** The project's own settings (V18's card): which file, which value, and whether any code reads it. */
-export function ProjectPlateView({ model, onOpenCode }: { model: ProjectModel; onOpenCode: OpenCode }) {
+export function ProjectPlateView({ model, row, onOpenCode }: { model: ProjectModel; row: string | null; onOpenCode: OpenCode }) {
   const rows = projectPlate(model);
   return (
     <PlateFrame path="L'usine › Réglages du projet" title="Réglages du projet" onEnter={null}>
@@ -129,7 +129,7 @@ export function ProjectPlateView({ model, onOpenCode }: { model: ProjectModel; o
         {rows.length > 0 ? (
           <ul className="flex flex-col">
             {rows.map((r, i) => (
-              <SettingRow key={i} nom={r.nom} code={r.code} cited={r} onOpenCode={onOpenCode}>
+              <SettingRow key={i} nom={r.nom} code={r.code} cited={r} onOpenCode={onOpenCode} lit={r.code === row}>
                 {r.notRead && <span className="text-[12.5px] text-lamp-ink">lu par le code : non — changer cette valeur ne change rien pour l'instant</span>}
               </SettingRow>
             ))}
