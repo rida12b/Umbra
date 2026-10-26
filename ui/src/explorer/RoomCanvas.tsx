@@ -278,10 +278,10 @@ export function RoomCanvas({ model, room, enterable, selected, play, onSelect, o
 /** A path from one card to another over the top of both: up, across, down onto the second. */
 function hopBetween(a: Rect | undefined, b: Rect | undefined): Point[] | null {
   if (!a || !b) return null;
-  const y = Math.min(a.y, b.y) - 14;
+  const y = Math.min(a.y, b.y) - 7; // under the « câblage » chips, which sit higher in the gap
   const xa = a.x + a.w * (a.x + a.w / 2 === b.x + b.w / 2 ? 0.3 : 0.5); // one above the other: two separate legs
   const xb = b.x + b.w * (a.x + a.w / 2 === b.x + b.w / 2 ? 0.7 : 0.5);
-  return [{ x: xa, y: a.y }, { x: xa, y }, { x: xb, y }, { x: xb, y: b.y }];
+  return [{ x: xa, y: a.y }, { x: xa, y }, { x: xb, y }, { x: xb, y: b.y - 1 }]; // the tip stays above the card
 }
 
 /** The answer's words under the room (V38): its step, who it answers, and what it holds. */

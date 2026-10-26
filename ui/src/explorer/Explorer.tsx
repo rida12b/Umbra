@@ -16,7 +16,6 @@ import { InfoPanel } from "./InfoPanel";
 import { buildLevel, levelOf, trail, type Box, type Level, type LevelKey } from "./levels";
 import { NarrowLevel } from "./NarrowLevel";
 import { PlayerBar } from "./PlayerBar";
-import { buildFloor } from "./floor";
 import { followedRoom, groupOf, journeyStations, stepGroups, type Station } from "./stations";
 import { trackJourney } from "./track";
 
@@ -113,8 +112,6 @@ export function Explorer({ project, route, theme, narrow }: Props) {
 
   // A step that changes room first shows the floor, the belt lit from the old room to the new one, then the room opens.
   const [transit, setTransit] = useState<number | null>(null); // the step whose move is shown on the floor
-  // Only a move the floor draws a line for: a floor with nothing lit between the two rooms would show no movement.
-  const floorLines = useMemo(() => (model ? (({ beltLinks, links }) => [...beltLinks, ...links])(buildFloor(model)) : []), [model]);
   const shown = useRef<{ journey: string; station: Station } | null>(null);
   useLayoutEffect(() => {
     const station = stations?.[stepNumber - 1];
@@ -122,7 +119,7 @@ export function Explorer({ project, route, theme, narrow }: Props) {
     shown.current = journey && station ? { journey: journey.id, station } : null;
     if (!journey || !station || before?.journey !== journey.id || STILL || narrow) return;
     const [a, b] = [before.station.room, station.room];
-    const moved = a && b && a !== b && levelKey === `part:${b}` && floorLines.some((l) => (l.from === a && l.to === b) || (l.from === b && l.to === a));
+    const moved = a && b && a !== b && levelKey === `part:${b}`;
     if (!moved) return;
     setTransit(stepNumber);
     const timer = window.setTimeout(() => setTransit(null), TRANSIT_MS);
@@ -130,7 +127,7 @@ export function Explorer({ project, route, theme, narrow }: Props) {
       window.clearTimeout(timer);
       setTransit(null);
     };
-  }, [journey, stations, stepNumber, levelKey, narrow, floorLines]);
+  }, [journey, stations, stepNumber, levelKey, narrow]);
   const floorLevel = useMemo(() => (model && transit !== null ? buildLevel(model, DEFAULT_LEVEL, project.name) : null), [model, transit, project.name]);
   const transitPlay = useMemo(
     () => (model && journey && stations && floorLevel && transit !== null ? playOn(journey, stations, floorLevel, transit) : null),
@@ -229,7 +226,7 @@ export function Explorer({ project, route, theme, narrow }: Props) {
         <section className="flex min-h-0 flex-col" aria-label={`Carte : ${transitPlay && floorLevel ? floorLevel.title : level.title}`}>
           <div className="map-surface relative min-h-0 flex-1">
             {floorLevel?.floor && transitPlay ? (
-              <FloorCanvas model={model} floor={floorLevel.floor} level={floorLevel} selected={null} play={transitPlay} onSelect={select} onEnter={enter} transit={TRANSIT_MS - 150} />
+              <FloorCanvas model={model} floor={floorLevel.floor} level={floorLevel} selected={null} play={transitPlay} onSelect={select} onEnter={enter} transit={TRANSIT_MS - 150} onNothingLit={() => setTransit(null)} />
             ) : level.floor ? (
               <FloorCanvas model={model} floor={level.floor} level={level} selected={route.select ?? null} play={playState} onSelect={select} onEnter={enter} />
             ) : level.room ? (

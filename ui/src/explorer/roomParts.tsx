@@ -30,9 +30,10 @@ export function MachineCard({ machine, rect, look, selected, onSelect, numbers =
       style={at(rect)}
     >
       {pill && <span className="fl-pill" title={pill}>{pill}</span>}
-      {/* Played or not, the same layout (V50): the first number in its circle, the others on « aussi à l'étape »; the step played is filled. */}
+      {/* Played or not, the same card (V47, V50): the first number in its circle, the others on « aussi à l'étape »;
+          the step played is underlined when it is one of those, the yellow edge says the rest. */}
       <span className="flex items-start gap-1.5">
-        {first !== undefined && <span className={`fl-num mt-0.5 ${first === current ? "on" : ""}`}>{first}</span>}
+        {first !== undefined && <span className="fl-num mt-0.5">{first}</span>}
         <span className="line-clamp-3 text-[14px] leading-tight font-bold text-ink">{machine.nom}</span>
       </span>
       <span className="mt-1 line-clamp-2 text-[12.5px] leading-snug text-muted">{machine.words}</span>
@@ -42,7 +43,7 @@ export function MachineCard({ machine, rect, look, selected, onSelect, numbers =
           {again.map((n, i) => (
             <span key={n}>
               {i > 0 && ", "}
-              <span className={n === current ? "fl-num on" : ""}>{n}</span>
+              <span className={n === current ? "font-bold text-fl-hl underline underline-offset-2" : ""}>{n}</span>
             </span>
           ))}
         </span>

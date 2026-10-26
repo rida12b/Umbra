@@ -22,10 +22,11 @@ interface Props {
   onSelect: (id: string | null) => void;
   onEnter: (box: Box) => void;
   transit?: number; // shown for this long while the data changes room: the particle makes one run and arrives
+  onNothingLit?: () => void; // the floor draws no line between the two rooms: a still floor would show no move
 }
 
 /** The first screen of a project: the factory floor, read top-left to bottom-right, scrolled down only. */
-export function FloorCanvas({ model, floor, level, selected, play, onSelect, onEnter, transit }: Props) {
+export function FloorCanvas({ model, floor, level, selected, play, onSelect, onEnter, transit, onNothingLit }: Props) {
   const screen = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(1000);
   useLayoutEffect(() => {
@@ -83,6 +84,11 @@ export function FloorCanvas({ model, floor, level, selected, play, onSelect, onE
   const lit = (from: string, to: string) => !!was && !!now && was !== now && ((from === was && to === now) || (from === now && to === was));
   const back = (from: string) => from === now; // drawn the other way: the particle runs backwards
   const byHand = play && !play.station.room && !play.station.person ? play.station : null;
+  // Decided on what is really drawn (a link the layout could not route is not drawn), before the floor is painted.
+  const anyLit = [...plan.belt, ...plan.routes].some(({ link }) => lit(link.from, link.to));
+  useLayoutEffect(() => {
+    if (transit && !anyLit) onNothingLit?.();
+  }, [transit, anyLit, onNothingLit]);
 
   return (
     <div ref={screen} className="absolute inset-0 overflow-x-hidden overflow-y-auto" onClick={() => onSelect(null)}>

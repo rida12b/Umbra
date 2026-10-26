@@ -437,9 +437,9 @@ function StepInfo({ projectId, model, journey, number, onStep }: {
                     type="button"
                     onClick={() => onStep(n)}
                     aria-current={on ? "step" : undefined}
-                    className={`flex w-full items-center gap-3 rounded-lg px-2.5 py-1.5 text-left text-[15px] ${on ? "bg-lamp-soft font-semibold ring-2 ring-fl-hl" : "text-muted hover:bg-raised"}`}
+                    className={`flex w-full items-center gap-3 rounded-lg px-2.5 py-1.5 text-left text-[15px] ${on ? "bg-lamp-soft font-semibold ring-2 ring-fl-hl" : "font-semibold text-ink hover:bg-raised"}`}
                   >
-                    <span className={`flex size-6 shrink-0 items-center justify-center rounded-full text-[12.5px] font-bold ${on ? "bg-lamp text-on-lamp" : "border border-line"}`}>{n}</span>
+                    <span className={`flex size-6 shrink-0 items-center justify-center rounded-full text-[12.5px] font-bold ${on ? "bg-lamp text-on-lamp" : "border-[1.5px] border-fl-data text-fl-data"}`}>{n}</span>
                     <span className="min-w-0">
                       {stepLabel(step)}
                       {machineOf(step.composant) && <span className="block text-[12.5px] font-normal text-faint">{machineOf(step.composant)}</span>}

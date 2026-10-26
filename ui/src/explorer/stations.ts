@@ -110,7 +110,7 @@ export function stepGroups(model: ProjectModel, journey: Journey): StepGroup[] |
   return groups;
 }
 
-/** Room runs of one step are folded into the group before them (« Dans « A » puis « B » »): a 16-step journey
+/** Room runs of one step are folded into the group before them (« « A » → « B » »): a 16-step journey
  * reads as a few chunks, not as its step list again. */
 function merged(runs: StepGroup[]): StepGroup[] {
   const groups: (StepGroup & { rooms: string[] })[] = [];
@@ -120,7 +120,7 @@ function merged(runs: StepGroup[]): StepGroup[] {
     if (before && run.from === run.to && !run.title.startsWith("Retour")) {
       before.to = run.to;
       if (!before.rooms.includes(room)) before.rooms.push(room);
-      before.title = `Dans ${before.rooms.slice(0, 3).join(" puis ")}${before.rooms.length > 3 ? "…" : ""}`;
+      before.title = `${before.rooms.slice(0, 3).join(" → ")}${before.rooms.length > 3 ? " → …" : ""}`;
     } else groups.push({ ...run, rooms: [room] });
   }
   return groups.map(({ title, from, to }) => ({ title, from, to }));

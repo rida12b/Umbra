@@ -36,7 +36,7 @@ export function PlayerBar({ journey, step, station, group, onStep, onStop, onOpe
   if (!current) return null;
   const lines = current.lignes ? ` l.${current.lignes[0]}-${current.lignes[1]}` : "";
   return (
-    <section className="border-t-2 border-lamp-line bg-panel px-5 py-3 max-sm:px-3" aria-label="Chemin de données en lecture">
+    <section className="border-t-2 border-lamp-line bg-panel px-5 py-2 max-sm:px-3" aria-label="Chemin de données en lecture">
       <div className="flex items-center gap-4 max-sm:gap-2">
         {/* As in mockup A (V65): three square buttons, then the step in words. */}
         <div className="flex shrink-0 gap-1.5">
@@ -51,16 +51,18 @@ export function PlayerBar({ journey, step, station, group, onStep, onStop, onOpe
           </Square>
         </div>
         <div className="min-w-0 flex-1">
-          <p className="truncate text-[13px] text-faint">
-            {journey.nom} · étape {step} sur {last}
+          {/* Where the step sits first (step, then its group), the journey's name last: the panel already says it. */}
+          <p className="text-[13px] text-faint sm:truncate">
+            étape {step} sur {last}
             {group && (
               <>
-                {" "}· <span className="text-muted">{group.title}</span> · {stepsWord(group)}
+                {" "}· <span className="text-muted">{group.title}</span> ({stepsWord(group)})
               </>
             )}
+            <span className="max-sm:hidden"> · {journey.nom}</span>
           </p>
-          <p className="text-[18px] leading-snug max-sm:text-[15px]">
-            <span className="mr-2 inline-flex size-7 items-center justify-center rounded-full bg-lamp text-[14px] font-bold text-on-lamp">{step}</span>
+          <p className="line-clamp-2 text-[16px] leading-snug max-sm:text-[15px]">
+            <span className="mr-2 inline-flex size-6 items-center justify-center rounded-full bg-lamp text-[13px] font-bold text-on-lamp">{step}</span>
             <b>{stepLabel(current)}</b>
             <span className="text-muted"> — {current.simple || current.texte}</span>
           </p>
