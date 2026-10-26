@@ -1,11 +1,20 @@
 import { createContext, useContext, useEffect, useState } from "react";
-import { api, type Journey, type ModelState, type ProjectModel } from "./api";
+import { api, ApiError, type Journey, type ModelState, type ProjectModel } from "./api";
 import { useLive } from "./live";
 
 const POLL_MS = 4000;
 
-/** The model as the page sees it: `unreachable` when the engine itself did not answer (not a study failure). */
-export type PageModelState = ModelState & { unreachable?: boolean };
+/** Why the page has no model, when the engine said no (not a failed study, which comes back as state « error »). */
+export type Failure = "unreachable" | "read" | "other";
+/** The model as the page sees it; `retry` asks again after a failure. */
+export type PageModelState = ModelState & { failure?: Failure; retry?: () => void };
+
+const failureOf = (error: Error): Failure =>
+  error instanceof ApiError && error.status === 0
+    ? "unreachable"
+    : error.message.startsWith("reading the project failed")
+      ? "read"
+      : "other";
 
 export const ModelContext = createContext<PageModelState | null>(null);
 export const useModel = () => useContext(ModelContext);
@@ -16,30 +25,40 @@ export const useModel = () => useContext(ModelContext);
  */
 export function useProjectModel(projectId: string | null): PageModelState | null {
   const [state, setState] = useState<PageModelState | null>(null);
+  const [attempt, setAttempt] = useState(0);
   const { revision } = useLive();
 
   useEffect(() => {
     if (!projectId) return;
     let current = true;
     let timer: number | undefined;
-    // Umbra could not answer at all: not a failed study, so the page does not blame Claude Code.
-    const unreachable = (error: Error) =>
-      current && setState({ state: "error", model: null, created_at: null, changed: [], message: error.message, unreachable: true });
+    // The engine said no (or did not answer): not a failed study, so the page does not blame Claude Code.
+    const failed = (error: Error) =>
+      current &&
+      setState({
+        state: "error",
+        model: null,
+        created_at: null,
+        changed: [],
+        message: error.message,
+        failure: failureOf(error),
+        retry: () => setAttempt((n) => n + 1),
+      });
     const ask = () => api.model(projectId).then((found) => (found.state === "missing" || found.state === "stale" ? api.study(projectId) : found));
     const follow = (found: ModelState) => {
       if (!current) return;
       setState(found);
       // Still reading the project, or studying it: ask again; once read, a missing model starts its study.
       if (found.state === "indexing" || found.state === "queued" || found.state === "working") {
-        timer = window.setTimeout(() => ask().then(follow, unreachable), POLL_MS);
+        timer = window.setTimeout(() => ask().then(follow, failed), POLL_MS);
       }
     };
-    ask().then(follow, unreachable);
+    ask().then(follow, failed);
     return () => {
       current = false;
       window.clearTimeout(timer);
     };
-  }, [projectId, revision]);
+  }, [projectId, revision, attempt]);
 
   useEffect(() => setState(null), [projectId]);
   return state;

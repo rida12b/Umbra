@@ -125,6 +125,21 @@ test("a project added while the engine runs opens on its factory floor, never on
   await expect(page.getByText("a échoué")).toHaveCount(0);
 });
 
+test("a failed read says so, offers « Réessayer », and the retry opens the project (review of #85)", async ({ page }) => {
+  const project = await signIn(page);
+  const model = `**/v1/projects/${project}/model`;
+  await page.route(model, (route) =>
+    route.fulfill({ status: 500, contentType: "application/json", body: JSON.stringify({ detail: "reading the project failed: OSError: file locked" }) }),
+  );
+  await page.goto(`/#/p/${project}`);
+  await expect(page.getByRole("heading", { name: "Umbra n'a pas pu lire le projet" })).toBeVisible();
+  await expect(page.getByText("file locked")).toBeVisible();
+  await expect(page.getByText(/Claude Code est connecté|moteur Umbra tourne/)).toHaveCount(0); // neither wrong culprit
+  await page.unroute(model); // the cause went away
+  await page.getByRole("button", { name: "Réessayer" }).click();
+  await expect(page.getByRole("navigation", { name: "Où vous êtes" })).toContainText("L'usine");
+});
+
 test("old links open the parts with the path playing", async ({ page }) => {
   const project = await signIn(page);
   await page.goto(`/#/p/${project}?node=parcours%3A&journey=order&step=abc`);

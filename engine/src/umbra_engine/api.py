@@ -2,6 +2,7 @@
 
 import secrets
 import threading
+import time
 from collections.abc import AsyncIterator, Callable
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -80,8 +81,10 @@ def create_app(
             threading.Thread(target=pump_journal, name="umbra-journal", daemon=True).start()
         yield
         journal_stop.set()
-        for reader in list(readers):  # let a project being read finish before the registry closes
-            reader.join(timeout=READ_JOIN_S)
+        # Let a read in progress finish before the registry closes: one budget for all of them, not one each.
+        deadline = time.monotonic() + READ_JOIN_S
+        for reader in list(readers):
+            reader.join(timeout=max(0.0, deadline - time.monotonic()))
         for timer in follow_ups:
             timer.cancel()
         if live_projects is not None:
@@ -102,7 +105,7 @@ def create_app(
     index_locks: dict[str, threading.Lock] = {}
     index_guard = threading.Lock()
     indexing: set[str] = set()
-    index_errors: dict[str, str] = {}  # a read that failed: said to the page instead of « indexing » forever
+    index_errors: dict[str, str] = {}  # a failed read: said once to the page, then the next ask reads again
     readers: list[threading.Thread] = []  # background reads, waited for at shutdown
 
     def lock_of(project_id: str) -> threading.Lock:
@@ -115,20 +118,24 @@ def create_app(
 
     def reindex_and_follow(project: Project) -> None:
         try:
-            index_now(project)
-        except Exception as error:  # noqa: BLE001 — a background read must report, never vanish
+            try:
+                index_now(project)
+            except Exception as error:  # noqa: BLE001 — a background read must report, never vanish
+                with index_guard:
+                    index_errors[project.id] = f"{type(error).__name__}: {error}"
+                return
+            finally:
+                with index_guard:
+                    indexing.discard(project.id)
+            if journal_stop.is_set():  # the engine stopped while it was reading: nothing to follow any more
+                return
+            # The page asks for its model again.
+            events.publish(project.id, {"type": "indexed", "changed": [], "count": 0})
+            if live_projects is not None:
+                live_projects.follow(project)
+        finally:  # only now: shutdown waits for this thread until its very last step
             with index_guard:
-                index_errors[project.id] = f"{type(error).__name__}: {error}"
-            return
-        finally:
-            with index_guard:
-                indexing.discard(project.id)
-        if journal_stop.is_set():  # the engine stopped while it was reading: nothing to follow any more
-            return
-        # The page asks for its model again.
-        events.publish(project.id, {"type": "indexed", "changed": [], "count": 0})
-        if live_projects is not None:
-            live_projects.follow(project)
+                readers[:] = [r for r in readers if r is not threading.current_thread()]
 
     def start_indexing(project: Project) -> None:
         """Read a Project in the background, one read at a time (#85); meanwhile its model is « indexing »."""
@@ -145,9 +152,9 @@ def create_app(
         """True when the index is current; otherwise start reading the Project and say False."""
         project = known_project(project_id)
         with index_guard:
-            failed = index_errors.get(project_id)
             if project_id in indexing:
                 return False
+            failed = index_errors.pop(project_id, None)  # one failed attempt, not a state: next ask retries
         if failed:
             detail = f"reading the project failed: {failed}"
             raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, detail)
@@ -193,7 +200,10 @@ def create_app(
         except ProjectIdCollisionError as error:
             raise HTTPException(status.HTTP_409_CONFLICT, str(error)) from error
         if live_projects is not None:  # the running engine reads it at once, as at startup (#85)
-            ensure_indexed(project.id)
+            try:
+                ensure_indexed(project.id)
+            except HTTPException:  # an earlier read failed: it is registered; this call started nothing new
+                start_indexing(project)
         return ProjectOut.of(project)
 
     @app.get("/v1/projects", dependencies=authorized)
