@@ -20,6 +20,9 @@ COMMAND = [
 ]  # fmt: skip
 
 
+NOT_INSTALLED = "Claude Code is not installed on this machine (https://claude.com/claude-code)"
+
+
 class ClaudeUnavailableError(RuntimeError):
     """Claude Code is missing, not signed in with a subscription, or did not answer."""
 
@@ -47,6 +50,21 @@ def subscription_login() -> bool:
         return json.loads(result.stdout).get("authMethod") == "claude.ai"
     except (OSError, subprocess.TimeoutExpired, ValueError):
         return False
+
+
+def readiness_problem() -> str | None:
+    """Why a study cannot run on this machine, in words for the user; None when Claude Code is ready."""
+    try:
+        subprocess.run(
+            ["claude", "--version"], capture_output=True, timeout=30, env=child_environment(dict(os.environ))
+        )
+    except FileNotFoundError:
+        return f"{NOT_INSTALLED}. Install it, then run `claude` once to sign in."
+    except (OSError, subprocess.TimeoutExpired):
+        return "Claude Code did not answer `claude --version`."
+    if not subscription_login():
+        return "Claude Code is not signed in with a claude.ai subscription. Run `claude` once and sign in."
+    return None
 
 
 STUDY_TIMEOUT_S = 40 * 60
@@ -86,6 +104,8 @@ def _run(command: list[str], prompt: str, folder: Path, timeout: int) -> subproc
             env=child_environment(dict(os.environ)),
             timeout=timeout,
         )
+    except FileNotFoundError as error:
+        raise ClaudeUnavailableError(NOT_INSTALLED) from error
     except (OSError, subprocess.TimeoutExpired) as error:
         raise ClaudeUnavailableError(f"claude did not answer: {type(error).__name__}") from error
 

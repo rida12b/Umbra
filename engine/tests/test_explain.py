@@ -121,3 +121,20 @@ def test_the_daily_budget_stops_background_calls(setup, auth, fake):
     refused = explain(client, auth, project, "app/db.py", "post")
     assert refused["state"] == "error" and "budget" in refused["message"]
     assert len(fake.prompts) == 1
+
+
+def test_a_machine_without_claude_code_is_told_so_in_plain_words(monkeypatch):
+    """#98: a first-time user saw « claude did not answer: FileNotFoundError »."""
+    import subprocess
+
+    import pytest
+
+    from umbra_engine.gateways import claude
+
+    def missing(*args, **kwargs):
+        raise FileNotFoundError("claude")
+
+    monkeypatch.setattr(subprocess, "run", missing)
+    with pytest.raises(claude.ClaudeUnavailableError, match="not installed on this machine"):
+        claude.ask("hello")
+    assert "not installed" in (claude.readiness_problem() or "")

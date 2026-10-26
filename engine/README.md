@@ -2,7 +2,25 @@
 
 Local daemon that registers Projects, keeps one isolated store per Project and exposes them through a local API. See `../SPEC.md` for the V1 scope.
 
-## Install on Windows (from the repository)
+## Try it on your project (Windows, macOS, Linux)
+
+You need Python 3.11–3.13, [pipx](https://pipx.pypa.io) and [Claude Code](https://claude.com/claude-code) signed in
+with a claude.ai subscription (run `claude` once). Umbra asks your own Claude Code to study the project.
+
+```bash
+pipx install https://github.com/rida12b/Umbra/releases/download/engine-v0.1.0/umbra_engine-0.1.0-py3-none-any.whl
+umbra-engine start path/to/your/project
+```
+
+`start` registers the folder, indexes it, runs the engine and opens your browser on the project. The first study
+takes a few minutes. Next time, run the same command: only changed files are read again.
+
+**On a server or a VM without a screen**, the engine only answers on `127.0.0.1`, on purpose: it shows your code.
+Run `umbra-engine start <folder> --no-browser` there, open a tunnel from your own computer with
+`ssh -L 7811:127.0.0.1:7811 you@server`, then open the printed link in your browser (it works once, for 2 minutes;
+`umbra-engine open` on the server prints a new one).
+
+## Install from the repository (to work on Umbra)
 
 Requirements: Python 3.11–3.13, Git and Node.js 20.19+ (for the web app), all on `PATH`.
 
@@ -16,9 +34,13 @@ umbra-engine --help
 
 The command is `umbra-engine` while the v0.7 `umbra` command still exists; it becomes `umbra` when v0.7 is removed.
 
+A tag `engine-v<version>` (matching `version` in `engine/pyproject.toml`) builds the wheel with the web app inside,
+checks a clean install opens a project, and attaches it to a GitHub Release (`.github/workflows/engine-release.yml`).
+
 ## Use
 
 ```powershell
+umbra-engine start C:\path\to\your\project # add + index + serve, browser on the Project
 umbra-engine add C:\path\to\your\project   # register a Project (idempotent)
 umbra-engine list                          # registered Projects
 umbra-engine index C:\path\to\your\project # register if needed, then index

@@ -1,0 +1,58 @@
+name: Engine release
+
+# A tag `engine-v<version>` publishes one wheel with the web app already built inside (#98): users install it with
+# pipx and need neither Node nor a clone. Every pull request that touches packaging builds and checks it too.
+on:
+  push:
+    tags: ["engine-v*"]
+  pull_request:
+    paths: ["engine/pyproject.toml", "ui/vite.config.ts", ".github/workflows/engine-release.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: write # the GitHub Release
+
+jobs:
+  wheel:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: ui/package-lock.json
+      - run: npm ci && npm run build # into engine/src/umbra_engine/web
+        working-directory: ui
+      - run: python -m pip install "build>=1.2,<2"
+      - run: python -m build --wheel engine --outdir dist
+      - name: The tag matches the package version
+        if: startsWith(github.ref, 'refs/tags/engine-v')
+        run: ls dist/umbra_engine-${GITHUB_REF_NAME#engine-v}-py3-none-any.whl
+      - name: The wheel holds the web app
+        run: python -c "import glob, sys, zipfile; names = zipfile.ZipFile(glob.glob('dist/*.whl')[0]).namelist(); sys.exit('umbra_engine/web/index.html' not in names)"
+      - name: A clean install opens a Project in one command
+        env:
+          UMBRA_HOME: ${{ runner.temp }}/umbra-home
+        run: |
+          python -m venv "$RUNNER_TEMP/clean"
+          "$RUNNER_TEMP/clean/bin/pip" install dist/*.whl
+          "$RUNNER_TEMP/clean/bin/umbra-engine" start engine/src --no-browser > "$RUNNER_TEMP/start.log" 2>&1 &
+          for _ in $(seq 60); do curl -sf http://127.0.0.1:7811/ | grep -q '<div id="root">' && break; sleep 1; done
+          cat "$RUNNER_TEMP/start.log"
+          grep -q '#login=.*&p=src-' "$RUNNER_TEMP/start.log"
+          curl -sf http://127.0.0.1:7811/ | grep -q '<div id="root">'
+      - uses: actions/upload-artifact@v4
+        with:
+          name: umbra-engine-wheel
+          path: dist/*.whl
+      - name: GitHub Release with the wheel
+        if: startsWith(github.ref, 'refs/tags/engine-v')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" dist/*.whl --title "Umbra engine ${GITHUB_REF_NAME#engine-v}" \
+            --notes "Install: \`pipx install https://github.com/${{ github.repository }}/releases/download/$GITHUB_REF_NAME/$(basename dist/*.whl)\`, then \`umbra-engine start <your project folder>\`. Needs Python 3.11-3.13 and Claude Code signed in."
