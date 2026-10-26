@@ -125,6 +125,12 @@ export function ProjectPlateView({ model, row, onOpenCode }: { model: ProjectMod
   const rows = projectPlate(model);
   return (
     <PlateFrame path="L'usine › Réglages du projet" title="Réglages du projet" onEnter={null}>
+      {rows.some((r) => r.notRead) && (
+        // Dry run of #81: the first place a reader looks for Q5; say where the setting that counts is.
+        <p className="mt-3 rounded-lg border border-line-soft px-3 py-2 text-[13px] leading-snug text-muted">
+          Les lignes « lu par le code : non » ne changent rien. Le réglage que le code lit est sur la fiche d'une machine : cherchez son nom avec Ctrl K (par exemple « port » ou « en-tête »).
+        </p>
+      )}
       <Slot label="Réglages">
         {rows.length > 0 ? (
           <ul className="flex flex-col">

@@ -58,7 +58,7 @@ const words = (text: string) => plain(text).split(/[^a-z0-9]+/).filter(Boolean).
 // are nouns too: they stay real words.
 const FILLER = new Set([
   "le", "la", "les", "l", "de", "du", "des", "d", "un", "une", "je", "veu", "a", "au", "aux", "et", "en", "pour", "mon", "ma", "me",
-  "ce", "cet", "cette", "qui", "que", "qu", "on", "comment", "ou", "est", "sont", "quel", "quelle", "se", "son", "sa", "ses", "il", "y", "peut",
+  "ce", "cet", "cette", "qui", "que", "qu", "on", "comment", "ou", "est", "sont", "quel", "quelle", "se", "son", "sa", "ses", "il", "y", "peut", "combien",
 ]);
 const INTENT = new Set(["changer", "modifier", "regler", "mettre"]);
 
@@ -93,7 +93,11 @@ export function buildIndex(model: ProjectModel): Entry[] {
     const c = comp.get(l.composant);
     if (!c) continue; // an intention on a machine the model does not have: nowhere to land
     const terms = (c.termes ?? []).map((t) => `${t.simple} ${t.code}`).join(" ");
-    add({ key: `changer:${l.intention}`, kind: "changer", label: l.intention, detail: l.reglage, address: `${roomOf(c.id)} › ${c.nom}`, target: { kind: "machine", bloc: c.bloc, machine: c.id, row: l.reglage }, name: l.intention, terms });
+    // « température » finds « Je veux des réponses plus ou moins variées » through its setting (« Créativité du modèle »,
+    // llm_temperature): the intention's own words rarely hold the code's word.
+    const setting = (c.reglages ?? []).find((r) => r.code === l.reglage);
+    const body = [l.reglage, setting?.nom ?? "", setting?.effet ?? ""].join(" ");
+    add({ key: `changer:${l.intention}`, kind: "changer", label: l.intention, detail: l.reglage, address: `${roomOf(c.id)} › ${c.nom}`, target: { kind: "machine", bloc: c.bloc, machine: c.id, row: l.reglage }, name: l.intention, terms, body });
   }
   for (const j of model.parcours) {
     add({ key: `trajet:${j.id}`, kind: "etape", label: j.nom, detail: j.depart || j.declencheur, address: `Trajet · ${j.etapes.length} étapes`, target: { kind: "etape", journey: j.id, step: 1 }, name: j.nom });

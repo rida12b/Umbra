@@ -77,7 +77,8 @@ export function machinePlate(model: ProjectModel, id: string): MachinePlate | nu
     rend: items(c.sort, true),
     reglages: c.reglages?.length ? c.reglages : null,
     ou: c.expose,
-    fichiers: c.fichiers,
+    // Every file the plate cites, not only the machine's own: a setting may live in the project's config file.
+    fichiers: [...new Set([...c.fichiers, ...(c.reglages ?? []).flatMap((r) => (r.fichier ? [r.fichier] : [])), ...c.expose.flatMap((e) => (e.fichier ? [e.fichier] : []))])],
     vuDans: seenIn(model, new Set([c.id])),
     mots: c.termes ?? [],
   };
