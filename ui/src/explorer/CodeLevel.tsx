@@ -5,6 +5,7 @@ import { MapCanvas, type Selection } from "../map/MapCanvas";
 import { roleOf, useModel } from "../model";
 import { DetailsPanel } from "../panel/DetailsPanel";
 import type { Theme } from "../theme";
+import { PanelResizer, usePanelWidth } from "../shell/PanelWidth";
 import { StateMessage } from "../ui";
 
 interface Props {
@@ -24,6 +25,8 @@ export function CodeLevel({ projectId, node, expand, select, theme, narrow, onVi
   const [view, setView] = useState<MapView | ApiError | null>(null);
   const [selection, setSelection] = useState<Selection>(null);
   const selectApplied = useRef(false);
+  const grid = useRef<HTMLDivElement>(null);
+  const panelWidth = usePanelWidth();
   // The parent passes a new function on each render: kept in a ref so the map is not fetched again for it.
   const drill = useRef(onDrill);
   drill.current = onDrill;
@@ -86,7 +89,12 @@ export function CodeLevel({ projectId, node, expand, select, theme, narrow, onVi
   }
   const labels = new Map(view.nodes.map((element) => [element.key, element.label]));
   return (
-    <div className={narrow ? "grid h-full min-h-0 grid-rows-[minmax(0,3fr)_minmax(0,2fr)]" : "grid h-full min-h-0 grid-cols-[minmax(0,1fr)_400px]"}>
+    <div
+      ref={grid}
+      className={narrow ? "grid h-full min-h-0 grid-rows-[minmax(0,3fr)_minmax(0,2fr)]" : "relative grid h-full min-h-0"}
+      style={narrow ? undefined : { gridTemplateColumns: `minmax(0,1fr) ${panelWidth}px` }}
+    >
+      {!narrow && <PanelResizer grid={grid} />}
       <div className="map-surface relative min-h-0">
         {view.nodes.length === 0 ? (
           <StateMessage>Rien n'a été trouvé à l'intérieur.</StateMessage>

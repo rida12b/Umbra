@@ -15,6 +15,7 @@ import { enterable } from "./room";
 import { InfoPanel } from "./InfoPanel";
 import { buildLevel, levelOf, PROJECT_SETTINGS, trail, type Box, type Level, type LevelKey } from "./levels";
 import { NarrowLevel } from "./NarrowLevel";
+import { PanelResizer, usePanelWidth } from "../shell/PanelWidth";
 import { PlateSheet } from "./PlateSheet";
 import { PlayerBar } from "./PlayerBar";
 import { followedRoom, groupOf, journeyStations, stepGroups, type Station } from "./stations";
@@ -72,6 +73,8 @@ interface Props {
  */
 export function Explorer({ project, route, theme, narrow }: Props) {
   const state = useModel();
+  const grid = useRef<HTMLDivElement>(null);
+  const panelWidth = usePanelWidth();
   const model = state?.model ?? null;
   const levelKey = explorerLevel(route.node);
   const level = useMemo(() => (model && levelKey ? buildLevel(model, levelKey, project.name) : null), [model, levelKey, project.name]);
@@ -242,7 +245,8 @@ export function Explorer({ project, route, theme, narrow }: Props) {
         )}
       </div>
     ) : (
-      <div className="grid h-full min-h-0 grid-cols-[minmax(0,1fr)_400px]">
+      <div ref={grid} className="relative grid h-full min-h-0" style={{ gridTemplateColumns: `minmax(0,1fr) ${panelWidth}px` }}>
+        <PanelResizer grid={grid} />
         <section className="flex min-h-0 flex-col" aria-label={`Carte : ${transitPlay && floorLevel ? floorLevel.title : level.title}`}>
           <div className="map-surface relative min-h-0 flex-1">
             {floorLevel?.floor && transitPlay ? (

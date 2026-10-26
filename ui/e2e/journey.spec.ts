@@ -265,6 +265,36 @@ test("a room's plate opens its machines from the floor; the project's settings o
   }
 });
 
+test("the explanation panel can be widened by its edge, is remembered, and goes back on double-click (#92)", async ({ page, isMobile }) => {
+  test.skip(isMobile, "a phone has no side panel");
+  await page.setViewportSize({ width: 1440, height: 900 });
+  const project = await signIn(page);
+  await page.goto(`/#/p/${project}?node=x%3Apart%3Aapi&select=orders`);
+  const panel = page.getByRole("complementary", { name: "Explication" });
+  const edge = page.getByRole("separator", { name: /Largeur du panneau/ });
+  const width = async () => (await panel.boundingBox())!.width;
+  expect(Math.round(await width())).toBe(400);
+  const box = (await edge.boundingBox())!;
+  await page.mouse.move(box.x + box.width / 2, box.y + 200);
+  await page.mouse.down();
+  await page.mouse.move(box.x - 250, box.y + 200, { steps: 8 });
+  await page.mouse.up();
+  expect(await width()).toBeGreaterThan(600);
+  const map = (await page.locator(".map-surface").boundingBox())!;
+  expect(map.width).toBeLessThan(1440 - 600);
+  await page.reload();
+  await expect(page.getByRole("region", { name: "Commandes", exact: true })).toBeVisible();
+  expect(await width()).toBeGreaterThan(600); // remembered in this browser
+  // Never wider than 70 % of the screen: the map stays.
+  await edge.focus();
+  for (let i = 0; i < 40; i++) await page.keyboard.press("ArrowLeft");
+  expect(await width()).toBeLessThanOrEqual(Math.round(1440 * 0.7) + 1);
+  await page.keyboard.press("ArrowRight");
+  await expect(page).toHaveURL(/select=orders/); // the arrows moved the edge, nothing else
+  await edge.dblclick();
+  expect(Math.round(await width())).toBe(400);
+});
+
 test("old links open the parts with the path playing", async ({ page }) => {
   const project = await signIn(page);
   await page.goto(`/#/p/${project}?node=parcours%3A&journey=order&step=abc`);
