@@ -45,8 +45,29 @@ test("a room plate lists its machines and every step done in it", () => {
   assert.ok(plate.recoit && plate.recoit.length > 0);
   assert.deepEqual(plate.rend?.at(-1), { text: "une réponse ou un refus", refusal: true });
   assert.ok(plate.machines.some((m) => m.id === "porte-client"));
-  assert.ok(plate.vuDans.every((v) => v.where !== ""));
+  assert.ok(plate.vuDans.some((v) => v.where === "Contrôle du nom du client"));
   assert.equal(roomPlate(load("watchdog-v17"), "nope"), null);
+});
+
+test("a room no machine works in still lists the journeys that reach it (the database, the person)", () => {
+  const fastapi = load("fastapi-template");
+  const db = roomPlate(fastapi, "db")!;
+  const reach = fastapi.parcours.flatMap((j) => j.etapes.filter((s) => s.touche.includes("db")));
+  assert.equal(db.vuDans.length, reach.length);
+  assert.ok(db.vuDans.length > 0 && db.vuDans.every((v) => v.where === ""));
+  assert.ok(roomPlate(load("watchdog-v17"), "agent-surveille")!.vuDans.length >= 3);
+});
+
+test("red marks a refusal given back, never an input about errors, and catches the study's failure words", () => {
+  const fastapi = load("fastapi-template");
+  const sentry = roomPlate(fastapi, "sentry")!;
+  assert.ok((sentry.recoit ?? []).every((i) => !i.refusal), "an input about errors is not a refusal");
+  const outs = fastapi.composants.flatMap((c) => machinePlate(fastapi, c.id)!.rend ?? []);
+  for (const words of ["Un échec si la base ne répond pas en 5 minutes", "Un arrêt si un secret vaut encore la valeur par défaut hors local"]) {
+    const found = outs.find((i) => i.text === words);
+    if (found) assert.ok(found.refusal, words);
+  }
+  assert.ok(outs.some((i) => i.refusal));
 });
 
 test("the project's settings say which ones the code never reads", () => {

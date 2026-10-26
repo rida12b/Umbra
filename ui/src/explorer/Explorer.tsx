@@ -15,6 +15,7 @@ import { enterable } from "./room";
 import { InfoPanel } from "./InfoPanel";
 import { buildLevel, levelOf, PROJECT_SETTINGS, trail, type Box, type Level, type LevelKey } from "./levels";
 import { NarrowLevel } from "./NarrowLevel";
+import { PlateSheet } from "./PlateSheet";
 import { PlayerBar } from "./PlayerBar";
 import { followedRoom, groupOf, journeyStations, stepGroups, type Station } from "./stations";
 import { trackJourney } from "./track";
@@ -91,7 +92,10 @@ export function Explorer({ project, route, theme, narrow }: Props) {
   );
   const select = useCallback((id: string | null) => go({ select: id }), [go]);
   // A cited file opens its code, the function holding the cited line selected (see CodeLevel, « line:N »).
-  const openCode = useCallback((path: string, line: number | null) => go({ node: path, select: line ? `line:${line}` : null }), [go]);
+  const openCode = useCallback(
+    (path: string, lines: [number, number] | null) => go({ node: path, select: lines ? `line:${lines[0]}${lines[1] !== lines[0] ? `-${lines[1]}` : ""}` : null }),
+    [go],
+  );
   const rooms = useMemo(() => (model ? enterable(model) : new Set<string>()), [model]);
   // A door opens the room behind it (a history entry: Back returns here), or explains a part without machines.
   const openDoor = useCallback((bloc: string) => (rooms.has(bloc) ? openLevel(`part:${bloc}`) : select(bloc)), [rooms, openLevel, select]);
@@ -182,6 +186,7 @@ export function Explorer({ project, route, theme, narrow }: Props) {
         narrow={narrow}
         onView={setCodeView}
         onOpen={(node, expand) => go({ node, expand, select: null })}
+        onDrill={(node) => go({ node, expand: false })}
       />
     );
   else if (level && level.room === null)
@@ -215,8 +220,9 @@ export function Explorer({ project, route, theme, narrow }: Props) {
         onEnter={enter}
         onPlay={play}
         onStep={onStep}
-        onSelect={select}
+        onOpenMachine={(bloc, machine) => go({ node: levelNode(`part:${bloc}`), select: machine })}
         onOpenCode={openCode}
+        oldMethod={!!state?.methode_ancienne}
         projectSettings={settings}
       />
     );
@@ -229,15 +235,9 @@ export function Explorer({ project, route, theme, narrow }: Props) {
           {sheet ? panelFor(null, false) : panel}
         </section>
         {sheet && (
-          // On a phone a plate is a bottom sheet over the list (#79): its close button stays at hand, Échap closes it too.
-          <div className="fixed inset-x-0 bottom-0 z-30 flex max-h-[78dvh] flex-col rounded-t-2xl border-t border-line bg-panel shadow-2xl" role="dialog" aria-label="Fiche">
-            <div className="flex shrink-0 justify-end px-3 pt-2">
-              <button type="button" onClick={() => select(null)} className="rounded-lg border border-line px-3 py-1.5 text-[14px]" aria-label="Fermer la fiche">
-                Fermer
-              </button>
-            </div>
-            <div className="min-h-0 overflow-y-auto pb-[env(safe-area-inset-bottom,0px)]">{panel}</div>
-          </div>
+          <PlateSheet from={route.select ?? ""} onClose={() => select(null)}>
+            {panel}
+          </PlateSheet>
         )}
       </div>
     ) : (

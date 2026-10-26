@@ -8,6 +8,8 @@ import { Line, LineMarkers } from "./floorLines";
 import type { Room } from "./room";
 import type { Point } from "./floorLayout";
 import { placeRoom, type Rect } from "./roomLayout";
+import { PROJECT_SETTINGS } from "./levels";
+import { ProjectSettingsCard } from "./ProjectSettingsCard";
 import { rememberRoom } from "./roomMemory";
 import { ChuteCard, DoorCard, HungTag, MachineCard, WiringBand } from "./roomParts";
 
@@ -246,11 +248,8 @@ export function RoomCanvas({ model, room, enterable, selected, play, onSelect, o
                 </li>
               ))}
               {settings.length > 0 && (
-                <li className="w-[230px] rounded-lg border border-dashed border-fl-code px-2.5 py-1.5 text-[12.5px]">
-                  <span className="block font-semibold text-ink">Réglages du projet</span>
-                  <span className="line-clamp-2 text-muted">
-                    {settings.length} réglage{settings.length > 1 ? "s" : ""} · {[...new Set(settings.map((r) => r.fichier).filter(Boolean))].join(", ")}
-                  </span>
+                <li>
+                  <ProjectSettingsCard model={model} className="w-[230px]" selected={selected === PROJECT_SETTINGS} onOpen={() => onSelect(PROJECT_SETTINGS)} />
                 </li>
               )}
             </ul>

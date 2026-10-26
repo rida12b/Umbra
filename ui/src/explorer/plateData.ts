@@ -8,14 +8,14 @@ import { stepLabel } from "../arch/story.ts";
 
 export interface Item {
   text: string;
-  refusal: boolean; // what comes back when it says no (« ou un refus… »): red on the plate
+  refusal: boolean; // in Rend only: what comes back when it says no (« ou un refus… », « un échec si… »), red on the plate
 }
 export interface Seen {
   journey: string;
   nom: string; // the journey's name
   step: number; // 1-based
   action: string;
-  where: string; // the machine the step happens on
+  where: string; // the machine the step happens on; "" when the step only reaches this part (a room plate)
 }
 export interface MachinePlate {
   title: string;
@@ -46,16 +46,22 @@ export interface ProjectSettingRow extends Cited {
   notRead: boolean; // the study found no code that reads it (« lu par le code : non »)
 }
 
-const REFUSAL = /\b(refus|refuse|erreur|rejet)/i;
-const items = (list: string[] | undefined): Item[] | null => (list?.length ? list.map((text) => ({ text, refusal: REFUSAL.test(text) })) : null);
+// The study writes a refusal as an alternative outcome of what a machine gives back: « ou un refus si … »,
+// « un échec si … », « une erreur 401 ». Only Rend is read that way: an input about errors (Sentry) is not a refusal.
+const REFUSAL = /^(ou|sinon)\s|(^|[\s'’(])(refus|échec|erreur|arrêt|rejet)|\b[45]\d\d\b/iu; // « é » is not a \b word letter without /u
+const items = (list: string[] | undefined, outcomes = false): Item[] | null =>
+  list?.length ? list.map((text) => ({ text, refusal: outcomes && REFUSAL.test(text) })) : null;
 
-/** Every step done on these machines, in model order: « Recevoir… · étape 2 — Vérifie le nom du client ». */
-function seenIn(model: ProjectModel, machines: Set<string>): Seen[] {
+/** Every step done on these machines, or (a room) that reaches the part, in model order:
+ * « Recevoir… · étape 2 — Vérifie le nom du client ». */
+function seenIn(model: ProjectModel, machines: Set<string>, part: string | null = null): Seen[] {
   const names = new Map(model.composants.map((c) => [c.id, c.nom]));
   return model.parcours.flatMap((j) =>
-    j.etapes.flatMap((s, i) =>
-      s.composant && machines.has(s.composant) ? [{ journey: j.id, nom: j.nom, step: i + 1, action: stepLabel(s), where: names.get(s.composant) ?? "" }] : [],
-    ),
+    j.etapes.flatMap((s, i) => {
+      const on = !!s.composant && machines.has(s.composant);
+      if (!on && !(part && s.touche.includes(part))) return [];
+      return [{ journey: j.id, nom: j.nom, step: i + 1, action: stepLabel(s), where: on ? (names.get(s.composant!) ?? "") : "" }];
+    }),
   );
 }
 
@@ -68,7 +74,7 @@ export function machinePlate(model: ProjectModel, id: string): MachinePlate | nu
     fait: c.en_bref || c.role,
     detail: c.en_bref && c.role !== c.en_bref ? c.role : "",
     recoit: items(c.entre),
-    rend: items(c.sort),
+    rend: items(c.sort, true),
     reglages: c.reglages?.length ? c.reglages : null,
     ou: c.expose,
     fichiers: c.fichiers,
@@ -86,9 +92,9 @@ export function roomPlate(model: ProjectModel, bloc: string): RoomPlate | null {
     fait: b.en_bref || b.role,
     detail: b.en_bref && b.role !== b.en_bref ? b.role : "",
     recoit: items(b.entre),
-    rend: items(b.sort),
+    rend: items(b.sort, true),
     machines: machines.map((m) => ({ id: m.id, nom: m.nom, words: m.en_bref || m.role })),
-    vuDans: seenIn(model, new Set(machines.map((m) => m.id))),
+    vuDans: seenIn(model, new Set(machines.map((m) => m.id)), bloc),
   };
 }
 
