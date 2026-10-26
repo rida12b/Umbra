@@ -148,3 +148,15 @@ test("a doubt lands on the floor with that line lit", () => {
   assert.equal(doubt.target.kind, "doute");
   assert.equal(model.incertitudes[doubt.target.kind === "doute" ? doubt.target.index : -1], doubt.label);
 });
+
+test("short round of #80: a filler word and one letter is no search; a question finds what its keywords find; « règles » is a noun", () => {
+  const model = load("watchdog-v17");
+  assert.deepEqual(find(model, "le p"), []);
+  assert.deepEqual(find(model, "je veux c"), []);
+  assert.ok(find(model, "le po").length > 0);
+  const keys = (q: string) => find(model, q).flatMap((g) => g.results.map((r) => r.key));
+  assert.deepEqual(keys("où sont gardés les relevés"), keys("gardés relevés"));
+  assert.ok(group(find(model, "où sont gardés les relevés"), "machine").some((r) => r.label === "Mémoire des relevés"));
+  assert.ok(group(find(model, "règles"), "machine").length > 0, "« règles » finds what talks about rules");
+  assert.deepEqual(find(model, "changer").map((g) => g.kind), [], "a bare verb is not « je veux changer »");
+});

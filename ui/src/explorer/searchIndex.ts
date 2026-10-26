@@ -52,10 +52,15 @@ export const plain = (text: string) => text.normalize("NFD").replace(/\p{Diacrit
 const KEEP_S = new Set(["acces", "temps", "mois", "pas", "plus", "sous", "dans", "apres", "tres", "fois", "cas", "corps", "prix", "choix", "deux", "trois", "processus", "status", "alias", "redis", "https", "os"]);
 const stem = (t: string) => (t.length > 3 && /[sx]$/.test(t) && !KEEP_S.has(t) ? t.slice(0, -1) : t);
 const words = (text: string) => plain(text).split(/[^a-z0-9]+/).filter(Boolean).map(stem);
-// Words that carry no meaning in a query (« changer le port »): articles, « je veux », and the intention verbs, which
-// only say « I want to change », what the « Je veux changer… » group is for.
-const FILLER = new Set(["le", "la", "les", "l", "de", "du", "des", "d", "un", "une", "je", "veu", "a", "au", "aux", "et", "en", "pour", "mon", "ma", "me", "ce", "cet", "cette", "qui", "que", "on", "comment", "ou"]);
-const INTENT = new Set(["changer", "modifier", "regler", "mettre", "change", "modifie", "regle"]);
+// Words that carry no meaning in a query (« changer le port », « où sont gardés les relevés »): articles, « je veux »,
+// question words and auxiliaries (compared after the plural rule: « quels » is « quel »), and the intention verbs in
+// the infinitive only, which say « I want to change », what the « Je veux changer… » group is for. « règle », « change »
+// are nouns too: they stay real words.
+const FILLER = new Set([
+  "le", "la", "les", "l", "de", "du", "des", "d", "un", "une", "je", "veu", "a", "au", "aux", "et", "en", "pour", "mon", "ma", "me",
+  "ce", "cet", "cette", "qui", "que", "qu", "on", "comment", "ou", "est", "sont", "quel", "quelle", "se", "son", "sa", "ses", "il", "y", "peut",
+]);
+const INTENT = new Set(["changer", "modifier", "regler", "mettre"]);
 
 export function buildIndex(model: ProjectModel): Entry[] {
   const bloc = new Map(model.blocs.map((b) => [b.id, b]));
@@ -66,14 +71,15 @@ export function buildIndex(model: ProjectModel): Entry[] {
     entries.push({ ...e, note: e.note ?? null, name: words(e.name), terms: words(e.terms ?? ""), body: words(e.body ?? "") });
 
   for (const b of model.blocs)
-    add({ key: `bloc:${b.id}`, kind: "machine", label: b.nom, detail: b.en_bref || b.role, address: `L'usine › ${b.nom}`, target: { kind: "room", bloc: b.id }, name: b.nom, body: b.en_bref || b.role });
+    add({ key: `bloc:${b.id}`, kind: "machine", label: b.nom, detail: b.en_bref || b.role, address: `L'usine › ${b.nom}`, target: { kind: "room", bloc: b.id }, name: b.nom, body: [b.en_bref || b.role, ...(b.entre ?? []), ...(b.sort ?? [])].join(" ") });
   for (const c of model.composants) {
     const at = `${roomOf(c.id)} › ${c.nom}`;
     const machine = (row: string | null): Target => ({ kind: "machine", bloc: c.bloc, machine: c.id, row });
     const terms = (c.termes ?? []).map((t) => `${t.simple} ${t.code}`).join(" ");
     // Not its `role`: written for a developer, it names the code's shared words (« tenant_id ») in every machine, and a
-    // search for one would list them all. Its plain words and its terms carry the reader's vocabulary.
-    add({ key: `composant:${c.id}`, kind: "machine", label: c.nom, detail: c.en_bref || c.role, address: at, target: machine(null), name: c.nom, terms, body: c.en_bref || c.role });
+    // search for one would list them all. Its plain words, what it takes in and gives back (v1.7) and its terms carry the
+    // reader's vocabulary.
+    add({ key: `composant:${c.id}`, kind: "machine", label: c.nom, detail: c.en_bref || c.role, address: at, target: machine(null), name: c.nom, terms, body: [c.en_bref || c.role, ...(c.entre ?? []), ...(c.sort ?? [])].join(" ") });
     for (const r of c.reglages ?? [])
       add({ key: `reglage:${c.id}:${r.code}`, kind: "reglage", label: r.nom, detail: r.code, address: `${at} › Réglage « ${r.nom} »`, target: machine(r.code), name: r.nom, terms, body: `${r.code} ${r.valeur} ${r.effet}` });
     for (const e of c.expose)
@@ -110,9 +116,10 @@ export function searchIndex(index: Entry[], query: string): Group[] {
   const typed = words(query);
   if (typed.join("").length < 2) return [];
   const wanted = typed.filter((w) => !FILLER.has(w) && !INTENT.has(w));
+  if (wanted.length > 0 && wanted.join("").length < 2) return []; // « le p »: still typing, one letter is not a search
   // Only « je veux changer »: every intention, nothing else.
   if (wanted.length === 0)
-    return typed.some((w) => INTENT.has(w)) ? [{ kind: "changer", title: GROUP_TITLE.changer, results: index.filter((e) => e.kind === "changer").map(({ name: _n, terms: _t, body: _b, ...r }) => r) }] : [];
+    return typed.length >= 2 && typed.some((w) => INTENT.has(w)) ? [{ kind: "changer", title: GROUP_TITLE.changer, results: index.filter((e) => e.kind === "changer").map(({ name: _n, terms: _t, body: _b, ...r }) => r) }] : [];
   const hits = (list: string[]) => wanted.every((w) => list.some((t) => t.startsWith(w)));
   const scored = index.flatMap((e) => {
     const score = hits(e.name) ? 3 : hits([...e.name, ...e.terms]) ? 2 : hits([...e.name, ...e.terms, ...e.body]) ? 1 : 0;
