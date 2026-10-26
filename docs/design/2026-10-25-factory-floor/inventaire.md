@@ -106,11 +106,13 @@ Références : `ref-plate-watchdog.png` (haut de la fiche) et `ref-plate-watchdo
 | V68 | plate | Titre | Nom de la machine, **gras blanc ≈ 20 px**. | modèle | #79 | |
 | V69 | plate | Cases fixes | Six cases toujours dans cet ordre : FAIT, REÇOIT, REND, RÉGLAGES, OÙ, VU DANS. Libellé en **petites capitales grises ≈ 11 px, espacées**, filet gris fin entre deux cases. | fixe | #79 | |
 | V70 | plate | Fait | `en_bref` en **gras blanc ≈ 16 px**, puis `role` en gris ≈ 13 px. | modèle | #79 | |
-| V71 | plate | Cadre « pas encore dans le modèle — lu dans le code » | Cadre pointillé ambre autour de Reçoit / Rend / Réglages, puce ambre en haut. | — | #79 | Sans objet : depuis v1.7 ces cases viennent du modèle. Une case vide dit « pas encore dans le modèle — relancer l'étude (nouvelle méthode) » (ticket #79). |
+| V71 | plate | Cadre « pas encore dans le modèle — lu dans le code » | Cadre pointillé ambre autour de Reçoit / Rend / Réglages, puce ambre en haut. | — | #79 | OK Rida (délégué, 2026-10-26 : « Tu gère go »). Sans objet : depuis v1.7 ces cases viennent du modèle. Une case vide dit « pas encore dans le modèle — relancer l'étude (nouvelle méthode) » (ticket #79). |
 | V72 | plate | Reçoit, Rend | Une ligne blanche ≈ 14 px par élément. Dans A, une puce de code et un lien fichier:ligne suivent : le modèle v1.7 n'en donne pas pour `entre`/`sort`, rien n'est inventé. Un refus (« ou un refus… ») est en rouge (ticket). | v1.7 | #79 | |
 | V73 | plate | Réglages | Une ligne par réglage, filet entre deux : nom blanc ≈ 14 px à gauche, lien **bleu monospace fichier:ligne** à droite, puis le code exact dans une **puce monospace** sombre, puis l'effet en gris ≈ 12.5 px et la marque ✓ vérifié / ? hypothèse. | v1.7 `reglages` | #79 | Choix Rida 2026-10-26 : ligne de la maquette A, pas le tableau à 6 colonnes du ticket. |
 | V74 | plate | Où | Pour chaque `expose` : nom en puce monospace, puis chemin **bleu monospace** + « l.a-b » et **« ✓ vérifié » vert** (sinon « ? non vérifié »). Puis « Fichiers : » gris et les chemins en bleu. | modèle | #79 | |
 | V75 | plate | Vu dans | Un bouton à bord gris par étape faite ici : petite barre de couleur à gauche, « nom du trajet · étape N — action ». Clic : le trajet joue depuis cette étape. | calculé | #79 | La barre est jaune pour tous les trajets : le jaune ne veut dire que « donnée » (conflit 1). |
+| V76 | plate | Bouton « Entrer dedans » | Bouton à bord gris ≈ 14 px sous le titre, avant FAIT, quand la machine ou la pièce a quelque chose à ouvrir. Absent de A. | fixe | #79 | OK Rida (délégué, 2026-10-26 : « Tu gère go ») : gardé, c'est le chemin vers le niveau du dessous. |
+| V77 | plate | Ligne « Mots » | Sous Fait, gris ≈ 12.5 px : « Mots : nom du client = `X-Tenant-ID / tenant_id` », le nom du code en puce monospace. Absent de A, demandé par le ticket (`termes`). | v1.7 `termes` | #79 | OK Rida (délégué, 2026-10-26). |
 
 ## Conflits entre les maquettes A et B
 
@@ -142,6 +144,7 @@ Règle générale : **B est la base** ; de A on garde seulement le mouvement de 
 - Conflits 2, 3, 4, 6, 8, 9, 11, 13, 14, 15 : réglés par la règle « B est la base ».
 - Conflit 12 (pointillé à plusieurs sens), 16 (jaune de « texte du modèle »), 17 (bleu) : gardés comme dans B.
 - V35 : le texte coupé de « refus 422 » est un défaut de la maquette, pas à recopier.
+- #79 (2026-10-26) : **OK Rida, délégué** (« Tu gère go ») — côte à côte de la fiche validé, V71 retiré, V76 et V77 gardés.
 - V55 (2026-10-26, #77) : **OK Rida** — pendant la lecture, « Échap : arrêter le chemin » remplace « ‹ Remonter (Échap) » (Échap arrête le trajet, ticket #77 point 8). Écran réel validé côte à côte (« oui »).
 
 ## Attribution
