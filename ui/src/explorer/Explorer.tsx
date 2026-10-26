@@ -186,7 +186,7 @@ export function Explorer({ project, route, theme, narrow }: Props) {
         narrow={narrow}
         onView={setCodeView}
         onOpen={(node, expand) => go({ node, expand, select: null })}
-        onDrill={(node) => go({ node, expand: false })}
+        onDrill={(node) => navigate({ ...route, projectId: project.id, node, expand: false }, { replace: true })}
       />
     );
   else if (level && level.room === null)

@@ -67,8 +67,15 @@ export function routeHash(route: Route): string {
   return `#/p/${encodeURIComponent(route.projectId)}${query ? `?${query}` : ""}`;
 }
 
-export function navigate(route: Route): void {
-  window.location.hash = routeHash(route);
+/** `replace`: the new place takes the current history entry (a step the reader did not choose, like going down to
+ * the function that holds a cited line), so Back skips it instead of landing on it again. */
+export function navigate(route: Route, { replace = false }: { replace?: boolean } = {}): void {
+  if (!replace) {
+    window.location.hash = routeHash(route);
+    return;
+  }
+  window.history.replaceState(null, "", routeHash(route));
+  window.dispatchEvent(new HashChangeEvent("hashchange"));
 }
 
 export function useRoute(): Route {

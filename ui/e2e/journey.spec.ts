@@ -233,6 +233,13 @@ test("a machine's plate: six fixed slots, ✓ and ?, refusals in red, plays from
   await page.getByRole("region", { name: "Commandes", exact: true }).getByRole("button", { name: "api/app/orders.py l.8-10" }).click();
   await expect(page).toHaveURL(/node=api%2Fapp%2Forders\.py.*select=line%3A8-10/);
   await expect(page.getByLabel("Les lignes citées")).toContainText("def create_order");
+  // A line inside a class: the code goes down to the method, and one Back returns to the plate (review of #79).
+  await page.goto(`/#/p/${project}?node=x%3Apart%3Aapi&select=orders`);
+  await page.getByRole("region", { name: "Commandes", exact: true }).getByRole("button", { name: "api/app/limits.py:3" }).click();
+  await expect(page).toHaveURL(/node=api%2Fapp%2Flimits\.py%3A%3ALimits.*select=line%3A3/);
+  await expect(page.getByLabel("Les lignes citées")).toContainText("return len(order) < 100");
+  await page.goBack();
+  await expect(page.getByRole("region", { name: "Commandes", exact: true })).toBeVisible();
 });
 
 test("a room's plate opens its machines from the floor; the project's settings open from any settings card (#79)", async ({ page, isMobile }) => {
@@ -246,6 +253,11 @@ test("a room's plate opens its machines from the floor; the project's settings o
   const settings = page.getByRole("region", { name: "Réglages du projet" });
   await expect(settings).toContainText("image: postgres:16");
   await expect(settings).toContainText("lu par le code : non");
+  if (isMobile) {
+    // Closing the sheet gives the keyboard back to the card it was opened from.
+    await page.keyboard.press("Escape");
+    await expect(page.getByRole("button", { name: /Réglages du projet/ }).first()).toBeFocused();
+  }
   if (!isMobile) {
     await page.goto(`/#/p/${project}?node=x%3Apart%3Aapi`);
     await page.getByRole("button", { name: /Réglages du projet/ }).click();

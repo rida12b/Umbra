@@ -26,6 +26,7 @@ FILES = {
         "def create_order(order):\n    validate(order)\n    return save(order)\n"
     ),
     "api/app/store.py": "def save(order):\n    return order\n",
+    "api/app/limits.py": "class Limits:\n    def check(self, order):\n        return len(order) < 100\n",
     "web/src/app.ts": "export function submit(order: string) {\n  return fetch('/orders', { body: order })\n}\n",
 }
 
@@ -52,7 +53,9 @@ MODEL = {
          "reglages": [{"nom": "Contrôle de la commande", "code": "validate(order)", "sorte": "branchement", "valeur": "validate",
                        "effet": "Refuse une commande vide", "fichier": "api/app/orders.py", "lignes": [9, 9]},
                       {"nom": "Rangement", "code": "save_to_disk(order)", "sorte": "branchement", "valeur": "disk",
-                       "effet": "Range la commande", "fichier": "api/app/orders.py", "lignes": [40, 41]}]},
+                       "effet": "Range la commande", "fichier": "api/app/orders.py", "lignes": [40, 41]},
+                      {"nom": "Taille maximale", "code": "return len(order) < 100", "sorte": "limite", "valeur": "100",
+                       "effet": "Refuse une commande trop longue", "fichier": "api/app/limits.py", "lignes": [3, 3]}]},
     ],
     "parcours": [
         {"id": "order", "nom": "Passer une commande", "declencheur": "Le client clique sur Commander.",
