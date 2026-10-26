@@ -19,6 +19,12 @@ export interface Station {
   note: string | null; // the move in words, under the step's sentence; always set when the station stays
 }
 
+/** The room the camera opens for a station: its machine's room; else none, the floor (a step done by hand, or a
+ * pre-v1.7 step that names a whole part: the floor lights that part, a room would light nothing). */
+export function followedRoom(station: Station | undefined, rooms: Set<string>): string | null {
+  return station?.machine && station.room && rooms.has(station.room) ? station.room : null;
+}
+
 /** Two steps on the same station have the same key. */
 export const stationKey = (s: Station) => s.machine ?? (s.room ? `room:${s.room}` : s.person ? `person:${s.person}` : "hand");
 
@@ -87,7 +93,7 @@ export function stepGroups(model: ProjectModel, journey: Journey): StepGroup[] |
     .filter((p) => p.nom && p.de >= 1 && p.a >= p.de && p.de <= last)
     .map((p) => ({ title: p.nom, from: p.de, to: Math.min(p.a, last) }))
     .sort((a, b) => a.from - b.from);
-  if (phases.length === 0) return last > LONG_JOURNEY ? runs : null;
+  if (phases.length === 0) return last > LONG_JOURNEY ? merged(runs) : null;
   const groups: StepGroup[] = [];
   // The room runs that cover the steps from..to, cut to fit.
   const fill = (from: number, to: number) => {
@@ -103,6 +109,25 @@ export function stepGroups(model: ProjectModel, journey: Journey): StepGroup[] |
   if (next <= last) fill(next, last);
   return groups;
 }
+
+/** Room runs of one step are folded into the group before them (« Dans « A » puis « B » »): a 16-step journey
+ * reads as a few chunks, not as its step list again. */
+function merged(runs: StepGroup[]): StepGroup[] {
+  const groups: (StepGroup & { rooms: string[] })[] = [];
+  for (const run of runs) {
+    const before = groups.at(-1);
+    const room = run.title.replace(/^Dans /, "");
+    if (before && run.from === run.to && !run.title.startsWith("Retour")) {
+      before.to = run.to;
+      if (!before.rooms.includes(room)) before.rooms.push(room);
+      before.title = `Dans ${before.rooms.slice(0, 3).join(" puis ")}${before.rooms.length > 3 ? "…" : ""}`;
+    } else groups.push({ ...run, rooms: [room] });
+  }
+  return groups.map(({ title, from, to }) => ({ title, from, to }));
+}
+
+/** « étapes 3–7 », or « étape 11 » for a group of one. */
+export const stepsWord = (g: StepGroup) => (g.from === g.to ? `étape ${g.from}` : `étapes ${g.from}–${g.to}`);
 
 /** The group a step is in, for the player bar: « Dans « Serveur » · étapes 3–7 ». */
 export function groupOf(groups: StepGroup[] | null, n: number): StepGroup | null {

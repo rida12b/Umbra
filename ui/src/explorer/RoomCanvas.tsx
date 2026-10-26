@@ -6,6 +6,7 @@ import { buildFloor, mainJourney } from "./floor";
 import { FloorHeader } from "./FloorHeader";
 import { Line, LineMarkers } from "./floorLines";
 import type { Room } from "./room";
+import type { Point } from "./floorLayout";
 import { placeRoom, type Rect } from "./roomLayout";
 import { rememberRoom } from "./roomMemory";
 import { ChuteCard, DoorCard, HungTag, MachineCard, WiringBand } from "./roomParts";
@@ -44,7 +45,13 @@ export function RoomCanvas({ model, room, enterable, selected, play, onSelect, o
   const block = model.blocs.find((b) => b.id === room.bloc);
   const component = (id: string) => model.composants.find((c) => c.id === id);
   const station = play?.station ?? null;
-  const wiring = room.band.map((id) => ({ nom: name(id), words: component(id)?.en_bref ?? "", file: component(id)?.fichiers[0] ?? null, lit: station?.machine === id }));
+  // Another journey than the one the room is drawn for: the doors', tags' and answer's step numbers belong to the
+  // room's journey, so they are hidden; the wiring band gets the played journey's numbers when it is the station.
+  const foreign = !!play && play.journey !== room.journey?.id;
+  const bandSteps = (id: string) => (play ? play.stations.filter((s) => s.machine === id).map((s) => s.n) : []);
+  const wiring = room.band.map((id) => ({
+    nom: name(id), words: component(id)?.en_bref ?? "", file: component(id)?.fichiers[0] ?? null, lit: station?.machine === id, steps: bandSteps(id), current: station?.n ?? null,
+  }));
   // The band wires the machines it uses (V30): a thin grey mark down to each of them.
   const wired = room.belt.filter((m) => room.band.some((id) => component(id)?.utilise.includes(m.id)));
 
@@ -116,6 +123,10 @@ export function RoomCanvas({ model, room, enterable, selected, play, onSelect, o
   const went = station?.room === room.bloc ? station.machine : null;
   const lit = (from: string, to: string) => !!came && !!went && came !== went && ((from === came && to === went) || (from === went && to === came));
   const back = (from: string) => from === went;
+  // No belt section joins them (a return to an earlier machine, a door that feeds another machine): a short lit
+  // hop above the cards, for this step only, so the picture moves as the words say.
+  const joined = [...plan.belt, ...plan.doorLinks].some((s) => lit(s.from, s.to));
+  const hop = play && !joined && came && went && came !== went ? hopBetween(plan.rects.get(came), plan.rects.get(went)) : null;
   const bare = (id: string) => id.replace(/^door:/, "");
   // The answer going back (V37) lights on the step that sends it, in the journey the room is drawn for.
   const replying = !!room.reply && play?.journey === room.journey?.id && station?.n === room.reply.step;
@@ -152,6 +163,7 @@ export function RoomCanvas({ model, room, enterable, selected, play, onSelect, o
                 }),
               )}
               {plan.reply && <Line points={plan.reply.points} kind="reply" lit={replying} />}
+              {hop && <Line points={hop} kind="data" lit />}
               {[...plan.belt, ...plan.doorLinks].map((s) => (
                 <Line key={`${s.from}>${s.to}`} points={s.points} kind="belt" lit={lit(s.from, s.to)} back={back(s.from)} dim />
               ))}
@@ -167,7 +179,7 @@ export function RoomCanvas({ model, room, enterable, selected, play, onSelect, o
                 );
               })}
             {plan.doorLinks.map((s) => {
-              const step = s.from.startsWith("door:") ? crossing(bare(s.from), "in") : crossing(bare(s.to), "out");
+              const step = foreign ? undefined : s.from.startsWith("door:") ? crossing(bare(s.from), "in") : crossing(bare(s.to), "out");
               const p = s.points;
               if (step === undefined || p.length < 2) return null;
               return (
@@ -182,7 +194,7 @@ export function RoomCanvas({ model, room, enterable, selected, play, onSelect, o
                 </span>
               );
             })}
-            {room.reply && plan.rects.get("reply") && <ReplyLabel rect={plan.rects.get("reply")!} step={room.reply.step} verb={room.reply.verb} to={name(room.reply.door)} words={room.reply.words} />}
+            {room.reply && plan.rects.get("reply") && <ReplyLabel rect={plan.rects.get("reply")!} step={foreign ? null : room.reply.step} verb={room.reply.verb} to={name(room.reply.door)} words={room.reply.words} />}
             {room.band.length > 0 && plan.rects.get("band") && <WiringBand rect={plan.rects.get("band")!} items={wiring} />}
             {room.belt.length === 0 && (
               <p className="absolute text-[14px] text-muted" style={{ left: f.x + 16, top: (plan.rects.get("band")?.y ?? 34) + (plan.rects.get("band")?.h ?? 0) + 24 }}>
@@ -198,6 +210,7 @@ export function RoomCanvas({ model, room, enterable, selected, play, onSelect, o
                 rect={plan.rects.get(`door:${door.bloc}`)!}
                 enterable={enterable.has(door.bloc)}
                 onOpen={openDoor}
+                hideSteps={foreign}
                 touched={touched(door.bloc) || came === `door:${door.bloc}`}
               />
             ))}
@@ -216,7 +229,7 @@ export function RoomCanvas({ model, room, enterable, selected, play, onSelect, o
             ))}
             {room.belt.flatMap((machine) => machine.chutes.map((chute, k) => <ChuteCard key={`${machine.id}:${k}`} chute={chute} rect={plan.rects.get(`chute:${machine.id}:${k}`)!} />))}
             {room.belt.flatMap((machine) =>
-              machine.hung.map((h) => <HungTag key={`${machine.id}:${h.bloc}`} id={h.bloc} name={name(h.bloc)} verb={floor.links.find((l) => l.from === room.bloc && l.to === h.bloc)?.verb ?? null} steps={h.steps} rect={plan.rects.get(`hung:${machine.id}:${h.bloc}`)!} onSelect={onSelect} touched={touched(h.bloc)} />),
+              machine.hung.map((h) => <HungTag key={`${machine.id}:${h.bloc}`} id={h.bloc} name={name(h.bloc)} verb={floor.links.find((l) => l.from === room.bloc && l.to === h.bloc)?.verb ?? null} steps={foreign ? [] : h.steps} rect={plan.rects.get(`hung:${machine.id}:${h.bloc}`)!} onSelect={onSelect} touched={touched(h.bloc)} />),
             )}
           </div>
         </div>
@@ -262,11 +275,21 @@ export function RoomCanvas({ model, room, enterable, selected, play, onSelect, o
   );
 }
 
+/** A path from one card to another over the top of both: up, across, down onto the second. */
+function hopBetween(a: Rect | undefined, b: Rect | undefined): Point[] | null {
+  if (!a || !b) return null;
+  const y = Math.min(a.y, b.y) - 14;
+  const xa = a.x + a.w * (a.x + a.w / 2 === b.x + b.w / 2 ? 0.3 : 0.5); // one above the other: two separate legs
+  const xb = b.x + b.w * (a.x + a.w / 2 === b.x + b.w / 2 ? 0.7 : 0.5);
+  return [{ x: xa, y: a.y }, { x: xa, y }, { x: xb, y }, { x: xb, y: b.y }];
+}
+
 /** The answer's words under the room (V38): its step, who it answers, and what it holds. */
-function ReplyLabel({ rect, step, verb, to, words }: { rect: Rect; step: number; verb: string; to: string; words: string }) {
+function ReplyLabel({ rect, step, verb, to, words }: { rect: Rect; step: number | null; verb: string; to: string; words: string }) {
   return (
     <p className="absolute rounded-md border border-dashed border-line bg-bg px-2.5 py-1 text-center text-[12px] leading-snug" style={{ left: rect.x, top: rect.y, width: rect.w, minHeight: rect.h }}>
-      {step} · {verb} {to} <span className="fl-tech">texte du modèle, technique</span>
+      {step !== null && `${step} · `}
+      {verb} {to} <span className="fl-tech">texte du modèle, technique</span>
       {words && <span className="block truncate text-[11px] text-muted" title={words}>{words}</span>}
     </p>
   );

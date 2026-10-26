@@ -16,7 +16,8 @@ import { InfoPanel } from "./InfoPanel";
 import { buildLevel, levelOf, trail, type Box, type Level, type LevelKey } from "./levels";
 import { NarrowLevel } from "./NarrowLevel";
 import { PlayerBar } from "./PlayerBar";
-import { groupOf, journeyStations, stepGroups, type Station } from "./stations";
+import { buildFloor } from "./floor";
+import { followedRoom, groupOf, journeyStations, stepGroups, type Station } from "./stations";
 import { trackJourney } from "./track";
 
 /** Explorer levels live in the URL as `x:<level>` (« x:parts », « x:part:engine »); anything else is code. */
@@ -28,9 +29,10 @@ export const DEFAULT_LEVEL: LevelKey = "parts";
 const TRANSIT_MS = 900; // a step that changes room: the floor shows the data going there, then the room opens
 const STILL = typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
-/** The camera follows the data (#77): the room of the step's machine, else the floor (a step done by hand). */
+/** The camera follows the data (#77): the room of the step's machine, else the floor. */
 function followed(station: Station | undefined, rooms: Set<string>): LevelKey {
-  return station?.room && rooms.has(station.room) ? `part:${station.room}` : DEFAULT_LEVEL;
+  const room = followedRoom(station, rooms);
+  return room ? `part:${room}` : DEFAULT_LEVEL;
 }
 
 /** One step of a journey placed on a level, for the canvases. */
@@ -111,13 +113,16 @@ export function Explorer({ project, route, theme, narrow }: Props) {
 
   // A step that changes room first shows the floor, the belt lit from the old room to the new one, then the room opens.
   const [transit, setTransit] = useState<number | null>(null); // the step whose move is shown on the floor
+  // Only a move the floor draws a line for: a floor with nothing lit between the two rooms would show no movement.
+  const floorLines = useMemo(() => (model ? (({ beltLinks, links }) => [...beltLinks, ...links])(buildFloor(model)) : []), [model]);
   const shown = useRef<{ journey: string; station: Station } | null>(null);
   useLayoutEffect(() => {
     const station = stations?.[stepNumber - 1];
     const before = shown.current;
     shown.current = journey && station ? { journey: journey.id, station } : null;
     if (!journey || !station || before?.journey !== journey.id || STILL || narrow) return;
-    const moved = before.station.room && station.room && before.station.room !== station.room && levelKey === `part:${station.room}`;
+    const [a, b] = [before.station.room, station.room];
+    const moved = a && b && a !== b && levelKey === `part:${b}` && floorLines.some((l) => (l.from === a && l.to === b) || (l.from === b && l.to === a));
     if (!moved) return;
     setTransit(stepNumber);
     const timer = window.setTimeout(() => setTransit(null), TRANSIT_MS);
@@ -125,7 +130,7 @@ export function Explorer({ project, route, theme, narrow }: Props) {
       window.clearTimeout(timer);
       setTransit(null);
     };
-  }, [journey, stations, stepNumber, levelKey, narrow]);
+  }, [journey, stations, stepNumber, levelKey, narrow, floorLines]);
   const floorLevel = useMemo(() => (model && transit !== null ? buildLevel(model, DEFAULT_LEVEL, project.name) : null), [model, transit, project.name]);
   const transitPlay = useMemo(
     () => (model && journey && stations && floorLevel && transit !== null ? playOn(journey, stations, floorLevel, transit) : null),
@@ -149,9 +154,22 @@ export function Explorer({ project, route, theme, narrow }: Props) {
   }, [model, route.select, route.journey, levelKey, select, stop, openLevel]);
 
   if (!model) return <ModelPending state={state} />;
-  const crumbs = levelKey ? trail(model, levelKey) : [...trail(model, "parts"), ...(codeView?.breadcrumbs.map((c) => ({ key: c.key, title: c.label, code: true })) ?? [])];
+  // During the transit the floor is drawn: the breadcrumb and the map's name say so.
+  const crumbs = transitPlay ? trail(model, DEFAULT_LEVEL) : levelKey ? trail(model, levelKey) : [...trail(model, "parts"), ...(codeView?.breadcrumbs.map((c) => ({ key: c.key, title: c.label, code: true })) ?? [])];
   const box = level && route.select ? (level.boxes.find((b) => b.id === route.select) ?? null) : null;
 
+  const bar = journey && (
+    <PlayerBar
+      journey={journey}
+      step={stepNumber}
+      station={stations?.[stepNumber - 1] ?? null}
+      group={groupOf(groups, stepNumber)}
+      onStep={onStep}
+      onStop={stop}
+      onOpenFile={(path) => go({ node: path, select: null })}
+    />
+  );
+  let barUnderMap = false; // on a wide screen the bar sits under the map only, the panel runs to the bottom (V65)
   let body;
   if (!levelKey)
     body = (
@@ -186,6 +204,7 @@ export function Explorer({ project, route, theme, narrow }: Props) {
       </StateMessage>
     );
   else {
+    barUnderMap = !narrow;
     const panel = (
       <InfoPanel
         projectId={project.id}
@@ -207,16 +226,19 @@ export function Explorer({ project, route, theme, narrow }: Props) {
       </div>
     ) : (
       <div className="grid h-full min-h-0 grid-cols-[minmax(0,1fr)_400px]">
-        <section className="map-surface relative min-h-0" aria-label={`Carte : ${level.title}`}>
-          {floorLevel?.floor && transitPlay ? (
-            <FloorCanvas model={model} floor={floorLevel.floor} level={floorLevel} selected={null} play={transitPlay} onSelect={select} onEnter={enter} />
-          ) : level.floor ? (
-            <FloorCanvas model={model} floor={level.floor} level={level} selected={route.select ?? null} play={playState} onSelect={select} onEnter={enter} />
-          ) : level.room ? (
-            <RoomCanvas key={level.room.bloc} model={model} room={level.room} enterable={rooms} selected={route.select ?? null} play={playState} onSelect={select} onOpenDoor={openDoor} />
-          ) : (
-            <ExplorerCanvas level={level} theme={theme} selected={route.select ?? null} play={playState} onSelect={select} onEnter={enter} />
-          )}
+        <section className="flex min-h-0 flex-col" aria-label={`Carte : ${transitPlay && floorLevel ? floorLevel.title : level.title}`}>
+          <div className="map-surface relative min-h-0 flex-1">
+            {floorLevel?.floor && transitPlay ? (
+              <FloorCanvas model={model} floor={floorLevel.floor} level={floorLevel} selected={null} play={transitPlay} onSelect={select} onEnter={enter} transit={TRANSIT_MS - 150} />
+            ) : level.floor ? (
+              <FloorCanvas model={model} floor={level.floor} level={level} selected={route.select ?? null} play={playState} onSelect={select} onEnter={enter} />
+            ) : level.room ? (
+              <RoomCanvas key={level.room.bloc} model={model} room={level.room} enterable={rooms} selected={route.select ?? null} play={playState} onSelect={select} onOpenDoor={openDoor} />
+            ) : (
+              <ExplorerCanvas level={level} theme={theme} selected={route.select ?? null} play={playState} onSelect={select} onEnter={enter} />
+            )}
+          </div>
+          {bar}
         </section>
         <aside className="min-h-0 overflow-y-auto border-l border-line-soft" aria-label="Explication">
           {panel}
@@ -267,17 +289,7 @@ export function Explorer({ project, route, theme, narrow }: Props) {
         )}
       </nav>
       <div className="min-h-0 flex-1">{body}</div>
-      {journey && (
-        <PlayerBar
-          journey={journey}
-          step={stepNumber}
-          station={stations?.[stepNumber - 1] ?? null}
-          group={groupOf(groups, stepNumber)}
-          onStep={onStep}
-          onStop={stop}
-          onOpenFile={(path) => go({ node: path, select: null })}
-        />
-      )}
+      {!barUnderMap && bar}
     </div>
   );
 }

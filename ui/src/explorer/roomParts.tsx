@@ -30,27 +30,23 @@ export function MachineCard({ machine, rect, look, selected, onSelect, numbers =
       style={at(rect)}
     >
       {pill && <span className="fl-pill" title={pill}>{pill}</span>}
-      {numbers && numbers.length > 1 && (
-        // Every step of the journey played on this machine (« 3 · 5 »), the current one filled; on their own line, the name keeps its width.
-        <span className="mb-0.5 flex flex-wrap items-center gap-0.5 text-[10px] text-faint" aria-label={`étapes ${numbers.join(", ")}`}>
-          {numbers.map((n, i) => (
-            <span key={n} className="flex items-center gap-0.5">
-              {i > 0 && "·"}
-              <span className={`fl-num ${n === current ? "on" : ""}`}>{n}</span>
+      {/* Played or not, the same layout (V50): the first number in its circle, the others on « aussi à l'étape »; the step played is filled. */}
+      <span className="flex items-start gap-1.5">
+        {first !== undefined && <span className={`fl-num mt-0.5 ${first === current ? "on" : ""}`}>{first}</span>}
+        <span className="line-clamp-3 text-[14px] leading-tight font-bold text-ink">{machine.nom}</span>
+      </span>
+      <span className="mt-1 line-clamp-2 text-[12.5px] leading-snug text-muted">{machine.words}</span>
+      {again.length > 0 && (
+        <span className="text-[11.5px] text-faint">
+          aussi à l'étape{" "}
+          {again.map((n, i) => (
+            <span key={n}>
+              {i > 0 && ", "}
+              <span className={n === current ? "fl-num on" : ""}>{n}</span>
             </span>
           ))}
         </span>
       )}
-      <span className="flex items-start gap-1.5">
-        {numbers ? (
-          numbers.length === 1 && <span className={`fl-num mt-0.5 ${numbers[0] === current ? "on" : ""}`}>{numbers[0]}</span>
-        ) : (
-          first !== undefined && <span className="fl-num mt-0.5">{first}</span>
-        )}
-        <span className="line-clamp-3 text-[14px] leading-tight font-bold text-ink">{machine.nom}</span>
-      </span>
-      <span className="mt-1 line-clamp-2 text-[12.5px] leading-snug text-muted">{machine.words}</span>
-      {!numbers && again.length > 0 && <span className="text-[11.5px] text-faint">aussi à l'étape {again.join(", ")}</span>}
       <span className="mt-auto flex flex-col gap-1">
         {machine.entre[0] && <span className="fl-io" title={machine.entre.join(", ")}>→ reçoit {machine.entre[0]}</span>}
         {machine.sort[0] && <span className="fl-io out" title={machine.sort.join(", ")}>rend {machine.sort[0]} →</span>}
@@ -59,12 +55,12 @@ export function MachineCard({ machine, rect, look, selected, onSelect, numbers =
   );
 }
 
-export function DoorCard({ door, name, person, rect, enterable, onOpen, touched = false }: {
-  door: Door; name: string; person: boolean; rect: Rect; enterable: boolean; onOpen: (bloc: string) => void; touched?: boolean;
+export function DoorCard({ door, name, person, rect, enterable, onOpen, touched = false, hideSteps = false }: {
+  door: Door; name: string; person: boolean; rect: Rect; enterable: boolean; onOpen: (bloc: string) => void; touched?: boolean; hideSteps?: boolean;
 }) {
   const into = door.side === "left";
   // Only the way out lists its steps (V36); the way in says who sends, as in the mockup (V27).
-  const crossings = into ? [] : door.crossings.filter((c) => c.dir === "out");
+  const crossings = into || hideSteps ? [] : door.crossings.filter((c) => c.dir === "out");
   return (
     <button
       type="button"
@@ -120,7 +116,7 @@ export function HungTag({ name, verb, steps, rect, onSelect, id, touched = false
     <button
       type="button"
       data-room-item={`hung:${id}`}
-      title={`${name} — étapes ${steps.join(", ")}`}
+      title={steps.length ? `${name} — étapes ${steps.join(", ")}` : name}
       onClick={(event) => {
         event.stopPropagation();
         onSelect(id);
@@ -131,14 +127,17 @@ export function HungTag({ name, verb, steps, rect, onSelect, id, touched = false
       <Search size={13} className="mt-0.5 shrink-0 text-kind-outside" aria-hidden="true" />
       <span className="min-w-0">
         <span className="line-clamp-1 font-medium text-ink">{name}</span>
-        <span className="block truncate text-faint">{steps.length > 1 ? "étapes" : "étape"} {steps.join(", ")} · {verb || "va y chercher"}</span>
+        <span className="block truncate text-faint">
+          {steps.length > 0 && `${steps.length > 1 ? "étapes" : "étape"} ${steps.join(", ")} · `}
+          {verb || "va y chercher"}
+        </span>
       </span>
     </button>
   );
 }
 
 /** The start-up wiring (V29): what runs once when the service starts, with where it is in the code. */
-export function WiringBand({ rect, items }: { rect: Rect; items: { nom: string; words: string; file: string | null; lit?: boolean }[] }) {
+export function WiringBand({ rect, items }: { rect: Rect; items: { nom: string; words: string; file: string | null; lit?: boolean; steps?: number[]; current?: number | null }[] }) {
   // A journey played on the wiring itself (« démarrer ») lights the band: its station is not on the belt.
   const lit = items.some((item) => item.lit);
   return (
@@ -146,6 +145,9 @@ export function WiringBand({ rect, items }: { rect: Rect; items: { nom: string; 
       <span className="w-fit rounded border border-line px-1.5 text-[10.5px] font-semibold tracking-wide text-faint uppercase">câblage, au démarrage</span>
       {items.map((item) => (
         <span key={item.nom} className="truncate text-muted" title={`${item.nom} — ${item.words}`}>
+          {(item.steps ?? []).map((n) => (
+            <span key={n} className={`fl-num mr-1 align-[1px] ${n === item.current ? "on" : ""}`}>{n}</span>
+          ))}
           <strong className={`font-semibold ${item.lit ? "text-fl-hl" : "text-ink"}`}>{item.nom}</strong>
           {item.words && ` — ${item.words}`}
           {item.file && <span className="font-mono text-fl-service"> · {item.file}</span>}

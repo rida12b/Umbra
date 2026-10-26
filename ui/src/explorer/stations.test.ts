@@ -2,7 +2,8 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
 import type { ProjectModel } from "../api";
-import { journeyStations, stepGroups, stationKey } from "./stations.ts";
+import { followedRoom, groupOf, journeyStations, stationKey, stepGroups, stepsWord } from "./stations.ts";
+import { enterable } from "./room.ts";
 
 // Playing a journey moves the data machine by machine (#77): every « Suivante » changes the station, or says
 // why it does not. Real study models: two before v1.7 (Watchdog, JusticIA), two after (Watchdog, fastapi).
@@ -92,4 +93,41 @@ test("phases that leave steps out still cover every step, in order", () => {
   assert.deepEqual([groups[0]!.from, groups.at(-1)!.to], [1, 13]);
   assert.ok(groups.every((g, i) => i === 0 || g.from === groups[i - 1]!.to + 1));
   assert.ok(groups.some((g) => g.title === "Envoyer le courriel" && g.from === 4 && g.to === 7));
+});
+
+test("every step of a long journey has a group in the bar, a few groups only, never « étapes 11–11 »", () => {
+  const justicia = load("justicia");
+  const j = journey(justicia, "poser-question");
+  const groups = stepGroups(justicia, j)!;
+  for (let n = 1; n <= j.etapes.length; n++) assert.ok(groupOf(groups, n), `step ${n} has no group`);
+  assert.ok(groups.length <= 5, `${groups.length} groups for 16 steps`);
+  assert.ok(groups.every((g) => !/(\d+)–\1$/.test(stepsWord(g))));
+  assert.equal(stepsWord({ title: "", from: 11, to: 11 }), "étape 11");
+});
+
+test("overlapping and out-of-range phases still cover each step exactly once, in order", () => {
+  const model = load("fastapi-template");
+  const base = journey(model, "mot-de-passe-oublie");
+  for (const phases of [
+    [{ nom: "A", de: 1, a: 5 }, { nom: "B", de: 2, a: 3 }, { nom: "C", de: 4, a: 9 }],
+    [{ nom: "A", de: 1, a: 6 }, { nom: "Z", de: 20, a: 25 }],
+    [{ nom: "B", de: 6, a: 3 }, { nom: "A", de: 2, a: 40 }],
+  ]) {
+    const groups = stepGroups(model, { ...base, phases })!;
+    const covered = groups.flatMap((g) => {
+      assert.ok(g.from <= g.to, JSON.stringify(g));
+      return Array.from({ length: g.to - g.from + 1 }, (_, i) => g.from + i);
+    });
+    assert.deepEqual(covered, Array.from({ length: base.etapes.length }, (_, i) => i + 1), JSON.stringify(phases));
+  }
+});
+
+test("a step naming a whole part (before v1.7) is shown on the floor, where that part lights; never an empty room", () => {
+  const model = load("watchdog");
+  const j = structuredClone(journey(model, "envoi-evenement"));
+  j.etapes[1]!.composant = "api"; // a part with machines, not a machine
+  const stations = journeyStations(model, j);
+  assert.deepEqual([stations[1]!.machine, stations[1]!.room], [null, "api"]);
+  assert.equal(followedRoom(stations[1], enterable(model)), null); // the floor, not « api » with nothing lit
+  assert.equal(followedRoom(stations[0], enterable(model)), "api");
 });

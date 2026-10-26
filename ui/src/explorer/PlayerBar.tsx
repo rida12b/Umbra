@@ -1,8 +1,9 @@
-import { ChevronLeft, ChevronRight, X } from "lucide-react";
+import { Play, SkipForward, X } from "lucide-react";
+import type { ReactNode } from "react";
 import { useEffect } from "react";
 import type { Journey } from "../api";
 import { stepLabel } from "../arch/story";
-import type { Station, StepGroup } from "./stations";
+import { stepsWord, type Station, type StepGroup } from "./stations";
 
 interface Props {
   journey: Journey;
@@ -37,21 +38,24 @@ export function PlayerBar({ journey, step, station, group, onStep, onStop, onOpe
   return (
     <section className="border-t-2 border-lamp-line bg-panel px-5 py-3 max-sm:px-3" aria-label="Chemin de données en lecture">
       <div className="flex items-center gap-4 max-sm:gap-2">
-        <button
-          type="button"
-          onClick={() => onStep(step - 1)}
-          disabled={step <= 1}
-          className="rounded-lg border border-line p-2 hover:bg-raised disabled:opacity-30"
-          aria-label="Étape précédente"
-        >
-          <ChevronLeft size={20} />
-        </button>
+        {/* As in mockup A (V65): three square buttons, then the step in words. */}
+        <div className="flex shrink-0 gap-1.5">
+          <Square label="Étape précédente" disabled={step <= 1} onClick={() => onStep(step - 1)}>
+            <Play size={16} className="rotate-180 fill-current" />
+          </Square>
+          <Square label="Étape suivante" disabled={step >= last} onClick={() => onStep(step + 1)}>
+            <Play size={16} className="fill-current" />
+          </Square>
+          <Square label="Dernière étape" disabled={step >= last} onClick={() => onStep(last)} wide>
+            <SkipForward size={16} className="fill-current" />
+          </Square>
+        </div>
         <div className="min-w-0 flex-1">
           <p className="truncate text-[13px] text-faint">
             {journey.nom} · étape {step} sur {last}
             {group && (
               <>
-                {" "}· <span className="text-muted">{group.title}</span> · étapes {group.from}–{group.to}
+                {" "}· <span className="text-muted">{group.title}</span> · {stepsWord(group)}
               </>
             )}
           </p>
@@ -67,35 +71,31 @@ export function PlayerBar({ journey, step, station, group, onStep, onStop, onOpe
               <button
                 type="button"
                 onClick={() => onOpenFile(current.fichier!)}
-                title="Ouvrir ce fichier"
-                className="max-w-full truncate font-mono text-[12px] text-fl-service hover:underline"
+                title={`Ouvrir ${current.fichier}${lines}`}
+                aria-label={`${current.fichier}${lines}`}
+                className="flex max-w-full min-w-0 font-mono text-[12px] text-fl-service hover:underline"
               >
-                {current.fichier}
-                {lines}
+                {/* The path may be cut, never the lines; a phone shows the file's name only. */}
+                <span className="truncate max-sm:hidden">{current.fichier}</span>
+                <span className="truncate sm:hidden">{current.fichier.split("/").pop()}</span>
+                <span className="shrink-0 whitespace-pre">{lines}</span>
               </button>
             )}
           </p>
         </div>
-        {step < last ? (
-          <button
-            type="button"
-            onClick={() => onStep(step + 1)}
-            className="rounded-lg bg-ink px-4 py-2 text-[15px] font-medium text-bg hover:opacity-90 max-sm:px-2.5"
-            aria-label="Étape suivante"
-          >
-            <span className="flex items-center gap-1">
-              <span className="max-sm:sr-only">Suivante</span> <ChevronRight size={18} aria-hidden="true" />
-            </span>
-          </button>
-        ) : (
-          <button type="button" onClick={onStop} className="rounded-lg bg-ink px-4 py-2 text-[15px] font-medium text-bg hover:opacity-90 max-sm:px-2.5">
-            Terminer
-          </button>
-        )}
         <button type="button" onClick={onStop} className="rounded-lg p-2 text-muted hover:bg-raised" aria-label="Arrêter le chemin">
           <X size={18} />
         </button>
       </div>
     </section>
+  );
+}
+
+/** `wide`: only where there is room (not on a phone, where the step's words need the width). */
+function Square({ label, disabled, onClick, children, wide = false }: { label: string; disabled: boolean; onClick: () => void; children: ReactNode; wide?: boolean }) {
+  return (
+    <button type="button" onClick={onClick} disabled={disabled} aria-label={label} title={label} className={`flex size-10 items-center justify-center rounded-lg border border-line text-ink hover:bg-raised disabled:opacity-30 max-sm:size-9 ${wide ? "max-sm:hidden" : ""}`}>
+      {children}
+    </button>
   );
 }

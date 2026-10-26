@@ -21,10 +21,11 @@ interface Props {
   play: Play | null;
   onSelect: (id: string | null) => void;
   onEnter: (box: Box) => void;
+  transit?: number; // shown for this long while the data changes room: the particle makes one run and arrives
 }
 
 /** The first screen of a project: the factory floor, read top-left to bottom-right, scrolled down only. */
-export function FloorCanvas({ model, floor, level, selected, play, onSelect, onEnter }: Props) {
+export function FloorCanvas({ model, floor, level, selected, play, onSelect, onEnter, transit }: Props) {
   const screen = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(1000);
   useLayoutEffect(() => {
@@ -113,10 +114,10 @@ export function FloorCanvas({ model, floor, level, selected, play, onSelect, onE
           <svg className="pointer-events-none absolute overflow-visible" width={plan.size.width} height={plan.size.height} aria-hidden="true">
             <LineMarkers />
             {plan.belt.map(({ link, points }) => (
-              <Line key={link.id} points={points} kind="belt" lit={lit(link.from, link.to)} back={back(link.from)} />
+              <Line key={link.id} points={points} kind="belt" lit={lit(link.from, link.to)} back={back(link.from)} once={transit} />
             ))}
             {plan.routes.map(({ link, points }) => (
-              <Line key={link.id} points={points} kind={link.style} lit={lit(link.from, link.to)} back={back(link.from)} />
+              <Line key={link.id} points={points} kind={link.style} lit={lit(link.from, link.to)} back={back(link.from)} once={transit} />
             ))}
           </svg>
           {plan.belt.map(({ link, label, points }) => {
