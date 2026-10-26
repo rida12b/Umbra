@@ -36,8 +36,8 @@ function landing(model: ProjectModel, target: Target): Omit<Route, "projectId"> 
     }
     case "code":
       return { ...floor, node: target.path, select: target.lines ? `line:${target.lines[0]}-${target.lines[1]}` : null };
-    case "usine":
-      return floor;
+    case "doute":
+      return { ...floor, row: `doute:${target.index}` };
   }
 }
 
@@ -109,7 +109,10 @@ export function CommandPalette({ projectId, model, open, onOpenChange }: Props) 
                     <span className="line-clamp-2 text-ink">{r.label}</span>
                     {r.note && <span className="shrink-0 text-[12px] text-lamp-ink">{r.note}</span>}
                   </span>
-                  {r.detail && <span className={`truncate text-[12px] text-muted ${g.kind === "reglage" || g.kind === "changer" || g.kind === "code" ? "font-mono" : ""}`}>{r.detail}</span>}
+                  {r.detail && (
+                    // The code a setting is about may be long: two lines, cut anywhere, never its key word lost to « … ».
+                    <span className={`line-clamp-2 text-[12px] text-muted ${g.kind === "reglage" || g.kind === "changer" || g.kind === "code" ? "font-mono [overflow-wrap:anywhere]" : ""}`}>{r.detail}</span>
+                  )}
                   <span className="truncate text-[11.5px] text-faint">{r.address}</span>
                 </Command.Item>
               ))}

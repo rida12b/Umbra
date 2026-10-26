@@ -302,7 +302,13 @@ test("search with the reader's words: Ctrl K, type, Enter lands on the plate wit
   await page.getByRole("combobox", { name: "Chercher dans le projet" }).fill("postgres");
   await page.getByRole("option", { name: /Image de la base/ }).click();
   await expect(page.getByRole("region", { name: "Réglages du projet" }).locator('li[aria-current="true"]')).toContainText("lu par le code : non");
-  if (isMobile) await expect(page.getByRole("dialog", { name: "Fiche" })).toBeVisible();
+  if (isMobile) await expect(page.getByRole("dialog", { name: "Fiche" })).toBeVisible();  // A step found by its words starts the journey at that step, in the room of its machine.
+  await page.keyboard.press("Escape");
+  await page.keyboard.press("Control+k");
+  await page.getByRole("combobox", { name: "Chercher dans le projet" }).fill("valide puis enregistre");
+  await page.getByRole("group", { name: "Étapes des trajets" }).getByRole("option").first().click();
+  await expect(page).toHaveURL(/node=x%3Apart%3Aapi.*journey=order&step=2/);
+  await expect(page.getByLabel("Chemin de données en lecture")).toContainText("étape 2 sur 2");
 });
 
 test("a person cannot be entered; a link to a part without machines says so and leads back", async ({ page, isMobile }) => {

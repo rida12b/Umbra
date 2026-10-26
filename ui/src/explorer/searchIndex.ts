@@ -12,7 +12,7 @@ export type Target =
   | { kind: "projet"; row: string } // the project's settings plate
   | { kind: "etape"; journey: string; step: number }
   | { kind: "code"; path: string; lines: [number, number] | null }
-  | { kind: "usine" };
+  | { kind: "doute"; index: number }; // the floor's « Ce que Claude n'a pas pu vérifier », that line lit
 
 export type Kind = "changer" | "machine" | "reglage" | "etape" | "code" | "doute";
 export const GROUP_TITLE: Record<Kind, string> = {
@@ -47,7 +47,15 @@ export interface Group {
 
 /** Accents and capitals do not count: « ÉCRAN » is « ecran ». */
 export const plain = (text: string) => text.normalize("NFD").replace(/\p{Diacritic}/gu, "").toLowerCase();
-const words = (text: string) => plain(text).split(/[^a-z0-9]+/).filter(Boolean);
+// A plural is found like its singular (« clients », « erreurs »): a final s or x is dropped on both sides, except on
+// words where it is not a plural mark.
+const KEEP_S = new Set(["acces", "temps", "mois", "pas", "plus", "sous", "dans", "apres", "tres", "fois", "cas", "corps", "prix", "choix", "deux", "trois", "processus", "status", "alias", "redis", "https", "os"]);
+const stem = (t: string) => (t.length > 3 && /[sx]$/.test(t) && !KEEP_S.has(t) ? t.slice(0, -1) : t);
+const words = (text: string) => plain(text).split(/[^a-z0-9]+/).filter(Boolean).map(stem);
+// Words that carry no meaning in a query (« changer le port »): articles, « je veux », and the intention verbs, which
+// only say « I want to change », what the « Je veux changer… » group is for.
+const FILLER = new Set(["le", "la", "les", "l", "de", "du", "des", "d", "un", "une", "je", "veu", "a", "au", "aux", "et", "en", "pour", "mon", "ma", "me", "ce", "cet", "cette", "qui", "que", "on", "comment", "ou"]);
+const INTENT = new Set(["changer", "modifier", "regler", "mettre", "change", "modifie", "regle"]);
 
 export function buildIndex(model: ProjectModel): Entry[] {
   const bloc = new Map(model.blocs.map((b) => [b.id, b]));
@@ -67,7 +75,7 @@ export function buildIndex(model: ProjectModel): Entry[] {
     // search for one would list them all. Its plain words and its terms carry the reader's vocabulary.
     add({ key: `composant:${c.id}`, kind: "machine", label: c.nom, detail: c.en_bref || c.role, address: at, target: machine(null), name: c.nom, terms, body: c.en_bref || c.role });
     for (const r of c.reglages ?? [])
-      add({ key: `reglage:${c.id}:${r.code}`, kind: "reglage", label: r.nom, detail: r.code, address: `${at} › Réglage`, target: machine(r.code), name: r.nom, terms, body: `${r.code} ${r.valeur} ${r.effet}` });
+      add({ key: `reglage:${c.id}:${r.code}`, kind: "reglage", label: r.nom, detail: r.code, address: `${at} › Réglage « ${r.nom} »`, target: machine(r.code), name: r.nom, terms, body: `${r.code} ${r.valeur} ${r.effet}` });
     for (const e of c.expose)
       add({ key: `fonction:${c.id}:${e.quoi}`, kind: "code", label: e.quoi, detail: e.fichier ?? "", address: at, target: { kind: "code", path: e.fichier ?? "", lines: e.lignes }, name: e.quoi, body: e.fichier ?? "" });
     for (const f of c.fichiers)
@@ -93,14 +101,18 @@ export function buildIndex(model: ProjectModel): Entry[] {
       }),
     );
   }
-  model.incertitudes.forEach((d, i) => add({ key: `doute:${i}`, kind: "doute", label: d, detail: "", address: "Ce que l'étude n'a pas pu confirmer", target: { kind: "usine" }, name: d }));
+  model.incertitudes.forEach((d, i) => add({ key: `doute:${i}`, kind: "doute", label: d, detail: "", address: "L'usine › Ce que Claude n'a pas pu vérifier", target: { kind: "doute", index: i }, name: d }));
   return entries;
 }
 
 /** Every word typed must start a word of the entry. Name first, then its terms, then the rest; groups in a fixed order. */
 export function searchIndex(index: Entry[], query: string): Group[] {
-  const wanted = words(query);
-  if (wanted.join("").length < 2) return [];
+  const typed = words(query);
+  if (typed.join("").length < 2) return [];
+  const wanted = typed.filter((w) => !FILLER.has(w) && !INTENT.has(w));
+  // Only « je veux changer »: every intention, nothing else.
+  if (wanted.length === 0)
+    return typed.some((w) => INTENT.has(w)) ? [{ kind: "changer", title: GROUP_TITLE.changer, results: index.filter((e) => e.kind === "changer").map(({ name: _n, terms: _t, body: _b, ...r }) => r) }] : [];
   const hits = (list: string[]) => wanted.every((w) => list.some((t) => t.startsWith(w)));
   const scored = index.flatMap((e) => {
     const score = hits(e.name) ? 3 : hits([...e.name, ...e.terms]) ? 2 : hits([...e.name, ...e.terms, ...e.body]) ? 1 : 0;
