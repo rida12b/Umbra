@@ -8,11 +8,14 @@ import type { Rect } from "./roomLayout";
 // under its machine, a thing the machine searches or calls, and the start-up wiring band. Long words
 // are cut, the full text stays on hover and focus.
 
-type Look = "normal" | "lit" | "dim";
+type Look = "normal" | "lit" | "touched" | "dim";
 const at = (r: Rect) => ({ left: r.x, top: r.y, width: r.w, height: r.h });
 
-export function MachineCard({ machine, rect, look, selected, onSelect }: { machine: Machine; rect: Rect; look: Look; selected: boolean; onSelect: (id: string) => void }) {
-  const [first, ...again] = machine.steps;
+/** While a journey plays, `numbers` are its steps on this machine (« 3 · 5 »), `current` the one played, `pill` the data on it (V48). */
+export function MachineCard({ machine, rect, look, selected, onSelect, numbers = null, current = null, pill = null }: {
+  machine: Machine; rect: Rect; look: Look; selected: boolean; onSelect: (id: string) => void; numbers?: number[] | null; current?: number | null; pill?: string | null;
+}) {
+  const [first, ...again] = numbers ?? machine.steps;
   return (
     <button
       type="button"
@@ -23,15 +26,31 @@ export function MachineCard({ machine, rect, look, selected, onSelect }: { machi
         event.stopPropagation();
         onSelect(machine.id);
       }}
-      className={`fl-machine ${look === "lit" ? "lit" : look === "dim" ? "dim" : ""} ${selected ? "ring-2 ring-fl-service" : ""}`}
+      className={`fl-machine ${look === "normal" ? "" : look} ${selected ? "ring-2 ring-fl-service" : ""}`}
       style={at(rect)}
     >
+      {pill && <span className="fl-pill" title={pill}>{pill}</span>}
+      {numbers && numbers.length > 1 && (
+        // Every step of the journey played on this machine (« 3 · 5 »), the current one filled; on their own line, the name keeps its width.
+        <span className="mb-0.5 flex flex-wrap items-center gap-0.5 text-[10px] text-faint" aria-label={`étapes ${numbers.join(", ")}`}>
+          {numbers.map((n, i) => (
+            <span key={n} className="flex items-center gap-0.5">
+              {i > 0 && "·"}
+              <span className={`fl-num ${n === current ? "on" : ""}`}>{n}</span>
+            </span>
+          ))}
+        </span>
+      )}
       <span className="flex items-start gap-1.5">
-        {first !== undefined && <span className="fl-num mt-0.5">{first}</span>}
+        {numbers ? (
+          numbers.length === 1 && <span className={`fl-num mt-0.5 ${numbers[0] === current ? "on" : ""}`}>{numbers[0]}</span>
+        ) : (
+          first !== undefined && <span className="fl-num mt-0.5">{first}</span>
+        )}
         <span className="line-clamp-3 text-[14px] leading-tight font-bold text-ink">{machine.nom}</span>
       </span>
       <span className="mt-1 line-clamp-2 text-[12.5px] leading-snug text-muted">{machine.words}</span>
-      {again.length > 0 && <span className="text-[11.5px] text-faint">aussi à l'étape {again.join(", ")}</span>}
+      {!numbers && again.length > 0 && <span className="text-[11.5px] text-faint">aussi à l'étape {again.join(", ")}</span>}
       <span className="mt-auto flex flex-col gap-1">
         {machine.entre[0] && <span className="fl-io" title={machine.entre.join(", ")}>→ reçoit {machine.entre[0]}</span>}
         {machine.sort[0] && <span className="fl-io out" title={machine.sort.join(", ")}>rend {machine.sort[0]} →</span>}
@@ -40,8 +59,8 @@ export function MachineCard({ machine, rect, look, selected, onSelect }: { machi
   );
 }
 
-export function DoorCard({ door, name, person, rect, enterable, onOpen }: {
-  door: Door; name: string; person: boolean; rect: Rect; enterable: boolean; onOpen: (bloc: string) => void;
+export function DoorCard({ door, name, person, rect, enterable, onOpen, touched = false }: {
+  door: Door; name: string; person: boolean; rect: Rect; enterable: boolean; onOpen: (bloc: string) => void; touched?: boolean;
 }) {
   const into = door.side === "left";
   // Only the way out lists its steps (V36); the way in says who sends, as in the mockup (V27).
@@ -55,7 +74,7 @@ export function DoorCard({ door, name, person, rect, enterable, onOpen }: {
         event.stopPropagation();
         onOpen(door.bloc);
       }}
-      className={`fl-door ${door.role === "entree" ? "in" : door.role === "sortie" ? "out" : ""}`}
+      className={`fl-door ${door.role === "entree" ? "in" : door.role === "sortie" ? "out" : ""} ${touched ? "touched" : ""}`}
       style={at(rect)}
     >
       {door.role === "entree" && (
@@ -94,7 +113,9 @@ export function ChuteCard({ chute, rect }: { chute: Chute; rect: Rect }) {
   );
 }
 
-export function HungTag({ name, verb, steps, rect, onSelect, id }: { name: string; verb: string | null; steps: number[]; rect: Rect; id: string; onSelect: (id: string) => void }) {
+export function HungTag({ name, verb, steps, rect, onSelect, id, touched = false }: {
+  name: string; verb: string | null; steps: number[]; rect: Rect; id: string; onSelect: (id: string) => void; touched?: boolean;
+}) {
   return (
     <button
       type="button"
@@ -104,7 +125,7 @@ export function HungTag({ name, verb, steps, rect, onSelect, id }: { name: strin
         event.stopPropagation();
         onSelect(id);
       }}
-      className="absolute flex items-start gap-1.5 rounded-lg border border-dashed border-line bg-bg px-2.5 py-1.5 text-left text-[12.5px] leading-snug"
+      className={`fl-hung absolute flex items-start gap-1.5 rounded-lg border border-dashed border-line bg-bg px-2.5 py-1.5 text-left text-[12.5px] leading-snug ${touched ? "touched" : ""}`}
       style={at(rect)}
     >
       <Search size={13} className="mt-0.5 shrink-0 text-kind-outside" aria-hidden="true" />
@@ -117,13 +138,15 @@ export function HungTag({ name, verb, steps, rect, onSelect, id }: { name: strin
 }
 
 /** The start-up wiring (V29): what runs once when the service starts, with where it is in the code. */
-export function WiringBand({ rect, items }: { rect: Rect; items: { nom: string; words: string; file: string | null }[] }) {
+export function WiringBand({ rect, items }: { rect: Rect; items: { nom: string; words: string; file: string | null; lit?: boolean }[] }) {
+  // A journey played on the wiring itself (« démarrer ») lights the band: its station is not on the belt.
+  const lit = items.some((item) => item.lit);
   return (
-    <div data-room-item="band" className="absolute flex flex-col justify-center gap-1 rounded-lg border border-dashed border-line px-3 text-[12.5px]" style={at(rect)}>
+    <div data-room-item="band" className={`absolute flex flex-col justify-center gap-1 rounded-lg border border-dashed px-3 text-[12.5px] ${lit ? "border-fl-hl shadow-[0_0_0_2px_var(--fl-hl)]" : "border-line"}`} style={at(rect)}>
       <span className="w-fit rounded border border-line px-1.5 text-[10.5px] font-semibold tracking-wide text-faint uppercase">câblage, au démarrage</span>
       {items.map((item) => (
         <span key={item.nom} className="truncate text-muted" title={`${item.nom} — ${item.words}`}>
-          <strong className="font-semibold text-ink">{item.nom}</strong>
+          <strong className={`font-semibold ${item.lit ? "text-fl-hl" : "text-ink"}`}>{item.nom}</strong>
           {item.words && ` — ${item.words}`}
           {item.file && <span className="font-mono text-fl-service"> · {item.file}</span>}
         </span>

@@ -64,8 +64,9 @@ test("a data path played on the map, step by step, with its code on demand", asy
   await bar.getByRole("button", { name: "Étape suivante" }).click();
   await expect(page).toHaveURL(/journey=order&step=2/);
   await expect(bar).toContainText("L'API valide puis"); // a step without action: its first words
+  // In the step's room, the panel keeps the room's step cards, each with its code (V53).
   const panel = page.getByLabel("Explication");
-  await panel.getByText("Détails pour développeur (étape 2)").click();
+  await expect(panel.locator('[aria-current="step"]')).toContainText("L'API valide puis");
   await panel.getByRole("button", { name: "api/app/orders.py:8–10" }).click();
   await expect(page.locator('[data-cited="true"]').first()).toContainText("def create_order");
 });
@@ -138,6 +139,41 @@ test("a failed read says so, offers « Réessayer », and the retry opens the pr
   await page.unroute(model); // the cause went away
   await page.getByRole("button", { name: "Réessayer" }).click();
   await expect(page.getByRole("navigation", { name: "Où vous êtes" })).toContainText("L'usine");
+});
+
+test("a played journey follows the data: the step's room opens, the step moves, the bar covers nothing (#77)", async ({ page, isMobile }) => {
+  await page.setViewportSize(isMobile ? { width: 375, height: 812 } : { width: 1440, height: 900 });
+  const project = await signIn(page);
+  await page.goto(`/#/p/${project}?journey=order&step=1`);
+  const bar = page.getByLabel("Chemin de données en lecture");
+  await expect(bar.getByRole("button", { name: "web/src/app.ts l.1-3" })).toBeVisible(); // file:lines on the step
+  if (!isMobile) await expect(page.locator("animateMotion")).not.toHaveCount(0); // the data runs along the lit belt
+  await bar.getByRole("button", { name: "Étape suivante" }).click();
+  // The camera opens the room of the step's machine, and says the data moved there.
+  await expect(page).toHaveURL(/node=x%3Apart%3Aapi&journey=order&step=2/);
+  await expect(bar).toContainText("Passage dans « API commandes »");
+  const station = isMobile ? page.locator('[data-narrow-id="orders"] > div') : page.locator(".fl-machine.lit");
+  await expect(station).toContainText("Commandes");
+  // The bar sits under the map: the lit machine is in full view above it, at 1440 and at 375.
+  const [machine, under] = [await station.boundingBox(), await bar.boundingBox()];
+  expect(machine && under && machine.y + machine.height <= under.y).toBe(true);
+  if (!isMobile) {
+    const map = await page.getByLabel(/^Carte :/).boundingBox();
+    expect(map && under && map.y + map.height <= under.y + 1).toBe(true);
+  }
+});
+
+test("with reduced motion, a played journey moves without any animation (#77)", async ({ page, isMobile }) => {
+  test.skip(isMobile, "the phone shows a list: no belt to animate");
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  const project = await signIn(page);
+  await page.goto(`/#/p/${project}?journey=order&step=1`);
+  const bar = page.getByLabel("Chemin de données en lecture");
+  await expect(bar).toContainText("étape 1 sur 2");
+  await expect(page.locator("animateMotion")).toHaveCount(0);
+  await bar.getByRole("button", { name: "Étape suivante" }).click();
+  await expect(page.locator(".fl-machine.lit")).toContainText("Commandes"); // straight into the room, no floor first
+  await expect(page.locator(".room-open, animateMotion")).toHaveCount(0);
 });
 
 test("old links open the parts with the path playing", async ({ page }) => {

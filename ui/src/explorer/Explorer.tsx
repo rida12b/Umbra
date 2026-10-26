@@ -1,6 +1,6 @@
 import { ChevronRight } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
-import type { MapView, Project } from "../api";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import type { Journey, MapView, Project } from "../api";
 import { MethodBanner } from "../arch/MethodBanner";
 import { ModelPending } from "../arch/ModelStatus";
 import { useModel } from "../model";
@@ -13,9 +13,10 @@ import { FloorCanvas } from "./FloorCanvas";
 import { RoomCanvas } from "./RoomCanvas";
 import { enterable } from "./room";
 import { InfoPanel } from "./InfoPanel";
-import { buildLevel, levelOf, trail, type Box, type LevelKey } from "./levels";
+import { buildLevel, levelOf, trail, type Box, type Level, type LevelKey } from "./levels";
 import { NarrowLevel } from "./NarrowLevel";
 import { PlayerBar } from "./PlayerBar";
+import { groupOf, journeyStations, stepGroups, type Station } from "./stations";
 import { trackJourney } from "./track";
 
 /** Explorer levels live in the URL as `x:<level>` (« x:parts », « x:part:engine »); anything else is code. */
@@ -24,6 +25,30 @@ const LEVEL_PREFIX = "x:";
 /** The route node that opens one level of the explorer. */
 export const levelNode = (key: LevelKey) => `${LEVEL_PREFIX}${key}`;
 export const DEFAULT_LEVEL: LevelKey = "parts";
+const TRANSIT_MS = 900; // a step that changes room: the floor shows the data going there, then the room opens
+const STILL = typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+/** The camera follows the data (#77): the room of the step's machine, else the floor (a step done by hand). */
+function followed(station: Station | undefined, rooms: Set<string>): LevelKey {
+  return station?.room && rooms.has(station.room) ? `part:${station.room}` : DEFAULT_LEVEL;
+}
+
+/** One step of a journey placed on a level, for the canvases. */
+function playOn(journey: Journey, stations: Station[], level: Level, n: number): Play | null {
+  const track = trackJourney(journey, stations, level);
+  const step = track[n - 1];
+  const station = stations[n - 1];
+  if (!step || !station) return null;
+  return {
+    boxes: new Set(track.flatMap((s) => [...s.boxes, ...s.touched])),
+    links: new Set(track.flatMap((s) => (s.link ? [s.link] : []))),
+    step,
+    journey: journey.id,
+    stations,
+    station,
+    previous: stations[n - 2] ?? null,
+  };
+}
 
 export function explorerLevel(node: string): LevelKey | null {
   if (node === "arch:" || node === "carte:") return DEFAULT_LEVEL; // links made before the explorer
@@ -67,22 +92,45 @@ export function Explorer({ project, route, theme, narrow }: Props) {
   const rooms = useMemo(() => (model ? enterable(model) : new Set<string>()), [model]);
   // A door opens the room behind it (a history entry: Back returns here), or explains a part without machines.
   const openDoor = useCallback((bloc: string) => (rooms.has(bloc) ? openLevel(`part:${bloc}`) : select(bloc)), [rooms, openLevel, select]);
-  const play = useCallback((journey: string, step: number) => go({ journey, step, select: null }), [go]);
+  // Every step played opens where its machine is: one history entry per step, Back replays the step before.
+  const play = useCallback(
+    (id: string, step: number) => {
+      const target = model?.parcours.find((j) => j.id === id);
+      const station = model && target ? journeyStations(model, target)[step - 1] : undefined;
+      go({ journey: id, step, select: null, node: levelNode(followed(station, rooms)) });
+    },
+    [go, model, rooms],
+  );
   const stop = useCallback(() => go({ journey: null, step: null }), [go]);
-  const onStep = useCallback((step: number) => go({ step, select: null }), [go]);
-
   const journey = model?.parcours.find((j) => j.id === route.journey) ?? null;
+  const onStep = useCallback((step: number) => journey && play(journey.id, step), [journey, play]);
   const stepNumber = journey ? Math.min(route.step ?? 1, journey.etapes.length) : 0;
-  const track = useMemo(() => (model && journey && level ? trackJourney(model, journey, level) : null), [model, journey, level]);
-  const playState: Play | null = useMemo(() => {
-    const step = track?.[stepNumber - 1];
-    if (!track || !step) return null;
-    return {
-      boxes: new Set(track.flatMap((s) => s.boxes)),
-      links: new Set(track.flatMap((s) => (s.link ? [s.link] : []))),
-      step,
+  const stations = useMemo(() => (model && journey ? journeyStations(model, journey) : null), [model, journey]);
+  const groups = useMemo(() => (model && journey ? stepGroups(model, journey) : null), [model, journey]);
+  const playState = useMemo(() => (model && journey && stations && level ? playOn(journey, stations, level, stepNumber) : null), [model, journey, stations, level, stepNumber]);
+
+  // A step that changes room first shows the floor, the belt lit from the old room to the new one, then the room opens.
+  const [transit, setTransit] = useState<number | null>(null); // the step whose move is shown on the floor
+  const shown = useRef<{ journey: string; station: Station } | null>(null);
+  useLayoutEffect(() => {
+    const station = stations?.[stepNumber - 1];
+    const before = shown.current;
+    shown.current = journey && station ? { journey: journey.id, station } : null;
+    if (!journey || !station || before?.journey !== journey.id || STILL || narrow) return;
+    const moved = before.station.room && station.room && before.station.room !== station.room && levelKey === `part:${station.room}`;
+    if (!moved) return;
+    setTransit(stepNumber);
+    const timer = window.setTimeout(() => setTransit(null), TRANSIT_MS);
+    return () => {
+      window.clearTimeout(timer);
+      setTransit(null);
     };
-  }, [track, stepNumber]);
+  }, [journey, stations, stepNumber, levelKey, narrow]);
+  const floorLevel = useMemo(() => (model && transit !== null ? buildLevel(model, DEFAULT_LEVEL, project.name) : null), [model, transit, project.name]);
+  const transitPlay = useMemo(
+    () => (model && journey && stations && floorLevel && transit !== null ? playOn(journey, stations, floorLevel, transit) : null),
+    [model, journey, stations, floorLevel, transit],
+  );
 
   // Esc goes back up: first out of the selection, then out of the path being played, then one level up.
   useEffect(() => {
@@ -103,7 +151,6 @@ export function Explorer({ project, route, theme, narrow }: Props) {
   if (!model) return <ModelPending state={state} />;
   const crumbs = levelKey ? trail(model, levelKey) : [...trail(model, "parts"), ...(codeView?.breadcrumbs.map((c) => ({ key: c.key, title: c.label, code: true })) ?? [])];
   const box = level && route.select ? (level.boxes.find((b) => b.id === route.select) ?? null) : null;
-  const elsewhere = playState?.step.elsewhere ? level?.boxes.find((b) => b.id === playState.step.elsewhere?.id) : undefined;
 
   let body;
   if (!levelKey)
@@ -161,7 +208,9 @@ export function Explorer({ project, route, theme, narrow }: Props) {
     ) : (
       <div className="grid h-full min-h-0 grid-cols-[minmax(0,1fr)_400px]">
         <section className="map-surface relative min-h-0" aria-label={`Carte : ${level.title}`}>
-          {level.floor ? (
+          {floorLevel?.floor && transitPlay ? (
+            <FloorCanvas model={model} floor={floorLevel.floor} level={floorLevel} selected={null} play={transitPlay} onSelect={select} onEnter={enter} />
+          ) : level.floor ? (
             <FloorCanvas model={model} floor={level.floor} level={level} selected={route.select ?? null} play={playState} onSelect={select} onEnter={enter} />
           ) : level.room ? (
             <RoomCanvas key={level.room.bloc} model={model} room={level.room} enterable={rooms} selected={route.select ?? null} play={playState} onSelect={select} onOpenDoor={openDoor} />
@@ -222,10 +271,11 @@ export function Explorer({ project, route, theme, narrow }: Props) {
         <PlayerBar
           journey={journey}
           step={stepNumber}
-          where={playState?.step ?? null}
+          station={stations?.[stepNumber - 1] ?? null}
+          group={groupOf(groups, stepNumber)}
           onStep={onStep}
           onStop={stop}
-          onEnterElsewhere={() => elsewhere && enter(elsewhere)}
+          onOpenFile={(path) => go({ node: path, select: null })}
         />
       )}
     </div>

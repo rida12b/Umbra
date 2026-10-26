@@ -31,8 +31,10 @@ export function LineMarkers() {
   );
 }
 
-export function Line({ points, kind, lit, dim = false }: { points: Point[]; kind: LinkStyle | "belt"; lit: boolean; dim?: boolean }) {
+export function Line({ points, kind, lit, dim = false, back = false }: { points: Point[]; kind: LinkStyle | "belt"; lit: boolean; dim?: boolean; back?: boolean }) {
   const path = points.map((p, i) => `${i ? "L" : "M"}${p.x} ${p.y}`).join(" ");
+  // The particle runs the way the data goes: backwards on a line drawn the other way (an answer coming back).
+  const run = (back ? [...points].reverse() : points).map((p, i) => `${i ? "L" : "M"}${p.x} ${p.y}`).join(" ");
   const style = STROKE[kind];
   const colour = lit ? "var(--fl-hl)" : style.colour;
   const marker = kind === "control" || kind === "lookup" ? "url(#fl-arrow-ctl)" : lit ? "url(#fl-arrow-hl)" : "url(#fl-arrow-data)";
@@ -44,7 +46,7 @@ export function Line({ points, kind, lit, dim = false }: { points: Point[]; kind
       {kind === "belt" && <path d={path} fill="none" stroke="var(--fl-belt-slat)" strokeWidth={2} strokeDasharray="2 12" opacity={0.75} />}
       {lit && !STILL && (
         <circle r="5" style={{ fill: "var(--fl-hl)" }}>
-          <animateMotion dur="1.6s" repeatCount="indefinite" path={path} />
+          <animateMotion dur="1.6s" repeatCount="indefinite" path={run} />
         </circle>
       )}
     </g>

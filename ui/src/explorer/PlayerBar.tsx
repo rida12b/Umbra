@@ -2,19 +2,20 @@ import { ChevronLeft, ChevronRight, X } from "lucide-react";
 import { useEffect } from "react";
 import type { Journey } from "../api";
 import { stepLabel } from "../arch/story";
-import type { StepOnMap } from "./track";
+import type { Station, StepGroup } from "./stations";
 
 interface Props {
   journey: Journey;
   step: number; // 1-based
-  where: StepOnMap | null;
+  station: Station | null;
+  group: StepGroup | null; // a long journey: the phase or room the step is in
   onStep: (step: number) => void;
   onStop: () => void;
-  onEnterElsewhere: () => void;
+  onOpenFile: (path: string) => void;
 }
 
-/** The data path being played: its step in words, under the map, with previous and next. */
-export function PlayerBar({ journey, step, where, onStep, onStop, onEnterElsewhere }: Props) {
+/** The data path being played (V65): its step in words, under the map, with previous and next. */
+export function PlayerBar({ journey, step, station, group, onStep, onStop, onOpenFile }: Props) {
   const current = journey.etapes[step - 1];
   const last = journey.etapes.length;
 
@@ -32,9 +33,10 @@ export function PlayerBar({ journey, step, where, onStep, onStop, onEnterElsewhe
   }, [step, last, onStep]);
 
   if (!current) return null;
+  const lines = current.lignes ? ` l.${current.lignes[0]}-${current.lignes[1]}` : "";
   return (
-    <section className="border-t-2 border-lamp-line bg-panel px-5 py-3" aria-label="Chemin de données en lecture">
-      <div className="flex items-center gap-4">
+    <section className="border-t-2 border-lamp-line bg-panel px-5 py-3 max-sm:px-3" aria-label="Chemin de données en lecture">
+      <div className="flex items-center gap-4 max-sm:gap-2">
         <button
           type="button"
           onClick={() => onStep(step - 1)}
@@ -47,36 +49,46 @@ export function PlayerBar({ journey, step, where, onStep, onStop, onEnterElsewhe
         <div className="min-w-0 flex-1">
           <p className="truncate text-[13px] text-faint">
             {journey.nom} · étape {step} sur {last}
+            {group && (
+              <>
+                {" "}· <span className="text-muted">{group.title}</span> · étapes {group.from}–{group.to}
+              </>
+            )}
           </p>
-          <p className="text-[18px] leading-snug">
-            <span className="mr-2 inline-flex size-7 items-center justify-center rounded-full bg-lamp text-[14px] font-bold text-on-lamp">
-              {step}
-            </span>
+          <p className="text-[18px] leading-snug max-sm:text-[15px]">
+            <span className="mr-2 inline-flex size-7 items-center justify-center rounded-full bg-lamp text-[14px] font-bold text-on-lamp">{step}</span>
             <b>{stepLabel(current)}</b>
             <span className="text-muted"> — {current.simple || current.texte}</span>
           </p>
-          {where && where.boxes.length === 0 && (
-            <p className="mt-1 text-[13.5px] text-faint">Cette étape ne touche aucune pièce visible à ce niveau.</p>
-          )}
-          {where?.elsewhere && (
-            <button type="button" onClick={onEnterElsewhere} className="mt-1 text-[13.5px] text-lamp-ink hover:underline">
-              Elle se passe dans « {where.elsewhere.title} » : entrer pour la voir de près
-            </button>
-          )}
+          <p className="mt-0.5 flex flex-wrap items-baseline gap-x-3 text-[13px]">
+            {station?.note && <span className="text-lamp-ink">{station.note}</span>}
+            {station?.manual && station.machine && <span className="text-ok">fait par une personne</span>}
+            {current.fichier && (
+              <button
+                type="button"
+                onClick={() => onOpenFile(current.fichier!)}
+                title="Ouvrir ce fichier"
+                className="max-w-full truncate font-mono text-[12px] text-fl-service hover:underline"
+              >
+                {current.fichier}
+                {lines}
+              </button>
+            )}
+          </p>
         </div>
         {step < last ? (
           <button
             type="button"
             onClick={() => onStep(step + 1)}
-            className="rounded-lg bg-ink px-4 py-2 text-[15px] font-medium text-bg hover:opacity-90"
+            className="rounded-lg bg-ink px-4 py-2 text-[15px] font-medium text-bg hover:opacity-90 max-sm:px-2.5"
             aria-label="Étape suivante"
           >
             <span className="flex items-center gap-1">
-              Suivante <ChevronRight size={18} aria-hidden="true" />
+              <span className="max-sm:sr-only">Suivante</span> <ChevronRight size={18} aria-hidden="true" />
             </span>
           </button>
         ) : (
-          <button type="button" onClick={onStop} className="rounded-lg bg-ink px-4 py-2 text-[15px] font-medium text-bg hover:opacity-90">
+          <button type="button" onClick={onStop} className="rounded-lg bg-ink px-4 py-2 text-[15px] font-medium text-bg hover:opacity-90 max-sm:px-2.5">
             Terminer
           </button>
         )}

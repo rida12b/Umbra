@@ -99,6 +99,8 @@
   --color-fl-service: var(--fl-service);
   --color-fl-refus: var(--fl-refus);
   --color-fl-code: var(--fl-code);
+  --color-fl-hl: var(--fl-hl);
+  --color-fl-person-bg: var(--fl-person-bg);
 }
 
 /* Factory floor pieces (mockup B). Shapes by kind; the belt and the lit step in the data colour. */
@@ -110,10 +112,12 @@
 .fl-card.k-outside, .fl-card.k-tool { border-style: dashed; }
 .fl-card.lit { border-color: var(--fl-hl); box-shadow: 0 0 0 2px var(--fl-hl), 0 0 22px color-mix(in srgb, var(--fl-hl) 25%, transparent); }
 .fl-card.dim { opacity: .45; }
+.fl-card.touched { box-shadow: 0 0 0 2px color-mix(in srgb, var(--fl-hl) 38%, transparent); }
 .fl-badge { position: relative; z-index: 1; display: inline-flex; align-items: center; gap: 5px; align-self: flex-start; font-size: 11px; font-weight: 700; letter-spacing: .04em; border-radius: 999px; padding: 2px 9px; white-space: nowrap; }
 .fl-badge.in { background: var(--fl-person); color: var(--u-bg); }
 .fl-badge.out { background: var(--fl-store); color: var(--u-bg); }
 .fl-num { width: 17px; height: 17px; border-radius: 50%; border: 1.5px solid var(--fl-data); color: var(--fl-data); display: inline-flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 700; flex: none; }
+.fl-num.on { background: var(--fl-hl); border-color: var(--fl-hl); color: #1b1e24; }
 .fl-pv { display: inline-flex; align-items: center; gap: 4px; background: var(--fl-machine); border: 1px solid var(--fl-machine-line); border-radius: 6px; padding: 2px 6px 2px 3px; font-size: 11.5px; color: var(--u-muted); max-width: 100%; }
 .fl-chip { position: absolute; transform: translate(-50%, -50%); font-size: 12px; line-height: 1.3; background: var(--u-bg); color: var(--u-ink); padding: 2px 7px; border-radius: 6px; border: 1px solid var(--u-line); text-align: center; pointer-events: none; }
 .fl-chip.data { border-style: dashed; color: var(--u-muted); }
@@ -125,8 +129,11 @@
 /* An open room (mockup B, V27-V38): its frame, machines, doors outside the frame, red refusals. */
 .fl-frame { position: absolute; border: 1px solid var(--u-line); border-left: 4px solid var(--fl-service); border-radius: 12px; background: color-mix(in srgb, var(--u-panel) 55%, transparent); }
 .fl-machine { position: absolute; display: flex; flex-direction: column; gap: 2px; border-radius: 10px; border: 1px solid var(--u-line); background: var(--u-panel); padding: 9px 10px; text-align: left; }
-.fl-machine.lit { border: 2px solid var(--fl-hl); box-shadow: 0 0 22px color-mix(in srgb, var(--fl-hl) 30%, transparent); }
+.fl-machine.lit { border-color: var(--fl-hl); box-shadow: 0 0 0 2px var(--fl-hl), 0 0 22px color-mix(in srgb, var(--fl-hl) 30%, transparent); } /* V47: ≈ 3 px yellow edge and halo */
+.fl-machine.touched, .fl-door.touched, .fl-hung.touched { box-shadow: 0 0 0 2px color-mix(in srgb, var(--fl-hl) 38%, transparent); }
 .fl-machine.dim { opacity: .45; }
+/* V48: the data on the active machine, a yellow pill astride its top edge. */
+.fl-pill { position: absolute; left: 50%; top: 0; transform: translate(-50%, -50%); white-space: nowrap; max-width: 92%; overflow: hidden; text-overflow: ellipsis; border-radius: 999px; background: var(--fl-hl); color: #1b1e24; font-size: 11.5px; font-weight: 700; padding: 1px 9px; }
 .fl-io { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; border: 1px dashed var(--u-line); border-radius: 5px; padding: 1px 6px; font-size: 11px; line-height: 1.35; color: var(--u-muted); overflow: hidden; }
 .fl-io.out { text-align: right; }
 .fl-io.solid { border-style: solid; color: var(--u-ink); } /* a door's step (V36): a solid chip, the machine's in/out stay dashed */

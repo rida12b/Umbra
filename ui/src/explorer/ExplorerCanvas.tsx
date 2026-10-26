@@ -14,6 +14,7 @@ import {
   type BoxFlowNode,
   type Look,
 } from "./mapParts";
+import type { Station } from "./stations";
 import type { StepOnMap } from "./track";
 
 const nodeTypes = { box: BoxNode };
@@ -27,7 +28,11 @@ const FEW_LINKS = 8; // up to this many arrows, their words show all the time
 export interface Play {
   boxes: Set<string>; // every box of the journey (lit)
   links: Set<string>; // every arrow of the journey (lit)
-  step: StepOnMap; // the step being played
+  step: StepOnMap; // the step being played, on this level
+  journey: string; // the journey's id
+  stations: Station[]; // the whole journey, level-free: a room numbers its machines from it
+  station: Station; // the step being played
+  previous: Station | null; // the step before: the belt section between the two is lit
 }
 
 interface Props {
@@ -140,11 +145,6 @@ export function ExplorerCanvas({ level, theme, selected, play, onSelect, onEnter
       const data = { points: route.points, label, look, moving };
       return [{ id: link.id, type: "arrow" as const, source: link.from, target: link.to, data }];
     });
-    // A played step between two boxes the level has no arrow for: drawn for the time of the step.
-    const step = play?.step;
-    const [from, to] = step?.boxes ?? [];
-    if (step?.arrow && !step.link && from && to)
-      arrows.push({ id: "step", type: "arrow", source: from, target: to, data: { points: null, label: step.words, look: "lit", moving: true } });
     return arrows;
   }, [placed, level, hovered, selected, play]);
 

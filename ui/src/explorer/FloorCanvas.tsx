@@ -7,6 +7,7 @@ import { placeFloor, type Rect } from "./floorLayout";
 import { FloorHeader } from "./FloorHeader";
 import { FloorPiece, type Look } from "./floorParts";
 import type { Box, Level } from "./levels";
+import type { Station } from "./stations";
 import { buildRoom } from "./room";
 import { enteredRoom, takeReturn } from "./roomMemory";
 
@@ -48,6 +49,12 @@ export function FloorCanvas({ model, floor, level, selected, play, onSelect, onE
     const card = back.entered && el.querySelector<HTMLElement>(`[data-floor-id="${CSS.escape(back.entered)}"] button`);
     if (card) card.focus({ preventScroll: true });
   }, [model, plan]);
+  // While a journey plays, the lit station is always in view (a room low on the floor, the data going there).
+  const station = play?.step.boxes[0];
+  useLayoutEffect(() => {
+    const card = station ? screen.current?.querySelector<HTMLElement>(`[data-floor-id="${CSS.escape(station)}"]`) : null;
+    card?.scrollIntoView({ block: "nearest" });
+  }, [station, plan]);
   const enter = (box: Box) => {
     enteredRoom(model, box.id, screen.current?.scrollTop ?? 0);
     onEnter(box);
@@ -57,7 +64,9 @@ export function FloorCanvas({ model, floor, level, selected, play, onSelect, onE
   const name = (id: string) => block(id)?.nom ?? id;
   const stepsHere = (id: string) =>
     (floor.journey?.etapes ?? []).filter((s) => (model.composants.find((c) => c.id === s.composant)?.bloc ?? s.composant) === id).length;
-  const lookOf = (id: string): Look => (play ? (play.step.boxes.includes(id) ? "lit" : play.boxes.has(id) ? "normal" : "dim") : "normal");
+  // The station is lit; what the step reaches gets a faint ring; the rest of the journey stays, the others fade.
+  const lookOf = (id: string): Look =>
+    play ? (play.step.boxes.includes(id) ? "lit" : play.step.touched.includes(id) ? "touched" : play.boxes.has(id) ? "normal" : "dim") : "normal";
   const sortieStore = floor.sortie?.kind === "store" ? floor.sortie.id : null;
   // A tag whose line is drawn says it on the line (« démarre »); the card keeps its own words, as in the mockup (V8).
   const drawn = new Set(plan.routes.filter((r) => r.link.style !== "reply").flatMap((r) => [r.link.from, r.link.to]));
@@ -66,11 +75,25 @@ export function FloorCanvas({ model, floor, level, selected, play, onSelect, onE
     const link = floor.stripLinks.find((l) => l.from === id || l.to === id);
     return link ? `${link.verb || "→"} « ${name(link.from === id ? link.to : link.from)} » — contrôle, pas de donnée` : null;
   };
-  const lit = (from: string, to: string) => !!play && play.step.boxes.includes(from) && play.step.boxes.includes(to);
+  // The belt section the data just ran along: from the step before's room to this step's room.
+  const here = (s: Station | null | undefined) => (s ? (s.room ?? s.person) : null);
+  // The first step comes in from the floor's entry (the person or service that sends the data).
+  const [was, now] = [play && !play.previous ? floor.entree : here(play?.previous), here(play?.station)];
+  const lit = (from: string, to: string) => !!was && !!now && was !== now && ((from === was && to === now) || (from === now && to === was));
+  const back = (from: string) => from === now; // drawn the other way: the particle runs backwards
+  const byHand = play && !play.station.room && !play.station.person ? play.station : null;
 
   return (
     <div ref={screen} className="absolute inset-0 overflow-x-hidden overflow-y-auto" onClick={() => onSelect(null)}>
       <FloorHeader model={model} floor={floor} />
+      {byHand && (
+        // A step done by hand, outside any part: a person station on the floor, never nothing lit (#77).
+        <div className="sticky top-2 z-10 h-0 overflow-visible px-6">
+          <p className="inline-flex items-center gap-2 rounded-full border-2 border-fl-hl bg-fl-person-bg px-3 py-1 text-[13.5px] text-ink shadow-md">
+            <span className="fl-num on">{byHand.n}</span> Étape faite à la main par une personne, hors du code
+          </p>
+        </div>
+      )}
       <ol className="sr-only" aria-label="Le chemin de la donnée, pièce par pièce">
         {floor.entree && <li>Entrée : {name(floor.entree)}</li>}
         {floor.beltLinks.map((link) => (
@@ -90,10 +113,10 @@ export function FloorCanvas({ model, floor, level, selected, play, onSelect, onE
           <svg className="pointer-events-none absolute overflow-visible" width={plan.size.width} height={plan.size.height} aria-hidden="true">
             <LineMarkers />
             {plan.belt.map(({ link, points }) => (
-              <Line key={link.id} points={points} kind="belt" lit={lit(link.from, link.to)} />
+              <Line key={link.id} points={points} kind="belt" lit={lit(link.from, link.to)} back={back(link.from)} />
             ))}
             {plan.routes.map(({ link, points }) => (
-              <Line key={link.id} points={points} kind={link.style} lit={lit(link.from, link.to)} />
+              <Line key={link.id} points={points} kind={link.style} lit={lit(link.from, link.to)} back={back(link.from)} />
             ))}
           </svg>
           {plan.belt.map(({ link, label, points }) => {

@@ -6,7 +6,9 @@ import { lowerFirst, stepLabel } from "../arch/story";
 import { steps, Tag } from "../ui";
 import type { Box, Level } from "./levels";
 import type { Floor } from "./floor";
+import { mainJourney } from "./floor";
 import { buildRoom, stepRuns } from "./room";
+import { stepGroups } from "./stations";
 
 interface Props {
   projectId: string;
@@ -22,7 +24,10 @@ interface Props {
 /** The fixed panel: what the selected box is, or the step being played, or where you are. */
 export function InfoPanel({ projectId, model, level, box, playing, onEnter, onPlay, onStep }: Props) {
   if (box) return <BoxInfo projectId={projectId} model={model} box={box} onEnter={onEnter} onPlay={onPlay} />;
-  if (playing) return <StepInfo projectId={projectId} journey={playing.journey} number={playing.step} onStep={onStep} />;
+  // In a room, its own journey keeps the room's step cards, the step played framed in yellow (V53).
+  if (playing && level.room && level.room.journey?.id === playing.journey.id)
+    return <RoomInfo projectId={projectId} model={model} level={level} onPlay={onPlay} active={playing.step} />;
+  if (playing) return <StepInfo projectId={projectId} model={model} journey={playing.journey} number={playing.step} onStep={onStep} />;
   if (level.room) return <RoomInfo projectId={projectId} model={model} level={level} onPlay={onPlay} />;
   if (level.floor) return <FloorInfo model={model} level={level} floor={level.floor} onEnter={onEnter} onPlay={onPlay} />;
   return (
@@ -163,7 +168,9 @@ function Doubts({ model }: { model: ProjectModel }) {
 }
 
 /** The panel of an open room (V40, V44-V46): the driving journey's steps grouped by room, each refusal after the step that handles it. */
-function RoomInfo({ projectId, model, level, onPlay }: { projectId: string; model: ProjectModel; level: Level; onPlay: (id: string, step: number) => void }) {
+function RoomInfo({ projectId, model, level, onPlay, active = null }: {
+  projectId: string; model: ProjectModel; level: Level; onPlay: (id: string, step: number) => void; active?: number | null;
+}) {
   const room = level.room!;
   const block = model.blocs.find((b) => b.id === room.bloc);
   const journey = room.journey;
@@ -190,7 +197,8 @@ function RoomInfo({ projectId, model, level, onPlay }: { projectId: string; mode
                   const n = run.from + k;
                   return (
                     <li key={n}>
-                      <div className="rounded-lg border border-line-soft px-3 py-2 text-[13px]">
+                      <div className={`rounded-lg border px-3 py-2 text-[13px] ${n === active ? "border-2 border-fl-hl" : "border-line-soft"}`} aria-current={n === active ? "step" : undefined}
+                        ref={n === active ? (el) => el?.scrollIntoView({ block: "nearest" }) : undefined}>
                         <button type="button" onClick={() => onPlay(journey.id, n)} className="flex items-start gap-2 text-left hover:underline">
                           <span className="fl-num mt-0.5">{n}</span>
                           <span className="font-bold leading-snug">{stepLabel(step)}</span>
@@ -372,62 +380,75 @@ function Files({ title, paths }: { title: string; paths: string[] }) {
 
 const otherCases = (n: number) => (n === 1 ? "1 cas particulier" : `${n} cas particuliers`);
 
-function StepInfo({ projectId, journey, number, onStep }: {
-  projectId: string; journey: Journey; number: number; onStep: (n: number) => void;
+function StepInfo({ projectId, model, journey, number, onStep }: {
+  projectId: string; model: ProjectModel; journey: Journey; number: number; onStep: (n: number) => void;
 }) {
   const current = journey.etapes[number - 1];
   if (!current) return null;
+  const main = mainJourney(model).journey === journey;
+  // A long journey is cut into its phases (or its rooms): the reader sees where the data is, not 16 lines.
+  const groups = stepGroups(model, journey) ?? [{ title: "", from: 1, to: journey.etapes.length }];
+  const branchesAt = (n: number) => (journey.branches ?? []).filter((b) => b.etape === n);
+  const loose = (journey.branches ?? []).filter((b) => !b.etape || b.etape < 1 || b.etape > journey.etapes.length);
   // The sentence of the step is in the bar under the map; here: where it sits in the whole path.
   return (
     <Panel>
-      <p className="text-[13px] font-semibold text-faint">Chemin de données</p>
+      <p className="flex items-center gap-2 text-[13px] font-semibold text-faint">
+        Chemin de données
+        {main && <span className="rounded-full bg-fl-hl px-2 py-px text-[11px] font-bold text-[#1b1e24]">principal</span>}
+      </p>
       <h2 className="mt-1 text-[20px] leading-snug font-semibold">{journey.nom}</h2>
+      {/* V64: where it starts, every step, where it ends. */}
       <p className="mt-2 text-[14.5px] leading-relaxed text-muted">
-        <span className="font-medium text-ink">Point de départ : </span>
+        <span className="font-semibold text-fl-data">Départ : </span>
         {journey.depart || journey.declencheur}
       </p>
-      <ol className="mt-5 flex flex-col gap-1">
-        {journey.etapes.map((step, index) => {
-          const on = index + 1 === number;
-          return (
-            <li key={index}>
-              <button
-                type="button"
-                onClick={() => onStep(index + 1)}
-                aria-current={on ? "step" : undefined}
-                className={`flex w-full items-center gap-3 rounded-lg px-2.5 py-1.5 text-left text-[15px] ${on ? "bg-lamp-soft font-semibold" : "text-muted hover:bg-raised"}`}
-              >
-                <span className={`flex size-6 shrink-0 items-center justify-center rounded-full text-[12.5px] font-bold ${on ? "bg-lamp text-on-lamp" : "border border-line"}`}>
-                  {index + 1}
-                </span>
-                {stepLabel(step)}
-                {step.manuel && (
-                  <span className="ml-auto shrink-0 text-[12px] font-normal text-ok" title="Fait par une personne (un clic, une commande), pas par le programme">
-                    par une personne
-                  </span>
-                )}
-              </button>
-            </li>
-          );
-        })}
-      </ol>
+      {groups.map((group) => (
+        <section key={group.from}>
+          {group.title && <p className="mt-4 mb-1 text-[11px] font-semibold tracking-wide text-faint uppercase">{group.title}</p>}
+          <ol className={`flex flex-col gap-1 ${group.title ? "" : "mt-4"}`} start={group.from}>
+            {journey.etapes.slice(group.from - 1, group.to).map((step, k) => {
+              const n = group.from + k;
+              const on = n === number;
+              return (
+                <li key={n}>
+                  <button
+                    type="button"
+                    onClick={() => onStep(n)}
+                    aria-current={on ? "step" : undefined}
+                    className={`flex w-full items-center gap-3 rounded-lg px-2.5 py-1.5 text-left text-[15px] ${on ? "bg-lamp-soft font-semibold ring-2 ring-fl-hl" : "text-muted hover:bg-raised"}`}
+                  >
+                    <span className={`flex size-6 shrink-0 items-center justify-center rounded-full text-[12.5px] font-bold ${on ? "bg-lamp text-on-lamp" : "border border-line"}`}>{n}</span>
+                    {stepLabel(step)}
+                    {step.manuel && (
+                      <span className="ml-auto shrink-0 text-[12px] font-normal text-ok" title="Fait par une personne (un clic, une commande), pas par le programme">
+                        par une personne
+                      </span>
+                    )}
+                  </button>
+                  {branchesAt(n).map((branch, b) => (
+                    <div key={b} className="ml-9">
+                      <IfThen projectId={projectId} branch={branch} />
+                    </div>
+                  ))}
+                </li>
+              );
+            })}
+          </ol>
+        </section>
+      ))}
       {(journey.fin || journey.resultat) && (
         <section className="mt-5 rounded-xl bg-raised px-4 py-3">
-          <p className="text-[13px] font-semibold text-lamp-ink">À la fin</p>
+          <p className="text-[13px] font-semibold text-fl-store">Arrivée</p>
           <p className="mt-1 text-[15px] leading-relaxed">{journey.fin || journey.resultat}</p>
         </section>
       )}
-      {(journey.branches ?? []).length > 0 && (
+      {loose.length > 0 && (
         <section className="mt-6">
           <h3 className="text-[15px] font-semibold">Quand ça ne se passe pas comme prévu (sur tout le chemin)</h3>
-          <ul className="mt-2 space-y-2.5">
-            {(journey.branches ?? []).map((branch, index) => (
-              <li key={index} className="rounded-lg border border-line-soft px-3.5 py-2.5 text-[14.5px] leading-relaxed">
-                <span className="font-medium">Si {lowerFirst(branch.quand)}</span>
-                <span className="block text-muted">{branch.alors}</span>
-              </li>
-            ))}
-          </ul>
+          {loose.map((branch, index) => (
+            <IfThen key={index} projectId={projectId} branch={branch} />
+          ))}
         </section>
       )}
       {current.fichier && <Files title={`Pour changer l'étape ${number}`} paths={[current.fichier]} />}
