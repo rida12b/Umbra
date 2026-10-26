@@ -241,7 +241,8 @@ export interface ProjectModel {
 }
 
 export interface ModelState {
-  state: "ready" | "stale" | "methode" | "missing" | "queued" | "working" | "error";
+  // indexing: Umbra is still reading the project (just added, never read); the study comes next (#85).
+  state: "ready" | "stale" | "methode" | "missing" | "queued" | "working" | "error" | "indexing";
   model: ProjectModel | null;
   created_at: string | null;
   changed: string[];
@@ -357,6 +358,8 @@ export const api = {
   model: (id: string) => call<ModelState>(`${project(id)}/model`),
   study: (id: string) => call<ModelState>(`${project(id)}/model`, { method: "POST" }),
   /** The user's « Relancer l'étude »: the only call that studies a model written by an older method. */
+  // « Réessayer » after a failed read: the engine reads the project again at once (#85).
+  retryRead: (id: string) => call<ModelState>(`${project(id)}/model`, { method: "POST", body: JSON.stringify({ relire: true }) }),
   relaunchStudy: (id: string) =>
     call<ModelState>(`${project(id)}/model`, { method: "POST", body: JSON.stringify({ relancer: true }) }),
   explanation: (id: string, node: string) =>

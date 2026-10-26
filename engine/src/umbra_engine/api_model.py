@@ -29,7 +29,7 @@ from umbra_engine.project_store import ProjectStore
 from umbra_engine.projection.graph import ProjectGraph
 from umbra_engine.registry import Project
 
-ModelState = Literal["ready", "stale", "methode", "missing", "queued", "working", "error"]
+ModelState = Literal["ready", "stale", "methode", "missing", "queued", "working", "error", "indexing"]
 
 
 class ProjectModelState(BaseModel):
@@ -44,6 +44,7 @@ class ProjectModelState(BaseModel):
 
 class StudyRequest(BaseModel):
     relancer: bool = False  # the user clicked « Relancer l'étude »: the only way to restudy an old model
+    relire: bool = False  # the user clicked « Réessayer » after a failed read: read the Project again now
 
 
 def add_model_routes(
@@ -54,6 +55,7 @@ def add_model_routes(
     graph_of: Callable[[str], ProjectGraph],
     explainer: Explainer,
     study: Study,
+    ensure_indexed: Callable[..., bool],
 ) -> Callable[[str], ModelState]:
     """Adds the routes; returns `refresh_model(project_id)`: study or update when needed."""
 
@@ -110,14 +112,17 @@ def add_model_routes(
 
     @app.get("/v1/projects/{project_id}/model", dependencies=authorized)
     def get_model(project_id: str) -> ProjectModelState:
-        known_project(project_id)
+        # Not read yet (just added, or never indexed): read it now and say so; never « index it again » (#85).
+        if not ensure_indexed(project_id):
+            return ProjectModelState(state="indexing")
         return current(project_id)[0]
 
     @app.post("/v1/projects/{project_id}/model", dependencies=authorized)
     def request_model(project_id: str, body: StudyRequest | None = None) -> ProjectModelState:
         """Study the Project when it has no model, update it when the code changed since, or study it
         again with the current method when the user asks (`relancer`)."""
-        known_project(project_id)
+        if not ensure_indexed(project_id, retry=body is not None and body.relire):
+            return ProjectModelState(state="indexing")
         refresh_model(project_id, relaunch=body is not None and body.relancer)
         return current(project_id)[0]
 
