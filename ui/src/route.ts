@@ -19,11 +19,19 @@ const OLD_JOURNEYS_VIEW = "parcours:"; // journeys now live on the architecture:
 export const ACTIVITY_VIEW = "activite:";
 const LOGIN = "#login=";
 
+/** `#login=<code>&p=<id>` (`umbra-engine start`): the code, and the page to land on once signed in. */
+export function parseLogin(hash: string): { code: string | null; landing: string } | null {
+  if (!hash.startsWith(LOGIN)) return null;
+  const [code = "", ...rest] = hash.slice(LOGIN.length).split("&");
+  const projectId = new URLSearchParams(rest.join("&")).get("p");
+  return { code: safeDecode(code) || null, landing: projectId ? routeHash({ projectId, node: ARCHITECTURE_VIEW, expand: false }) : "#/" };
+}
+
 export function takeLoginCode(): string | null {
-  if (!window.location.hash.startsWith(LOGIN)) return null;
-  const code = safeDecode(window.location.hash.slice(LOGIN.length));
-  window.history.replaceState(null, "", `${window.location.pathname}#/`);
-  return code || null;
+  const login = parseLogin(window.location.hash);
+  if (!login) return null;
+  window.history.replaceState(null, "", `${window.location.pathname}${login.landing}`);
+  return login.code;
 }
 
 export function parseRoute(hash: string): Route {

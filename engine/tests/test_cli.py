@@ -59,3 +59,50 @@ def test_engine_errors_are_one_line_messages_not_tracebacks(settings, monkeypatc
     monkeypatch.setattr("umbra_engine.settings.TOKEN_READ_RETRIES", 1)
     assert cli.main(["token"]) == 1
     assert capsys.readouterr().err.startswith("umbra-engine: empty token file")
+
+
+def test_start_registers_indexes_and_serves_a_link_that_lands_on_the_project(
+    settings, make_repo, monkeypatch, capsys
+):
+    """#98: one command from a folder to the web app, on that Project."""
+    monkeypatch.setenv("UMBRA_HOME", str(settings.home))
+    repo = make_repo("watchdog")
+    seen = {}
+
+    import uvicorn
+
+    monkeypatch.setattr(uvicorn, "run", lambda app, host, port, log_level: seen.update(host=host))
+    monkeypatch.setattr("umbra_engine.gateways.claude.readiness_problem", lambda: None)
+    assert cli.main(["start", str(repo), "--no-browser"]) == 0
+    out = capsys.readouterr().out
+    project_id = out.split("indexed ", 1)[1].split(":", 1)[0]
+    assert project_id.startswith("watchdog-")
+    assert "#login=" in out and f"&p={project_id}" in out
+    assert seen["host"] == "127.0.0.1"
+    assert "Warning" not in out
+
+    assert cli.main(["start", str(repo), "--no-browser"]) == 0  # a second run reuses the same Project
+    assert f"indexed {project_id}:" in capsys.readouterr().out
+
+
+def test_start_says_when_claude_code_is_missing_and_still_serves(settings, make_repo, monkeypatch, capsys):
+    monkeypatch.setenv("UMBRA_HOME", str(settings.home))
+    repo = make_repo("watchdog")
+
+    import subprocess
+
+    import uvicorn
+
+    def no_claude(*args, **kwargs):
+        raise FileNotFoundError("claude")
+
+    monkeypatch.setattr(uvicorn, "run", lambda app, host, port, log_level: None)
+    monkeypatch.setattr(subprocess, "run", no_claude)
+    assert cli.main(["start", str(repo), "--no-browser"]) == 0
+    assert "Claude Code is not installed on this machine" in capsys.readouterr().out
+
+
+def test_start_on_a_missing_folder_exits_2(settings, tmp_path, monkeypatch, capsys):
+    monkeypatch.setenv("UMBRA_HOME", str(settings.home))
+    assert cli.main(["start", str(tmp_path / "nope"), "--no-browser"]) == 2
+    assert "does not exist" in capsys.readouterr().err

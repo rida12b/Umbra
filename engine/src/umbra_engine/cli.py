@@ -7,10 +7,14 @@ import argparse
 import sqlite3
 import sys
 from collections import Counter
+from typing import TYPE_CHECKING
 
 from umbra_engine.project_store import STALE_INDEX
-from umbra_engine.registry import ProjectIdCollisionError, ProjectPathError, Registry
+from umbra_engine.registry import Project, ProjectIdCollisionError, ProjectPathError, Registry
 from umbra_engine.settings import API_HOST, Settings, TokenFileError, load_or_create_token
+
+if TYPE_CHECKING:
+    from umbra_engine.indexer import IndexSummary  # imported when indexing: it loads the parsers
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -29,6 +33,9 @@ def main(argv: list[str] | None = None) -> int:
     verify.add_argument("project")
     verify.add_argument("--sample", type=int, default=30)
     verify.add_argument("--seed", type=int, default=0)
+    start = commands.add_parser("start", help="register and index a folder, then open it in the web app")
+    start.add_argument("path")
+    start.add_argument("--no-browser", action="store_true", help="print the login link, do not open it")
     serve = commands.add_parser("serve", help=f"run the local API and web app on {API_HOST}")
     serve.add_argument("--no-browser", action="store_true", help="print the login link, do not open it")
     commands.add_parser("open", help="open the web app of a running engine in the browser")
@@ -62,6 +69,8 @@ def _run(args: argparse.Namespace) -> int:
         return 0
     if args.command == "open":
         return _open(settings)
+    if args.command == "start":
+        return _start(settings, args.path, open_browser=not args.no_browser)
     return _serve(settings, open_browser=not args.no_browser)
 
 
@@ -97,11 +106,37 @@ def _index(settings: Settings, project_ref: str) -> int:
                 return 2
         with registry.open_store(project) as store:
             summary = index_project(project, store)
+    _print_indexed(project, summary)
+    return 0
+
+
+def _print_indexed(project: Project, summary: "IndexSummary") -> None:
     print(
         f"indexed {project.id}: {summary.files} files, {summary.readable} readable "
         f"({summary.redacted_secrets} secrets redacted), skipped {summary.skipped}, claims {summary.claims}"
     )
-    return 0
+
+
+def _start(settings: Settings, path: str, open_browser: bool) -> int:
+    """A first run in one command: register (idempotent), index (only changed files are read again), serve,
+    and open the login link straight on this Project. The study itself starts when the page opens it."""
+    from umbra_engine.gateways.claude import readiness_problem
+    from umbra_engine.indexer import index_project
+
+    try:
+        with Registry(settings) as registry:
+            project, _ = registry.add(path)
+            print(f"indexing {project.root} ...")
+            with registry.open_store(project) as store:
+                summary = index_project(project, store)
+    except ProjectPathError as error:
+        print(f"umbra-engine: {error}", file=sys.stderr)
+        return 2
+    _print_indexed(project, summary)
+    problem = readiness_problem()
+    if problem:
+        print(f"\nWarning: {problem}\nUmbra needs it to study and explain the project.\n")
+    return _serve(settings, open_browser, project.id)
 
 
 def _coverage(settings: Settings, project_ref: str, state: str | None) -> int:
@@ -152,7 +187,7 @@ def _verify_facts(settings: Settings, project_ref: str, sample: int, seed: int) 
     return 0 if checks and correct == len(checks) else 1
 
 
-def _serve(settings: Settings, open_browser: bool) -> int:
+def _serve(settings: Settings, open_browser: bool, project_id: str | None = None) -> int:
     import threading
     import webbrowser
 
@@ -161,9 +196,10 @@ def _serve(settings: Settings, open_browser: bool) -> int:
     from umbra_engine.api import create_app
 
     app = create_app(settings, live=True)
-    link = _login_link(settings, app.state.ui_sessions.new_login_code())
+    link = _login_link(settings, app.state.ui_sessions.new_login_code(), project_id)
     print(f"Umbra web app: {link}")
     print("(one-time link, valid 2 minutes; `umbra-engine open` makes a new one)")
+    sys.stdout.flush()  # the link must reach a redirected log now, not when the server stops
     if open_browser:
         threading.Timer(1.0, webbrowser.open_new_tab, args=(link,)).start()
     uvicorn.run(app, host=API_HOST, port=settings.port, log_level="info")
@@ -195,9 +231,13 @@ def _open(settings: Settings) -> int:
     return 0
 
 
-def _login_link(settings: Settings, code: str) -> str:
-    """The code sits in the fragment: browsers never send it to the server, so no log records it."""
-    return f"http://{API_HOST}:{settings.port}/#login={code}"
+def _login_link(settings: Settings, code: str, project_id: str | None = None) -> str:
+    """The code sits in the fragment: browsers never send it to the server, so no log records it.
+    With a Project, the page lands on it once signed in."""
+    from urllib.parse import quote
+
+    landing = f"&p={quote(project_id, safe='')}" if project_id else ""
+    return f"http://{API_HOST}:{settings.port}/#login={code}{landing}"
 
 
 if __name__ == "__main__":

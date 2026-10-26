@@ -26,7 +26,7 @@
 
 ---
 
-> **System Explorer (V1) is being built** next to this v0.7 tool. Scope: [`SPEC.md`](SPEC.md). Engine install on Windows: [`engine/README.md`](engine/README.md). v0.7 below stays unchanged until V1 is validated.
+> **System Explorer (V1) is being built** next to this v0.7 tool. Scope: [`SPEC.md`](SPEC.md). Try it on your project in two commands: [`engine/README.md`](engine/README.md). v0.7 below stays unchanged until V1 is validated.
 
 ## 😰 The Problem
 
