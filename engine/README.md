@@ -45,7 +45,8 @@ umbra-engine add C:\path\to\your\project   # register a Project (idempotent)
 umbra-engine list                          # registered Projects
 umbra-engine index C:\path\to\your\project # register if needed, then index
 umbra-engine serve                         # local API and web app on http://127.0.0.1:7811
-umbra-engine open                          # new browser login link for a running engine
+umbra-engine open [folder]                 # new browser login link for a running engine (on that folder's map)
+umbra-engine mcp                           # MCP server for Claude Code (stdio): the `show` tool
 umbra-engine token                         # local token for API clients
 ```
 
@@ -60,6 +61,19 @@ files say without any LLM: who comes in (ENTRÉE), the parts that run left to ri
 (each a verb), what leaves the project (◉ SORTIES), and the tools around (`+ N outils autour`). Hover any box,
 arrow or output for its proof (file and lines); dashed means deduced, not read. Boxes keep their place across
 reloads and re-indexing.
+
+## Ask in Claude Code, see the answer on the map (`/umbra`)
+
+The Claude Code plugin in `plugin/` registers the `umbra` MCP server (`umbra-engine mcp`, so `umbra-engine` must
+be on `PATH`) and the `/umbra` skill. In a repo, type `/umbra`: Claude runs `umbra-engine open .` (or starts the
+engine) and the map opens. Then ask a question about the repo, e.g. « où j'ajoute un champ prix à Item ? »: Claude
+answers in at most 3 lines and calls `show({caption, path, parts})`. The open tab lights up to 6 numbered places
+under their boxes, dims the rest, and shows one bar with « copier pour Claude » (the question and the files, ready
+for an agent) and « effacer ». ← → move along the numbers. The engine runs no model for this: Claude Code is the
+only one. A name that is not on the map is refused with the list of valid boxes, so Claude corrects itself.
+
+Under the hood: `POST /v1/projects/<id>/show` checks the request against the map and the indexed files and pushes
+it to the open tabs over `/events`; `GET` returns what is lit now; `DELETE` clears it.
 
 Every `/v1/projects` endpoint needs the token, as `Authorization: Bearer <token>`. `POST /v1/projects` only accepts absolute paths.
 

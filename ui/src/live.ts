@@ -1,15 +1,18 @@
 import { createContext, useContext, useEffect, useState } from "react";
-import { readSessionHeader, signedOut } from "./api";
+import { api, readSessionHeader, signedOut, type Highlight } from "./api";
+import { applyEvent, newer } from "./projectmap/lit";
 
 // What the engine reports while it watches the Project: every event (a re-read, Claude's activity) bumps
-// `revision`, and views read their data again.
+// `revision`, and views read their data again. A `show` from Claude Code (#104) is not a change of the
+// project: it only sets `highlight`, the path lit on the map (null once « effacer » is pressed anywhere).
 export interface Live {
   connected: boolean;
   revision: number;
+  highlight: Highlight | null;
 }
 
 const RETRY_MS = 3000;
-const IDLE: Live = { connected: false, revision: 0 };
+const IDLE: Live = { connected: false, revision: 0, highlight: null };
 
 export const LiveContext = createContext<Live>(IDLE);
 export const useLive = () => useContext(LiveContext);
@@ -25,7 +28,7 @@ export function useLiveEvents(projectId: string | null): Live {
     let lastId: string | null = null; // sent back on reconnect: the engine replays what was missed
     setLive(IDLE);
 
-    const apply = () => setLive((previous) => ({ connected: true, revision: previous.revision + 1 }));
+    const apply = (data: string) => setLive((previous) => applyEvent(previous, data));
 
     const connect = async () => {
       while (!stopped) {
@@ -43,6 +46,11 @@ export function useLiveEvents(projectId: string | null): Live {
           if (!response.ok || !response.body) throw new Error(String(response.status));
           // (Re)connected: read everything again once, in case something changed while away.
           setLive((previous) => ({ ...previous, connected: true, revision: previous.revision + 1 }));
+          // What Claude lit before this tab opened (or while it was away) is shown too.
+          api.shownNow(projectId).then(
+            (highlight) => !stopped && setLive((previous) => ({ ...previous, highlight: newer(previous.highlight, highlight) })),
+            () => undefined,
+          );
           const reader = response.body.pipeThrough(new TextDecoderStream()).getReader();
           let buffer = "";
           for (;;) {
@@ -56,7 +64,7 @@ export function useLiveEvents(projectId: string | null): Live {
               const id = lines.find((line) => line.startsWith("id: "));
               const data = lines.find((line) => line.startsWith("data: "));
               if (id) lastId = id.slice(4);
-              if (data) apply();
+              if (data) apply(data.slice(6));
             }
           }
         } catch {

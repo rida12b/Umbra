@@ -18,6 +18,7 @@ dependencies = [
     "PyYAML>=6.0,<7.0",
     "tree-sitter-language-pack>=1.22,<2.0",
     "watchfiles>=1.0,<2.0",
+    "mcp>=1.26,<2.0",  # the `show` tool for Claude Code (umbra-engine mcp); 2.x is a new major API
 ]
 
 [project.optional-dependencies]
