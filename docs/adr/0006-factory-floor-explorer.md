@@ -1,6 +1,6 @@
 # The Explorer becomes a factory floor that opens rooms in place, with the journey played as a numbered line
 
-Status: accepted (2026-10-25, decided by Rida: "je suis ta recommandation"). Supersedes the Explorer layout of #50 (zone rows, ELK import graph inside a part). Requires study method v1.7.
+Status: superseded by ADR-0007 (2026-10-27). Was accepted (2026-10-25, decided by Rida: "je suis ta recommandation"). Supersedes the Explorer layout of #50 (zone rows, ELK import graph inside a part). Requires study method v1.7.
 
 ## Context
 

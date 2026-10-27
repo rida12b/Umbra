@@ -1,0 +1,1031 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Umbra — carte du projet</title>
+<style>
+:root{
+  --bg:#f5f6f8; --surface:#ffffff; --surface-2:#eef0f3; --ink:#15181d; --ink-2:#4a5160; --ink-3:#6f7786;
+  --line:#d6dbe3; --box:#ffffff; --box-stroke:#8e97a6; --stub:#e9ecf0; --stub-ink:#646c7b; --stub-stroke:#c9ced7;
+  --accent:#2457e6; --accent-soft:#e7edff; --accent-ink:#ffffff; --halo:#f5f6f8; --shadow:0 1px 2px rgba(20,24,30,.06),0 8px 24px rgba(20,24,30,.08);
+  --warn-bg:#fff6e0; --warn-line:#e7b74a; --warn-ink:#6b4b00;
+  --term-bg:#1b1c1f; --term-ink:#e6e6e6; --term-dim:#8b8f98; --term-acc:#d97757;
+  --mono:ui-monospace,"Cascadia Code","Cascadia Mono",Consolas,"SFMono-Regular",Menlo,monospace;
+  --sans:"Segoe UI Variable Text","Segoe UI",system-ui,-apple-system,"Helvetica Neue",Arial,sans-serif;
+  color-scheme:light;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0f1115; --surface:#161a20; --surface-2:#1d2229; --ink:#e7eaef; --ink-2:#aab1bd; --ink-3:#8a93a3;
+    --line:#2a3039; --box:#1a1f26; --box-stroke:#5d6778; --stub:#1f242c; --stub-ink:#8d96a5; --stub-stroke:#323946;
+    --accent:#7096ff; --accent-soft:#1e2a4a; --accent-ink:#0f1115; --halo:#0f1115; --shadow:0 1px 2px rgba(0,0,0,.4),0 8px 24px rgba(0,0,0,.35);
+    --warn-bg:#2a2210; --warn-line:#8a6a1f; --warn-ink:#f1d48a;
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0f1115; --surface:#161a20; --surface-2:#1d2229; --ink:#e7eaef; --ink-2:#aab1bd; --ink-3:#8a93a3;
+  --line:#2a3039; --box:#1a1f26; --box-stroke:#5d6778; --stub:#1f242c; --stub-ink:#8d96a5; --stub-stroke:#323946;
+  --accent:#7096ff; --accent-soft:#1e2a4a; --accent-ink:#0f1115; --halo:#0f1115; --shadow:0 1px 2px rgba(0,0,0,.4),0 8px 24px rgba(0,0,0,.35);
+  --warn-bg:#2a2210; --warn-line:#8a6a1f; --warn-ink:#f1d48a;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family:var(--sans);-webkit-font-smoothing:antialiased}
+body{overflow:hidden}
+button{font:inherit;color:inherit;cursor:pointer}
+.mono{font-family:var(--mono)}
+
+/* ---------- layout ---------- */
+.app{display:flex;height:100vh;width:100vw}
+.term{display:none}
+.tool{flex:1;min-width:0;display:flex;flex-direction:column;background:var(--bg)}
+.app.split{background:#d9dce1;padding:14px;gap:14px}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .app.split{background:#07080a}}
+:root[data-theme="dark"] .app.split{background:#07080a}
+.app.split .term{display:flex}
+.app.split .tool{border-radius:12px;overflow:hidden;box-shadow:var(--shadow);border:1px solid var(--line)}
+.browserbar{display:none;height:40px;align-items:center;gap:10px;padding:0 14px;background:var(--surface-2);border-bottom:1px solid var(--line)}
+.app.split .browserbar{display:flex}
+.dots{display:flex;gap:6px}.dots i{width:11px;height:11px;border-radius:50%;background:var(--line);display:block}
+.url{flex:1;max-width:420px;height:26px;border-radius:7px;background:var(--surface);border:1px solid var(--line);display:flex;align-items:center;padding:0 10px;font-size:12.5px;color:var(--ink-2);font-family:var(--mono)}
+
+/* top bar */
+.top{height:48px;display:flex;align-items:center;gap:14px;padding:0 20px;border-bottom:1px solid var(--line);background:var(--surface)}
+.logo{display:flex;align-items:center;gap:8px;font-weight:700;letter-spacing:.2px;font-size:15px}
+.logo svg{display:block}
+.crumbs{display:flex;align-items:center;gap:6px;font-size:14px;color:var(--ink-2);min-width:0}
+.crumbs button{background:none;border:0;padding:4px 6px;border-radius:6px;color:var(--ink-2)}
+.crumbs button:hover{background:var(--surface-2);color:var(--ink)}
+.crumbs .here{color:var(--ink);font-weight:600;padding:4px 6px}
+.crumbs .sep{color:var(--ink-3)}
+.top .spacer{flex:1}
+.seg{display:flex;border:1px solid var(--line);border-radius:8px;overflow:hidden;font-size:12.5px}
+.seg button{border:0;background:var(--surface);padding:4px 10px;color:var(--ink-2);white-space:nowrap}
+.seg button+button{border-left:1px solid var(--line)}
+.seg button.on{background:var(--surface-2);color:var(--ink);font-weight:600}
+.app.split .seg{display:none}
+
+/* header */
+.head{padding:14px 28px 6px;display:flex;align-items:center;gap:24px}
+.head .t{min-width:0;flex:1}
+.head h1{margin:0;font-size:22px;font-weight:700;letter-spacing:-.2px;display:flex;align-items:baseline;gap:10px}
+.head h1 .p{font-family:var(--mono);font-size:14px;font-weight:400;color:var(--ink-3)}
+.head .s{margin:6px 0 0;font-size:16.5px;color:var(--ink)}
+.status{flex:none;width:360px;border:1px solid var(--warn-line);background:var(--warn-bg);border-radius:10px;padding:9px 13px;font-size:13.5px;line-height:1.4}
+.status .h{display:flex;align-items:center;gap:8px;font-weight:700;font-size:14.5px;color:var(--ink)}
+.status .h span{margin-left:auto;font-weight:600;font-size:11.5px;color:var(--warn-ink);border:1px solid var(--warn-line);border-radius:999px;padding:1px 8px;white-space:nowrap}
+.status .f{color:var(--ink-2);margin-top:3px}
+.status .q{color:var(--warn-ink);margin-top:3px}
+.raw-note{flex:none;max-width:420px;font-size:13px;color:var(--warn-ink);border:1px solid var(--warn-line);background:var(--warn-bg);border-radius:10px;padding:8px 12px;line-height:1.4}
+
+/* caption bar */
+.caption{display:none;margin:10px 28px 0;background:var(--surface);border:1px solid var(--accent);border-radius:10px;padding:8px 10px 8px 14px;align-items:center;gap:14px;box-shadow:var(--shadow)}
+.caption.on{display:flex}
+.caption .what{display:flex;align-items:center;gap:10px;min-width:0;flex:1}
+.caption .kind{font-size:12px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:.6px;white-space:nowrap}
+.caption .q{font-size:15px;font-weight:600;white-space:nowrap}
+.caption .tag{font-size:11.5px;color:var(--ink-3);border:1px solid var(--line);border-radius:999px;padding:2px 8px;white-space:nowrap}
+.caption .step{font-size:13.5px;color:var(--ink-2);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;border-left:1px solid var(--line);padding-left:14px}
+.caption .step b{color:var(--accent)}
+.caption .step .mono{font-size:12.5px;color:var(--ink-3)}
+.btn{border:1px solid var(--line);background:var(--surface);border-radius:8px;padding:6px 12px;font-size:13.5px;white-space:nowrap}
+.btn:hover{border-color:var(--box-stroke)}
+a.btn{text-decoration:none;color:var(--ink);font-size:13px;font-weight:500}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);font-weight:600}
+.btn.icon{padding:6px 9px;font-family:var(--mono)}
+.btn.round{width:34px;height:34px;border-radius:50%;padding:0;font-weight:700}
+
+/* stage */
+.stage{flex:1;min-height:0;display:flex;position:relative}
+.mapcol{flex:1;min-width:0;display:flex;flex-direction:column}
+.mapwrap{flex:1;min-height:0;position:relative;padding:6px 20px 4px}
+.mapwrap svg{width:100%;height:100%;display:block}
+.panel{width:0;overflow:hidden}
+.panel.on{width:460px;flex:none;border-left:1px solid var(--line);background:var(--surface);overflow:auto}
+.strip{display:none}
+.strip.on{display:grid;grid-template-columns:230px 1fr 1fr;gap:22px;margin:0 20px 10px;padding:14px 18px;background:var(--surface);border:1px solid var(--accent);border-radius:12px;box-shadow:var(--shadow)}
+.strip h2{margin:0;font-family:var(--mono);font-size:20px}
+.strip .path{font-family:var(--mono);font-size:12px;color:var(--ink-3);margin:4px 0 12px}
+.four{margin:0;border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.four div{display:grid;grid-template-columns:92px 1fr;gap:10px;padding:7px 12px;border-top:1px solid var(--line);font-size:13.5px;line-height:1.4}
+.four div:first-child{border-top:0}
+.four dt{color:var(--ink-3);font-size:12.5px;padding-top:1px}
+.four dd{margin:0}
+.four .mono{font-size:12px;color:var(--ink-2)}
+.sec{font-size:12px;font-weight:700;color:var(--ink-3);text-transform:uppercase;letter-spacing:.7px;margin-bottom:4px}
+.acts{display:flex;flex-direction:column}
+.act{display:flex;align-items:center;gap:10px;padding:5px 8px;border-radius:8px;border:0;background:none;text-align:left;font-size:14px}
+.act:hover,.act.hov{background:var(--surface-2)}
+.m{font-family:var(--mono);font-size:11px;font-weight:700;width:54px;flex:none;color:var(--ink-2);border:1px solid var(--line);border-radius:5px;text-align:center;padding:2px 0}
+.act .lab{white-space:nowrap}
+.act .fn{font-family:var(--mono);font-size:12px;color:var(--ink-3);white-space:nowrap}
+.act .rt{margin-left:auto;font-family:var(--mono);font-size:12px;color:var(--ink-3);display:none}
+.act:hover .rt,.act.hov .rt{display:inline}
+.act .go{color:var(--accent);font-size:12.5px;font-weight:600;margin-left:auto;white-space:nowrap}
+
+/* bottom bar */
+.bottom{height:54px;display:flex;align-items:center;gap:14px;padding:0 24px;border-top:1px solid var(--line);background:var(--surface)}
+.bottom .spacer{flex:1}
+.gaps{display:none;font-size:13px;color:var(--ink-2);gap:8px;flex-wrap:nowrap;overflow:hidden}
+.gaps.on{display:flex}
+.gaps b{color:var(--warn-ink);white-space:nowrap}
+.gaps span{white-space:nowrap;border:1px solid var(--warn-line);background:var(--warn-bg);border-radius:999px;padding:3px 10px}
+
+/* svg */
+svg text{font-family:var(--sans);fill:var(--ink)}
+.n rect.b{fill:var(--box);stroke:var(--box-stroke);stroke-width:1.5}
+.n.dash rect.b{stroke-dasharray:6 5}
+.n .tt{font-size:17px;font-weight:650}
+.n .st{font-size:13.5px;fill:var(--ink-2)}
+.n .ft{font-size:12.5px;fill:var(--ink-3);font-family:var(--mono)}
+.n{cursor:pointer}
+.n.open:hover rect.b{stroke:var(--accent);stroke-width:2.2}
+.n:hover rect.b{stroke:var(--ink-2)}
+.n .hit{fill:transparent}
+.n .hov{font-size:12.5px;font-weight:600;fill:var(--accent);opacity:0}
+.n.open:hover .hov,.n.open.forcehover .hov{opacity:1}
+.n.forcehover rect.b{stroke:var(--accent);stroke-width:2.2}
+.n .om circle{fill:var(--surface-2);stroke:var(--box-stroke)}
+.n .om path{stroke:var(--ink-2);stroke-width:1.8;fill:none}
+.n.open:hover .om circle,.n.forcehover .om circle{fill:var(--accent);stroke:var(--accent)}
+.n.open:hover .om path,.n.forcehover .om path{stroke:var(--accent-ink)}
+.n.sel rect.b{stroke:var(--accent);stroke-width:2.5}
+.n.stub rect.b{fill:var(--stub);stroke:var(--stub-stroke)}
+.n.stub .tt{font-size:14px;font-weight:600;fill:var(--stub-ink)}
+.n.stub .st{fill:var(--stub-ink);font-size:12.5px}
+.actor .head{fill:none;stroke:var(--ink-2);stroke-width:2}
+.actor .body{fill:none;stroke:var(--ink-2);stroke-width:2;stroke-linecap:round}
+.chip rect{fill:var(--surface-2);stroke:var(--line)}
+.chip text{font-family:var(--mono);font-size:12.5px;fill:var(--ink)}
+.chip{cursor:pointer}
+.chip:hover rect{stroke:var(--accent)}
+.chip.lit rect{fill:var(--accent);stroke:var(--accent)}
+.chip.lit text{fill:var(--accent-ink);font-weight:700}
+.a path.l{fill:none;stroke:var(--ink-3);stroke-width:1.6}
+.a .hitp{fill:none;stroke:transparent;stroke-width:14}
+.a{cursor:help}
+.a:hover path.l{stroke:var(--ink)}
+.lbl{font-size:13px;fill:var(--ink-2);paint-order:stroke;stroke:var(--halo);stroke-width:5px;stroke-linejoin:round}
+.entry{font-size:12.5px;font-weight:800;letter-spacing:1.4px;fill:var(--ink)}
+.entry-l{stroke:var(--ink);stroke-width:2.4;fill:none}
+.out path{stroke:var(--ink-3);stroke-width:1.4;fill:none;stroke-dasharray:none}
+.out circle.o{fill:var(--bg);stroke:var(--ink);stroke-width:2}
+.out circle.i{fill:var(--ink)}
+.out text{font-size:13.5px;font-weight:600}
+.colhead{font-size:12.5px;font-weight:800;letter-spacing:1.4px;fill:var(--ink)}
+.colrule{stroke:var(--line);stroke-width:1.2}
+.note{font-size:12.5px;fill:var(--ink-3)}
+.around rect{fill:var(--surface);stroke:var(--box-stroke)}
+.around text{font-size:13.5px;font-weight:600}
+.around{cursor:pointer}
+.around:hover rect{stroke:var(--ink)}
+#ah path{fill:var(--ink-3)} #ahl path{fill:var(--accent)} #ahe path{fill:var(--ink)}
+/* raw engine output */
+.raw rect.b{fill:var(--surface);stroke:var(--box-stroke);stroke-width:1.3}
+.raw .tt{font-family:var(--mono);font-size:15px;font-weight:600}
+.raw .st{font-size:12.5px;fill:var(--ink-3)}
+.raw.grp rect.b{stroke-dasharray:3 3}
+
+/* path / question mode */
+.pathmode .dimmable{opacity:.22}
+.pathmode .n.lit,.pathmode .a.lit,.pathmode .out.lit{opacity:1}
+.pathmode .n.lit.on,.pathmode .n.lit.pass{opacity:.62}
+.pathmode .a.lit.on{opacity:.55}
+.n.lit rect.b{stroke:var(--accent);stroke-width:1.8;fill:var(--accent-soft)}
+.n.lit.cur rect.b{stroke-width:3.5}
+.n.lit.pass rect.b{fill:var(--box)}
+.n.stub.lit .tt,.n.stub.lit .st{fill:var(--accent);font-weight:700}
+.a.lit path.l{stroke:var(--accent);stroke-width:2}
+.a.lit.cur path.l{stroke-width:3.4}
+.a.lit .lbl{fill:var(--accent);font-weight:600}
+.out.lit path{stroke:var(--accent);stroke-width:2.4}
+.out.lit circle.o{stroke:var(--accent)} .out.lit circle.i{fill:var(--accent)} .out.lit text{fill:var(--accent)}
+.badge circle{fill:var(--accent)}
+.badge text{fill:var(--accent-ink);font-size:13px;font-weight:800;text-anchor:middle}
+.badge.cur circle{stroke:var(--accent-soft);stroke-width:5}
+.callout rect.cb{fill:var(--surface);stroke:var(--accent);stroke-width:1.6}
+.callout .row{cursor:help}
+.callout .row:hover rect.rh,.callout .row.forcehover rect.rh{fill:var(--accent-soft)}
+.callout rect.rh{fill:transparent}
+.callout .fn{font-family:var(--mono);font-size:14.5px;font-weight:600}
+.callout .why{font-size:14px;fill:var(--ink-2)}
+.callout line{stroke:var(--accent);stroke-width:1.6}
+
+/* drawer */
+.drawer .hd{padding:18px 22px 12px;border-bottom:1px solid var(--line);position:sticky;top:0;background:var(--surface);z-index:1}
+.drawer h3{margin:0;font-size:18px;display:flex;align-items:center}
+.drawer h3 .btn{margin-left:auto}
+.drawer .sub{font-size:13px;color:var(--ink-3);margin-top:6px;line-height:1.45}
+.grp{padding:10px 14px 2px}
+.grp .gh{font-size:12.5px;color:var(--ink-3);padding:4px 8px 6px;display:flex;gap:8px}
+.grp .gh b{color:var(--ink);font-family:var(--mono);font-weight:600}
+.cmds{display:flex;flex-wrap:wrap;gap:6px;padding:4px 8px 16px}
+.cmds span{font-family:var(--mono);font-size:12.5px;border:1px solid var(--line);border-radius:6px;padding:3px 8px;background:var(--surface-2)}
+
+/* popovers */
+.pop{position:absolute;z-index:20;background:var(--surface);border:1px solid var(--line);border-radius:10px;box-shadow:var(--shadow);padding:12px 14px;font-size:13.5px;line-height:1.45;display:none;max-width:380px}
+.pop.on{display:block}
+.pop .h{font-weight:700;font-size:14px;margin-bottom:4px}
+.pop .mono{font-size:12px;color:var(--ink-3)}
+.pop .hint{margin-top:6px;font-size:12.5px;color:var(--accent);font-weight:600}
+.pop.around-pop{max-width:none;width:470px;padding:6px 6px}
+.around-pop .r{display:grid;grid-template-columns:200px 1fr;column-gap:12px;padding:5px 10px;border-radius:6px;font-size:13px}
+.around-pop .r:hover{background:var(--surface-2)}
+.around-pop .r b{font-weight:600}
+.around-pop .r span{color:var(--ink-2)}
+.help{right:24px;bottom:66px;width:330px}
+.help .row{display:flex;align-items:center;gap:10px;padding:4px 0;font-size:13.5px}
+.help .row svg{flex:none}
+.toast{position:fixed;left:50%;bottom:72px;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:9px 16px;border-radius:9px;font-size:14px;display:none;z-index:50;box-shadow:var(--shadow)}
+.toast.on{display:block}
+
+/* terminal */
+.term{width:440px;flex:none;flex-direction:column;background:var(--term-bg);color:var(--term-ink);border-radius:12px;overflow:hidden;box-shadow:0 8px 30px rgba(0,0,0,.25);font-family:var(--mono);font-size:14px;line-height:1.6}
+.term .tb{height:40px;display:flex;align-items:center;gap:10px;padding:0 14px;background:#26272b;color:#a9adb5;font-size:12.5px}
+.term .tb .dots i{background:#45474d}
+.term .body{flex:1;padding:18px 20px;overflow:hidden;display:flex;flex-direction:column}
+.term .ln{white-space:pre-wrap}
+.term .dim{color:var(--term-dim)}
+.term .acc{color:var(--term-acc)}
+.term .usr{color:#ffffff;background:#2c2d31;border-radius:4px;padding:2px 6px;margin:10px -6px 4px;display:block}
+.term .ok{color:#7fbf7f}
+.term .sp{height:10px}
+.term .box{margin-top:auto;border:1px solid #4a4c52;border-radius:8px;padding:8px 12px;color:var(--term-dim)}
+.term .foot{font-size:12px;color:#6c7079;padding-top:6px}
+</style>
+</head>
+<body>
+<div class="app" id="app">
+  <section class="term" id="term" aria-label="Terminal Claude Code">
+    <div class="tb"><div class="dots"><i></i><i></i><i></i></div><span>claude — ~/clients/full-stack-fastapi-template</span></div>
+    <div class="body" id="termBody"></div>
+  </section>
+  <section class="tool" id="tool">
+    <div class="browserbar"><div class="dots"><i></i><i></i><i></i></div><div class="url">127.0.0.1:7420 · Umbra</div></div>
+    <div class="top">
+      <div class="logo"><svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true"><rect x="1.5" y="5" width="6" height="10" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.6"/><rect x="12.5" y="5" width="6" height="10" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M7.5 10h5" stroke="currentColor" stroke-width="1.6"/></svg>Umbra</div>
+      <nav class="crumbs" id="crumbs"></nav>
+      <div class="spacer"></div>
+      <div class="seg" id="segRepo" title="Deux projets d'exemple"></div>
+      <div class="seg" id="segVer" title="Ce qui est dessiné : la carte visée, ou ce que le moteur sort aujourd'hui sans IA"></div>
+    </div>
+    <div class="head" id="head"></div>
+    <div class="caption" id="caption"></div>
+    <div class="stage">
+      <div class="mapcol">
+        <div class="mapwrap" id="mapwrap"></div>
+        <div class="strip" id="strip"></div>
+      </div>
+      <aside class="panel" id="panel"></aside>
+    </div>
+    <div class="bottom">
+      <button class="btn" id="actionsBtn"></button>
+      <div class="gaps" id="gaps"></div>
+      <div class="spacer"></div>
+      <button class="btn round" id="helpBtn" aria-label="Aide : comment lire la carte">?</button>
+    </div>
+  </section>
+  <div class="pop" id="tip"></div>
+  <div class="pop around-pop" id="aroundPop"></div>
+  <div class="pop help" id="helpPop"></div>
+  <div class="toast" id="toast"></div>
+</div>
+
+<script>
+"use strict";
+const ROOTS = {
+  tpl: "C:/clients/full-stack-fastapi-template/",
+  sql: "C:/clients/sqlite-utils/"
+};
+const vs = (repo, p, l) => "vscode://file/" + ROOTS[repo] + p + (l ? ":" + l : "");
+
+/* ============ data, read in the repos on 2026-10-27 ============ */
+const ACTIONS_TPL = [
+  { file: "items.py", role: "items", rows: [
+    ["GET", "Lister ses items", "/api/v1/items/", "read_items", 14],
+    ["GET", "Voir un item", "/api/v1/items/{id}", "read_item", 49],
+    ["POST", "Créer un item", "/api/v1/items/", "create_item", 62, "A"],
+    ["PUT", "Modifier un item", "/api/v1/items/{id}", "update_item", 76],
+    ["DELETE", "Supprimer un item", "/api/v1/items/{id}", "delete_item", 100] ] },
+  { file: "users.py", role: "comptes", rows: [
+    ["POST", "S'inscrire", "/api/v1/users/signup"],
+    ["GET", "Voir son profil", "/api/v1/users/me"],
+    ["PATCH", "Modifier son profil", "/api/v1/users/me"],
+    ["PATCH", "Changer son mot de passe", "/api/v1/users/me/password"],
+    ["DELETE", "Supprimer son compte", "/api/v1/users/me"],
+    ["GET", "Lister les comptes (admin)", "/api/v1/users/"],
+    ["POST", "Créer un compte (admin)", "/api/v1/users/"],
+    ["GET", "Voir un compte", "/api/v1/users/{user_id}"],
+    ["PATCH", "Modifier un compte (admin)", "/api/v1/users/{user_id}"],
+    ["DELETE", "Supprimer un compte (admin)", "/api/v1/users/{user_id}"] ] },
+  { file: "login.py", role: "connexion", rows: [
+    ["POST", "Se connecter", "/api/v1/login/access-token"],
+    ["POST", "Vérifier sa connexion", "/api/v1/login/test-token"],
+    ["POST", "Demander un nouveau mot de passe", "/api/v1/password-recovery/{email}"],
+    ["POST", "Choisir un nouveau mot de passe", "/api/v1/reset-password/"],
+    ["POST", "Voir le courriel de récupération (admin)", "/api/v1/password-recovery-html-content/{email}"] ] },
+  { file: "utils.py", role: "outils", rows: [
+    ["POST", "Envoyer un courriel de test (admin)", "/api/v1/utils/test-email/"],
+    ["GET", "Vérifier que le serveur répond", "/api/v1/utils/health-check/"] ] },
+  { file: "private.py", role: "en local seulement", rows: [
+    ["POST", "Créer un compte sans connexion", "/api/v1/private/users/"] ] }
+];
+/* sqlite_utils/cli.py: the 47 @cli.command, name : line of the function */
+const CMDS_SQL = "tables:213 views:313 optimize:367 rebuild-fts:395 analyze:420 vacuum:446 dump:466 add-column:528 add-foreign-key:574 add-foreign-keys:603 index-foreign-keys:637 create-index:675 drop-index:719 enable-fts:760 populate-fts:801 disable-fts:823 enable-wal:845 disable-wal:868 enable-counts:891 reset-counts:920 insert:1355 upsert:1491 bulk:1591 create-database:1675 create-table:1746 duplicate:1818 rename-table:1842 drop-table:1865 create-view:1907 drop-view:1941 query:1989 memory:2105 search:2346 rows:2452 triggers:2522 indexes:2580 schema:2648 transform:2729 extract:2843 insert-files:2906 analyze-tables:3051 install:3150 uninstall:3165 convert:3250 add-geometry-column:3389 create-spatial-index:3430 plugins:3634".split(" ").map(s => s.split(":"));
+
+const AROUND = {
+  tpl: [
+    ["Suivi des erreurs", "Sentry, seulement si une clé est réglée", "backend/app/main.py:14"],
+    ["Préparation au démarrage", "crée les tables et le premier compte", "backend/scripts/prestart.sh"],
+    ["Tests", "serveur (pytest) et écrans (Playwright)", "backend/tests/ · frontend/tests/"],
+    ["Vérifications automatiques", "12 fichiers : tests, mise en ligne", ".github/workflows/"],
+    ["Voir la base (Adminer)", "la base dans le navigateur, en local", "compose.yml"],
+    ["Créer un projet depuis ce modèle", "questions posées à la création", "copier.yml"],
+    ["Documentation", "installer, développer, mettre en ligne", "README.md · development.md · deployment.md"]
+  ],
+  sql: [
+    ["Tests", "pytest, un fichier par commande ou presque", "tests/"],
+    ["Documentation", "site de documentation", "docs/"],
+    ["Vérifications automatiques", "7 fichiers : tests, publication", ".github/workflows/"],
+    ["Extensions", "d'autres paquets ajoutent des commandes", "sqlite_utils/plugins.py · hookspecs.py"]
+  ],
+  api: [
+    ["Réglages", "lit le fichier .env : base, clé secrète, courriel", "backend/app/core/config.py"],
+    ["Migrations", "créent et modifient les tables, 5 fichiers", "backend/app/alembic/versions/"]
+  ],
+  web: [
+    ["Tests des écrans", "Playwright", "frontend/tests/"],
+    ["Kit d'interface", "boutons, champs, tableaux réutilisés", "frontend/src/components/ui/"]
+  ]
+};
+
+/* ---- Level 0, target map: full-stack-fastapi-template ---- */
+const L0_TPL = {
+  vb: "0 100 1200 480",
+  entry: { x: 24, y: 168, d: "M24,190 L76,190" },
+  sorties: { x: 1036, y: 128 },
+  nodes: {
+    user: { kind: "actor", x: 80, y: 150, w: 120, h: 110, t: "Utilisateur", s: "navigateur",
+      tip: ["Utilisateur", "Une personne avec un compte : simple ou admin.", "Supposé : aucun fichier ne la décrit."] },
+    web: { x: 250, y: 150, w: 200, h: 110, t: "Application web", s: "React", f: "frontend/", open: "web",
+      tip: ["Application web", "Les écrans dans le navigateur. Garde la connexion et appelle le serveur.", "frontend/"] },
+    api: { x: 530, y: 150, w: 200, h: 110, t: "Serveur", s: "FastAPI · Python", f: "backend/app/", open: "api",
+      tip: ["Serveur", "Reçoit les appels, vérifie qui appelle, lit et écrit la base.", "backend/app/"] },
+    db: { x: 810, y: 150, w: 180, h: 110, t: "Base", s: "PostgreSQL",
+      tip: ["Base", "Garde les comptes et les items : 2 tables, user et item.", "compose.yml · backend/app/models.py"] },
+    mail: { x: 530, y: 420, w: 200, h: 90, t: "Courriel", s: "service externe",
+      tip: ["Courriel", "Envoie les courriels : mot de passe oublié, nouveau compte.", "réglage SMTP_HOST · backend/app/utils.py:33"] }
+  },
+  arrows: [
+    { id: "u-w", d: "M200,190 L250,190", lx: 225, ly: 180, t: "clique", info: ["Utilisateur → Application web", "clavier et souris : formulaires, boutons"] },
+    { id: "w-u", d: "M250,228 L200,228", lx: 225, ly: 250, t: "affiche", info: ["Application web → Utilisateur", "pages et listes mises à jour"] },
+    { id: "w-a", d: "M450,190 L530,190", lx: 490, ly: 180, t: "appelle", info: ["Application web → Serveur", "HTTP + JSON, adresses /api/v1/…", "frontend/src/client/sdk.gen.ts"] },
+    { id: "a-w", d: "M530,228 L450,228", lx: 490, ly: 250, t: "répond", info: ["Serveur → Application web", "réponse JSON ou erreur (401, 403, 404, 422)"] },
+    { id: "a-d", d: "M730,205 L810,205", lx: 770, ly: 195, t: "écrit", info: ["Serveur → Base", "SQL via SQLModel, une session par appel", "backend/app/api/deps.py:21"] },
+    { id: "a-m", d: "M630,260 L630,420", lx: 640, ly: 410, t: "envoie", anchor: "start", info: ["Serveur → Courriel", "SMTP, seulement si SMTP_HOST est réglé", "backend/app/utils.py:33"] }
+  ],
+  outs: [
+    { id: "o-db", d: "M990,205 L1040,205", at: [1048, 205], t: "ligne enregistrée", owner: "db" },
+    { id: "o-mail", d: "M730,465 L1040,465", at: [1048, 465], t: "courriel envoyé", owner: "mail" },
+    { id: "o-web", d: "M300,260 L300,548 L1040,548", at: [1048, 548], t: "écran mis à jour", owner: "web" }
+  ],
+  around: { x: 24, y: 520, w: 250, t: "+ 7 outils autour (tests, CI…)", list: "tpl" }
+};
+
+/* ---- Level 0, target map: sqlite-utils (no compose: a command + a library) ---- */
+const L0_SQL = {
+  vb: "0 100 1200 480",
+  entry: { x: 24, y: 168, d: "M24,190 L70,190" },
+  entry2: { x: 24, y: 368, d: "M24,390 L70,390" },
+  sorties: { x: 1036, y: 128 },
+  nodes: {
+    term: { kind: "actor", x: 70, y: 145, w: 150, h: 110, t: "Personne", s: "dans un terminal",
+      tip: ["Personne dans un terminal", "Tape « sqlite-utils … » avec un fichier .db.", "Supposé : déduit de la commande déclarée."] },
+    prog: { kind: "actor", x: 70, y: 345, w: 150, h: 110, t: "Programme Python", s: "import sqlite_utils",
+      tip: ["Programme Python", "Un autre programme qui utilise la bibliothèque.", "Supposé : déduit du README (« CLI utility and library »)."] },
+    cmd: { x: 300, y: 145, w: 220, h: 110, t: "Commande", s: "47 commandes", f: "cli.py", open: "none",
+      tip: ["Commande", "Lit ce qui est tapé, appelle la bibliothèque, affiche le résultat.", "pyproject.toml:72 · sqlite_utils/cli.py"] },
+    lib: { x: 300, y: 345, w: 220, h: 110, t: "Bibliothèque", s: "Database · Table", f: "db.py", open: "none",
+      tip: ["Bibliothèque", "Crée, remplit et modifie les tables d'un fichier SQLite.", "sqlite_utils/db.py:538"] },
+    file: { x: 690, y: 345, w: 200, h: 110, t: "Fichier SQLite", s: "un .db sur le disque",
+      tip: ["Fichier SQLite", "La base est un simple fichier, ouvert avec sqlite3.", "sqlite_utils/db.py:611"] }
+  },
+  arrows: [
+    { id: "t-c", d: "M220,200 L300,200", lx: 260, ly: 190, t: "tape", info: ["Personne → Commande", "sqlite-utils insert, query, search…", "pyproject.toml:72"] },
+    { id: "p-l", d: "M220,400 L300,400", lx: 260, ly: 390, t: "importe", info: ["Programme → Bibliothèque", "from sqlite_utils import Database", "sqlite_utils/__init__.py"] },
+    { id: "c-l", d: "M410,255 L410,345", lx: 422, ly: 305, t: "appelle", anchor: "start", info: ["Commande → Bibliothèque", "Database, Table : 6 appels trouvés", "sqlite_utils/cli.py"] },
+    { id: "l-f", d: "M520,400 L690,400", lx: 605, ly: 390, t: "lit et écrit", info: ["Bibliothèque → Fichier SQLite", "sqlite3.connect(fichier)", "sqlite_utils/db.py:611"] }
+  ],
+  outs: [
+    { id: "o-out", d: "M520,200 L1040,200", at: [1048, 200], t: "résultat affiché", t2: "JSON, CSV, tableau", owner: "cmd" },
+    { id: "o-file", d: "M890,400 L1040,400", at: [1048, 400], t: "fichier .db modifié", owner: "file" }
+  ],
+  around: { x: 24, y: 500, w: 290, t: "+ 4 outils autour (tests, docs…)", list: "sql" }
+};
+
+/* ---- Level 1: inside Serveur ---- */
+const L1_API = {
+  vb: "0 0 1240 540",
+  entry: { x: 20, y: 136 },
+  sorties: { x: 1020, y: 22 },
+  nodes: {
+    sWeb: { kind: "stub", x: 20, y: 150, w: 150, h: 90, t: "depuis", s2: ["Application web"], back: "web" },
+    porte: { x: 240, y: 145, w: 160, h: 100, t: "Porte d'entrée", f: "main.py",
+      tip: ["Porte d'entrée", "Crée l'appli et passe tout ce qui commence par /api/v1 aux routes.", "backend/app/main.py:33"] },
+    routes: { kind: "chips", x: 470, y: 120, w: 270, h: 150, t: "Routes", f: "api/routes/", chips: ["login", "users", "items", "utils", "private"],
+      tip: ["Routes", "Une adresse = une fonction. 23 adresses en 5 fichiers.", "backend/app/api/routes/"] },
+    sMail: { kind: "stub", x: 1020, y: 40, w: 200, h: 70, t: "vers Courriel", s2: ["◉ courriel envoyé"], back: "mail" },
+    sDb: { kind: "stub", x: 1020, y: 150, w: 200, h: 90, t: "vers Base", s2: ["◉ ligne enregistrée"], back: "db" },
+    controle: { x: 400, y: 340, w: 180, h: 92, t: "Contrôle d'accès", f: "api/deps.py", f2: "core/security.py",
+      tip: ["Contrôle d'accès", "Vérifie la connexion, retrouve le compte, protège les mots de passe.", "backend/app/api/deps.py · backend/app/core/security.py"] },
+    modeles: { x: 610, y: 340, w: 160, h: 92, t: "Modèles", s: "User · Item", f: "models.py",
+      tip: ["Modèles", "La forme des données : champs, longueurs, tables.", "backend/app/models.py"] },
+    acces: { x: 820, y: 340, w: 190, h: 92, t: "Accès aux données", s: "comptes", f: "crud.py",
+      tip: ["Accès aux données", "Fonctions prêtes pour les comptes : créer, chercher, vérifier.", "backend/app/crud.py · appelé par login.py et users.py"] }
+  },
+  arrows: [
+    { id: "w-p", d: "M170,195 L240,195", lx: 205, ly: 185, t: "appelle", info: ["Application web → Porte d'entrée", "HTTP, adresses /api/v1/…", "frontend/src/client/sdk.gen.ts"] },
+    { id: "p-r", d: "M400,195 L470,195", lx: 435, ly: 185, t: "passe", info: ["Porte d'entrée → Routes", "include_router(api_router, prefix=/api/v1)", "backend/app/main.py:33"] },
+    { id: "r-d", d: "M740,195 L1020,195", lx: 880, ly: 185, t: "écrit (items)", info: ["Routes → Base", "items.py écrit lui-même : session.add, session.commit", "backend/app/api/routes/items.py:70"] },
+    { id: "r-ml", d: "M650,120 L650,75 L1020,75", lx: 835, ly: 65, t: "envoie", info: ["Routes → Courriel", "login.py et users.py appellent send_email", "backend/app/utils.py:33"] },
+    { id: "r-c", d: "M500,270 L500,340", lx: 510, ly: 312, t: "vérifie la connexion", anchor: "start", info: ["Routes → Contrôle d'accès", "CurrentUser : chaque route protégée", "backend/app/api/deps.py:30"] },
+    { id: "r-m", d: "M690,270 L690,340", lx: 700, ly: 312, t: "valide", anchor: "start", info: ["Routes → Modèles", "ItemCreate, Item, UserPublic…", "backend/app/models.py"] },
+    { id: "r-a", d: "M740,250 L915,250 L915,340", lx: 925, ly: 300, t: "utilise", anchor: "start", info: ["Routes → Accès aux données", "crud.create_user, crud.authenticate…", "backend/app/api/routes/users.py:68"] },
+    { id: "a-d", d: "M1010,386 L1120,386 L1120,240", lx: 1130, ly: 320, t: "écrit (comptes)", anchor: "start", info: ["Accès aux données → Base", "session.add, session.commit", "backend/app/crud.py"] }
+  ],
+  outs: [],
+  around: { x: 20, y: 495, w: 300, t: "+ 2 autour (réglages, migrations)", list: "api" }
+};
+
+/* ---- Level 1: inside Application web ---- */
+const L1_WEB = {
+  vb: "0 0 1260 540",
+  entry: { x: 20, y: 136 },
+  sorties: { x: 1090, y: 22 },
+  nodes: {
+    sUser: { kind: "stub", x: 20, y: 150, w: 130, h: 90, t: "depuis", s2: ["Utilisateur"], back: "user" },
+    start: { x: 210, y: 145, w: 140, h: 100, t: "Démarrage", f: "main.tsx",
+      tip: ["Démarrage", "Lance l'appli, règle l'adresse du serveur, branche les pages.", "frontend/src/main.tsx:16 · :36"] },
+    pages: { x: 410, y: 140, w: 170, h: 110, t: "Pages", s: "connexion · items · admin", f: "routes/",
+      tip: ["Pages", "Une adresse du navigateur = une page. 10 fichiers.", "frontend/src/routes/"] },
+    ecrans: { x: 640, y: 140, w: 170, h: 110, t: "Écrans", s: "Items · Admin · Profil", f: "components/",
+      tip: ["Écrans", "Formulaires, tableaux, menus de chaque page.", "frontend/src/components/"] },
+    client: { x: 870, y: 140, w: 160, h: 110, t: "Client", s: "généré", f: "client/",
+      tip: ["Client", "Fonctions d'appel au serveur. Recréées automatiquement depuis le serveur, pas écrites à la main.", "frontend/src/client/sdk.gen.ts"] },
+    sApi: { kind: "stub", x: 1090, y: 150, w: 150, h: 90, t: "vers", s2: ["Serveur"], back: "api" },
+    auth: { x: 640, y: 340, w: 170, h: 92, t: "Connexion", s: "garde la preuve", f: "hooks/useAuth.ts",
+      tip: ["Connexion", "Garde la preuve de connexion dans le navigateur (localStorage).", "frontend/src/hooks/useAuth.ts:45"] }
+  },
+  arrows: [
+    { id: "u-s", d: "M150,195 L210,195", lx: 180, ly: 185, t: "ouvre" },
+    { id: "s-p", d: "M350,195 L410,195", lx: 380, ly: 185, t: "branche" },
+    { id: "p-e", d: "M580,195 L640,195", lx: 610, ly: 185, t: "affiche" },
+    { id: "e-c", d: "M810,195 L870,195", lx: 840, ly: 185, t: "appelle" },
+    { id: "c-a", d: "M1030,195 L1090,195", lx: 1060, ly: 185, t: "envoie" },
+    { id: "p-au", d: "M495,250 L495,386 L640,386", lx: 505, ly: 330, t: "qui est connecté ?", anchor: "start" },
+    { id: "au-c", d: "M810,386 L950,386 L950,250", lx: 960, ly: 330, t: "joint la preuve", anchor: "start" }
+  ],
+  outs: [
+    { id: "o-ecr", d: "M725,140 L725,70 L1110,70", at: [1118, 70], t: "écran mis à jour", owner: "ecrans", left: true }
+  ],
+  around: { x: 20, y: 495, w: 290, t: "+ 2 autour (tests, kit d'interface)", list: "web" }
+};
+
+/* ---- raw engine output (umbra-engine index + map_view, no LLM), 2026-10-27 ---- */
+const RAW_TPL = {
+  vb: "0 0 1200 470",
+  nodes: [
+    ["service:playwright", "playwright", "service (compose)", 30, 40],
+    ["service:frontend", "frontend", "service (compose)", 30, 180],
+    ["dir:scripts", "scripts", "dossier", 30, 320],
+    ["service:backend", "backend", "service (compose)", 330, 40],
+    ["service:mailcatcher", "mailcatcher", "service (compose)", 330, 180],
+    ["CONTRIBUTING.md", "CONTRIBUTING.md", "fichier", 330, 320],
+    ["service:prestart", "prestart", "service (compose)", 630, 40],
+    ["service:proxy", "proxy", "service (compose)", 630, 180],
+    ["service:adminer", "adminer", "service (compose)", 630, 320],
+    ["service:db", "db", "service (compose)", 930, 40],
+    ["service:traefik", "traefik", "service (compose)", 930, 180],
+    ["group", "+7 more", "README, docs, .copier, hooks…", 930, 320, true]
+  ],
+  edges: [
+    ["service:playwright", "service:backend", "dépend de", "M270,85 L330,85"],
+    ["service:playwright", "service:mailcatcher", "dépend de", "M250,130 L330,215"],
+    ["service:backend", "service:prestart", "dépend de", "M570,85 L630,85"],
+    ["service:prestart", "service:db", "dépend de", "M870,85 L930,85"],
+    ["service:backend", "service:db", "dépend de", "M450,40 L450,18 L1050,18 L1050,40"],
+    ["service:adminer", "service:db", "dépend de", "M870,340 L900,340 L900,110 L930,110"]
+  ],
+  gaps: ["pas de lien Application web → Serveur", "pas d'entrée ni de sorties", "outils pas rangés autour", "noms bruts (backend, db)"]
+};
+const RAW_SQL = {
+  vb: "0 0 1200 470",
+  nodes: [
+    ["dir:tests", "tests", "dossier", 30, 120],
+    ["dir:sqlite_utils", "sqlite_utils", "dossier · 10 fichiers", 330, 120],
+    ["dir:docs", "docs", "dossier", 630, 120],
+    ["README.md", "README.md", "fichier", 930, 120],
+    ["dir:.github/actions/setup-sqlite-version", ".github/actions/…", "dossier", 30, 280]
+  ],
+  edges: [
+    ["dir:tests", "dir:sqlite_utils", "appelle, importe", "M270,165 L330,165"]
+  ],
+  gaps: ["commande et bibliothèque pas séparées", "pas d'entrée ni de sorties", "tests et docs pas rangés autour"]
+};
+
+const PATH_A = {
+  name: "Créer un item",
+  steps: [
+    { node: "sWeb", arrows: [], t: "le formulaire envoie POST /api/v1/items/", f: "AddItem.tsx:57 → sdk.gen.ts:40" },
+    { node: "routes", arrows: ["w-p", "p-r"], pass: ["porte"], t: "create_item reçoit la demande", f: "routes/items.py:61" },
+    { node: "controle", arrows: ["r-c"], t: "vérifie la connexion, retrouve le compte", f: "deps.py:30 get_current_user" },
+    { node: "modeles", arrows: ["r-m"], t: "Item vérifie les champs", f: "models.py:87 · items.py:68" },
+    { node: "sDb", arrows: ["r-d"], t: "session.commit écrit la ligne", f: "routes/items.py:70", out: true }
+  ],
+  files: ["frontend/src/components/Items/AddItem.tsx", "frontend/src/client/sdk.gen.ts", "backend/app/main.py",
+    "backend/app/api/routes/items.py", "backend/app/api/deps.py", "backend/app/models.py"]
+};
+
+const PATH_B = {
+  q: "où j'ajoute un champ prix à Item ?",
+  web: [["1", "components/Items/", "formulaire, tableau", "frontend/src/components/Items/", "AddItem, EditItem et columns affichent les champs d'un item."],
+        ["2", "client/", "recréé automatiquement", "frontend/src/client/", "Ce code vient du serveur : on le recrée avec une commande, on ne l'écrit pas."]],
+  api: [["3", "models.py", "ajouter le champ", "backend/app/models.py", "ItemBase décrit les champs d'un item (ligne 71)."],
+        ["4", "alembic/versions/", "nouvelle migration", "backend/app/alembic/versions/", "La table item doit recevoir la nouvelle colonne : c'est ce fichier qui change la Base."],
+        ["5", "api/routes/items.py", "vérifier", "backend/app/api/routes/items.py", "Les routes reprennent ItemCreate / ItemUpdate : rien à écrire, à vérifier."]],
+  files: ["backend/app/models.py", "backend/app/alembic/versions/ (nouvelle migration)", "backend/app/api/routes/items.py",
+    "frontend/src/client/ (recréer)", "frontend/src/components/Items/"]
+};
+
+const REPOS = {
+  tpl: { name: "full-stack-fastapi-template", s: "Une appli web avec comptes : on se connecte, on gère ses « items ».",
+    status: "branche master · dernier changement 16/04/2026", n: 23, L0: L0_TPL, raw: RAW_TPL },
+  sql: { name: "sqlite-utils", s: "Un outil en ligne de commande et une bibliothèque Python pour remplir et modifier des fichiers SQLite.",
+    status: "branche main · dernier changement 10/10/2026", n: 47, L0: L0_SQL, raw: RAW_SQL }
+};
+
+/* ============ state ============ */
+const FRESH = { repo: "tpl", ver: "vise", view: "L0", panel: null, card: false, path: null, step: 1, split: null,
+  autour: false, sel: null, hoverAct: null, help: false, force: null };
+const S = Object.assign({}, FRESH);
+
+/* ============ svg helpers ============ */
+const esc = s => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+const defs = `<defs>
+ <marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,1 L9,5 L0,9 z"/></marker>
+ <marker id="ahl" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,1 L9,5 L0,9 z"/></marker>
+ <marker id="ahe" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,1 L9,5 L0,9 z"/></marker>
+</defs>`;
+function badge(n, x, y, cur) {
+  return `<g class="badge${cur ? " cur" : ""}"><circle cx="${x}" cy="${y}" r="${cur ? 15 : 12}"/><text x="${x}" y="${y + 4.5}">${n}</text></g>`;
+}
+/* o: { lit: "cur" | "on" | "pass", badge, litChip, sel, force } */
+function node(id, n, o) {
+  const kind = n.kind || "box";
+  const cls = ["n", "dimmable", kind];
+  if (n.open) cls.push("open");
+  if (n.dash) cls.push("dash");
+  if (o.lit) cls.push("lit", o.lit);
+  if (o.sel) cls.push("sel");
+  if (o.force) cls.push("forcehover");
+  const cx = n.x + n.w / 2;
+  let g = `<g class="${cls.join(" ")}" data-id="${id}">`;
+  if (kind === "actor") {
+    g += `<rect class="hit" x="${n.x}" y="${n.y}" width="${n.w}" height="${n.h}"/>`;
+    g += `<circle class="head" cx="${cx}" cy="${n.y + 18}" r="12"/><path class="body" d="M${cx - 22},${n.y + 60} C${cx - 22},${n.y + 36} ${cx + 22},${n.y + 36} ${cx + 22},${n.y + 60}"/>`;
+    g += `<text class="tt" x="${cx}" y="${n.y + 86}" text-anchor="middle">${esc(n.t)}</text>`;
+    g += `<text class="st" x="${cx}" y="${n.y + 106}" text-anchor="middle">${esc(n.s)}</text>`;
+    return g + `</g>`;
+  }
+  g += `<rect class="b" x="${n.x}" y="${n.y}" width="${n.w}" height="${n.h}" rx="10"/>`;
+  if (kind === "stub") {
+    const lines = n.s2 || [];
+    const y0 = n.y + n.h / 2 - (lines.length) * 10 + 5;
+    g += `<text class="tt" x="${cx}" y="${y0}" text-anchor="middle">${esc(n.t)}</text>`;
+    lines.forEach((l, i) => { g += `<text class="st" x="${cx}" y="${y0 + 20 * (i + 1)}" text-anchor="middle">${esc(l)}</text>`; });
+  } else if (kind === "chips") {
+    g += `<text class="tt" x="${cx}" y="${n.y + 32}" text-anchor="middle">${esc(n.t)}</text>`;
+    g += `<text class="ft" x="${cx}" y="${n.y + 54}" text-anchor="middle">${esc(n.f)}</text>`;
+    [n.chips.slice(0, 3), n.chips.slice(3)].forEach((r, ri) => {
+      const ws = r.map(c => (c.length + 3) * 7.5 + 14);
+      const tot = ws.reduce((a, b) => a + b, 0) + (r.length - 1) * 8;
+      let x = cx - tot / 2;
+      r.forEach((c, i) => {
+        const lit = o.litChip === c;
+        g += `<g class="chip${lit ? " lit" : ""}" data-chip="${c}"><rect x="${x}" y="${n.y + 70 + ri * 38}" width="${ws[i]}" height="28" rx="6"/><text x="${x + ws[i] / 2}" y="${n.y + 88.5 + ri * 38}" text-anchor="middle">${c}.py</text></g>`;
+        x += ws[i] + 8;
+      });
+    });
+  } else {
+    const hasS = !!n.s;
+    const ty = n.h <= 100 ? n.y + (hasS ? 32 : 40) : n.y + 42;
+    g += `<text class="tt" x="${cx}" y="${ty}" text-anchor="middle">${esc(n.t)}</text>`;
+    let y = ty;
+    if (hasS) { y += 23; g += `<text class="st" x="${cx}" y="${y}" text-anchor="middle">${esc(n.s)}</text>`; }
+    if (n.f) { y += hasS ? 22 : 26; g += `<text class="ft" x="${cx}" y="${y}" text-anchor="middle">${esc(n.f)}</text>`; }
+    if (n.f2) { y += 19; g += `<text class="ft" x="${cx}" y="${y}" text-anchor="middle">${esc(n.f2)}</text>`; }
+  }
+  if (n.open) {
+    const mx = n.x + n.w - 16, my = n.y + 16;
+    g += `<g class="om"><circle cx="${mx}" cy="${my}" r="9"/><path d="M${mx - 2},${my - 4} L${mx + 2},${my} L${mx - 2},${my + 4}"/></g>`;
+    g += `<text class="hov" x="${n.x + n.w}" y="${n.y - 9}" text-anchor="end">voir dedans →</text>`;
+  }
+  if (o.badge) g += badge(o.badge, n.x + 2, n.y + 2, o.lit === "cur");
+  return g + `</g>`;
+}
+function arrow(a, lit) {
+  const cls = ["a", "dimmable"]; if (lit) cls.push("lit", lit);
+  return `<g class="${cls.join(" ")}" data-arrow="${a.id}"><path class="hitp" d="${a.d}"/><path class="l" d="${a.d}" marker-end="url(#${lit ? "ahl" : "ah"})"/><text class="lbl" x="${a.lx}" y="${a.ly}" text-anchor="${a.anchor || "middle"}">${esc(a.t)}</text></g>`;
+}
+function out(o, lit) {
+  const [x, y] = o.at;
+  let t = `<text x="${x + 14}" y="${y + 5}">${esc(o.t)}</text>`;
+  if (o.t2) t += `<text x="${x + 14}" y="${y + 23}" style="font-weight:400;fill:var(--ink-2);font-size:12.5px">${esc(o.t2)}</text>`;
+  return `<g class="out dimmable${lit ? " lit" : ""}"><path d="${o.d}"/><circle class="o" cx="${x}" cy="${y}" r="8"/><circle class="i" cx="${x}" cy="${y}" r="3.2"/>${t}</g>`;
+}
+function frame(L) {
+  let g = "";
+  if (L.entry) {
+    g += `<g class="frame"><text class="entry" x="${L.entry.x}" y="${L.entry.y}">ENTRÉE</text>${L.entry.d ? `<path class="entry-l" d="${L.entry.d}" marker-end="url(#ahe)"/>` : ""}</g>`;
+  }
+  if (L.entry2) g += `<g class="dimmable"><text class="entry" x="${L.entry2.x}" y="${L.entry2.y}">ENTRÉE</text><path class="entry-l" d="${L.entry2.d}" marker-end="url(#ahe)"/></g>`;
+  if (L.sorties) g += `<g class="frame"><text class="colhead" x="${L.sorties.x}" y="${L.sorties.y}">SORTIES</text></g>`;
+  return g;
+}
+function aroundChip(L) {
+  const a = L.around;
+  return `<g class="around dimmable" id="aroundChip" data-list="${a.list}"><rect x="${a.x}" y="${a.y}" width="${a.w}" height="36" rx="18"/><text x="${a.x + a.w / 2}" y="${a.y + 23}" text-anchor="middle">${esc(a.t)}</text></g>`;
+}
+function callout(x, y, w, rows, connector) {
+  const rh = 32, h = rows.length * rh + 16;
+  let g = `<g class="callout">`;
+  if (connector) g += `<line x1="${connector[0]}" y1="${connector[1]}" x2="${connector[2]}" y2="${connector[3]}"/>`;
+  g += `<rect class="cb" x="${x}" y="${y}" width="${w}" height="${h}" rx="10"/>`;
+  rows.forEach((r, i) => {
+    const ry = y + 8 + i * rh;
+    g += `<g class="row${S.force === "why" + r[0] ? " forcehover" : ""}" data-n="${r[0]}" data-why="${esc(r[4])}" data-file="${esc(r[3])}"><rect class="rh" x="${x + 4}" y="${ry}" width="${w - 8}" height="${rh}" rx="6"/>`;
+    g += badge(r[0], x + 22, ry + 16, false);
+    g += `<text class="fn" x="${x + 44}" y="${ry + 21}">${esc(r[1])}</text>`;
+    g += `<text class="why" x="${x + w - 14}" y="${ry + 21}" text-anchor="end">${esc(r[2])}</text></g>`;
+  });
+  return g + `</g>`;
+}
+
+/* ============ renderers ============ */
+function renderL0() {
+  const R = REPOS[S.repo], L = R.L0;
+  const B = S.path === "B" && S.repo === "tpl";
+  let g = `<svg viewBox="${L.vb}" preserveAspectRatio="xMidYMid meet" class="${B ? "pathmode" : ""}" role="img" aria-label="Carte du projet">${defs}`;
+  g += frame(L);
+  L.arrows.forEach(a => { g += arrow(a, null); });
+  for (const [id, n] of Object.entries(L.nodes)) {
+    const lit = B && ["web", "api", "db"].includes(id) ? "cur" : null;
+    g += node(id, n, { lit, sel: S.sel === id, force: S.force === id });
+  }
+  L.outs.forEach(o => { g += out(o, false); });
+  g += aroundChip(L);
+  if (B) {
+    g += callout(150, 288, 330, PATH_B.web, [350, 260, 350, 288]);
+    g += callout(520, 285, 400, PATH_B.api, [630, 260, 630, 285]);
+  }
+  return g + `</svg>`;
+}
+function renderL1() {
+  const L = S.view === "web" ? L1_WEB : L1_API;
+  const A = S.path === "A" && S.view === "api";
+  const lit = {}, badges = {}, litArrows = {};
+  if (A) {
+    PATH_A.steps.forEach((st, i) => {
+      const state = i + 1 === S.step ? "cur" : "on";
+      lit[st.node] = state; badges[st.node] = i + 1;
+      (st.pass || []).forEach(p => { lit[p] = "pass"; });
+      st.arrows.forEach(a => { litArrows[a] = state; });
+    });
+  }
+  let g = `<svg viewBox="${L.vb}" preserveAspectRatio="xMidYMid meet" class="${A ? "pathmode" : ""}" role="img" aria-label="Dans la boîte">${defs}`;
+  g += frame(L);
+  L.arrows.forEach(a => { g += arrow(a, litArrows[a.id] || null); });
+  for (const [id, n] of Object.entries(L.nodes)) {
+    g += node(id, n, { lit: lit[id] || null, badge: badges[id], litChip: (A || S.card) && id === "routes" ? "items" : null, sel: S.sel === id });
+  }
+  L.outs.forEach(o => { g += out(o, false); });
+  g += aroundChip(L);
+  return g + `</svg>`;
+}
+function renderRaw() {
+  const R = REPOS[S.repo].raw;
+  let g = `<svg viewBox="${R.vb}" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Sortie brute du moteur">${defs}`;
+  R.edges.forEach(e => {
+    g += `<g class="a"><path class="l" d="${e[3]}" marker-end="url(#ah)"/></g>`;
+  });
+  R.nodes.forEach(([key, label, kind, x, y, grp]) => {
+    g += `<g class="n raw${grp ? " grp" : ""}" data-raw="${esc(key)}"><rect class="b" x="${x}" y="${y}" width="240" height="90" rx="8"/>` +
+      `<text class="tt" x="${x + 120}" y="${y + 40}" text-anchor="middle">${esc(label)}</text>` +
+      `<text class="st" x="${x + 120}" y="${y + 64}" text-anchor="middle">${esc(kind)}</text></g>`;
+  });
+  const lbl = R.edges.length > 1 ? "toutes les flèches : « dépend de » (déclaré dans compose)" : "flèche : « appelle, importe » (lu dans le code)";
+  g += `<text class="note" x="30" y="455">${esc(lbl)}</text>`;
+  return g + `</svg>`;
+}
+
+/* ============ chrome ============ */
+function crumbs() {
+  const c = document.getElementById("crumbs");
+  const parts = [["Vue d'ensemble", () => go({ view: "L0", card: false, path: null })]];
+  if (S.view === "api") parts.push(["Serveur", () => go({ card: false, path: null })]);
+  if (S.view === "web") parts.push(["Application web", null]);
+  if (S.card) parts.push(["items.py", null]);
+  c.innerHTML = "";
+  parts.forEach(([t, fn], i) => {
+    if (i) { const s = document.createElement("span"); s.className = "sep"; s.textContent = "›"; c.appendChild(s); }
+    const last = i === parts.length - 1;
+    const el = document.createElement(last ? "span" : "button");
+    el.textContent = t; if (last) el.className = "here"; else el.onclick = fn;
+    c.appendChild(el);
+  });
+  const segR = document.getElementById("segRepo");
+  segR.innerHTML = [["tpl", "fastapi-template"], ["sql", "sqlite-utils"]].map(([k, t]) => `<button class="${S.repo === k ? "on" : ""}" data-r="${k}">${t}</button>`).join("");
+  segR.querySelectorAll("button").forEach(b => b.onclick = () => go(Object.assign({}, FRESH, { repo: b.dataset.r, ver: S.ver })));
+  const segV = document.getElementById("segVer");
+  segV.style.display = S.view === "L0" ? "" : "none";
+  segV.innerHTML = [["vise", "carte visée"], ["raw", "moteur aujourd'hui"]].map(([k, t]) => `<button class="${S.ver === k ? "on" : ""}" data-v="${k}">${t}</button>`).join("");
+  segV.querySelectorAll("button").forEach(b => b.onclick = () => go({ ver: b.dataset.v, path: null, panel: null }));
+}
+function head() {
+  const h = document.getElementById("head");
+  const R = REPOS[S.repo];
+  if (S.view === "L0") {
+    const right = S.ver === "raw"
+      ? `<div class="raw-note"><b>Sortie brute du moteur, sans IA</b> (umbra-engine index, 27/10/2026). Rien n'est retouché : c'est le point de départ de la carte visée.</div>`
+      : `<div class="status"><div class="h">Où on en est <span>à définir avec toi</span></div><div class="f">${esc(R.status)}</div><div class="q">Ce qui a bougé récemment, ou ce qui est fini / pas fini ?</div></div>`;
+    const sentence = S.ver === "raw" ? `<span style="color:var(--ink-3)">Pas encore de phrase : Claude l'écrit à l'ouverture.</span>` : esc(R.s);
+    h.innerHTML = `<div class="t"><h1>${esc(R.name)}</h1><p class="s">${sentence}</p></div>${right}`;
+  } else if (S.card) {
+    h.innerHTML = `<div class="t"><h1>items.py <span class="p">backend/app/api/routes/</span></h1><p class="s">Les adresses pour lister, voir, créer, modifier et supprimer ses items.</p></div>`;
+  } else if (S.view === "web") {
+    h.innerHTML = `<div class="t"><h1>Application web <span class="p">frontend/src/</span></h1><p class="s">Les écrans dans le navigateur : ils affichent les pages et appellent le serveur.</p></div>`;
+  } else {
+    h.innerHTML = `<div class="t"><h1>Serveur <span class="p">backend/app/</span></h1><p class="s">Reçoit les appels de l'application web, vérifie qui appelle, lit et écrit la base.</p></div>`;
+  }
+}
+function caption() {
+  const c = document.getElementById("caption");
+  if (!S.path) { c.className = "caption"; c.innerHTML = ""; return; }
+  c.className = "caption on";
+  if (S.path === "A") {
+    const st = PATH_A.steps[S.step - 1];
+    c.innerHTML = `<div class="what"><span class="kind">Chemin</span><span class="q">Créer un item</span><span class="tag" title="Suivi automatique des appels dans le code, sans IA">tracé automatiquement</span>
+      <span class="step"><b>Étape ${S.step} sur 5</b> &nbsp;${esc(st.t)} &nbsp;<span class="mono">${esc(st.f)}</span></span></div>
+      <button class="btn icon" data-k="prev" aria-label="Étape précédente">←</button><button class="btn icon" data-k="next" aria-label="Étape suivante">→</button>
+      <button class="btn primary" data-k="copy">copier pour Claude</button><button class="btn" data-k="clear">effacer</button>`;
+  } else {
+    c.innerHTML = `<div class="what"><span class="kind">Question</span><span class="q">« ${esc(PATH_B.q)} »</span><span class="tag">posée dans Claude Code</span></div>
+      <button class="btn primary" data-k="copy">copier pour Claude</button><button class="btn" data-k="clear">effacer</button>`;
+  }
+  c.querySelectorAll("button").forEach(b => b.onclick = () => {
+    const k = b.dataset.k;
+    if (k === "prev") go({ step: Math.max(1, S.step - 1) });
+    if (k === "next") go({ step: Math.min(5, S.step + 1) });
+    if (k === "clear") go({ path: null });
+    if (k === "copy") copyFiles();
+  });
+}
+function strip() {
+  const p = document.getElementById("strip");
+  if (!S.card) { p.className = "strip"; p.innerHTML = ""; return; }
+  p.className = "strip on";
+  p.innerHTML = `<div><h2>items.py</h2><div class="path">backend/app/api/routes/items.py</div><a class="btn" href="${vs("tpl", "backend/app/api/routes/items.py", 1)}">ouvrir le code</a></div>
+    <dl class="four">
+      <div><dt>Reçoit</dt><dd>GET · POST · PUT · DELETE <span class="mono">/api/v1/items/</span> + connexion</dd></div>
+      <div><dt>Renvoie</dt><dd>un item, une liste d'items, ou une erreur</dd></div>
+      <div><dt>Appelé par</dt><dd>Application web</dd></div>
+      <div><dt>Appelle</dt><dd>Contrôle d'accès · Modèles · Base</dd></div>
+    </dl>
+    <div><div class="sec">Ce qu'on peut faire ici</div><div class="acts">${ACTIONS_TPL[0].rows.map(r => actRow(r, true)).join("")}</div></div>`;
+  bindActs(p);
+}
+function panel() {
+  const p = document.getElementById("panel");
+  if (S.panel === "actions") {
+    p.className = "panel on drawer";
+    if (S.repo === "tpl") {
+      p.innerHTML = `<div class="hd"><h3>Ce qu'on peut faire <span style="color:var(--ink-3);font-weight:500;margin-left:8px">23</span><button class="btn" data-close>fermer</button></h3>
+        <div class="sub">Les adresses que le serveur accepte, rangées par fichier. Noms en français proposés par Claude, l'adresse exacte au survol. Clic : voir le chemin.</div></div>
+        ${ACTIONS_TPL.map(g => `<div class="grp"><div class="gh"><b>${g.file}</b><span>${g.role} · ${g.rows.length}</span></div>${g.rows.map(r => actRow(r, false)).join("")}</div>`).join("")}`;
+    } else {
+      p.innerHTML = `<div class="hd"><h3>Ce qu'on peut faire <span style="color:var(--ink-3);font-weight:500;margin-left:8px">47</span><button class="btn" data-close>fermer</button></h3>
+        <div class="sub">Les commandes de <span class="mono">sqlite-utils</span>, lues dans cli.py. Pas encore nommées en français.</div></div>
+        <div class="grp"><div class="gh"><b>cli.py</b><span>47 commandes</span></div><div class="cmds">${CMDS_SQL.map(([c, l]) => `<span title="cli.py:${l}">${c}</span>`).join("")}</div></div>`;
+    }
+    p.querySelector("[data-close]").onclick = () => go({ panel: null });
+    bindActs(p);
+  } else { p.className = "panel"; p.innerHTML = ""; }
+}
+function actRow(r, withFn) {
+  const hov = S.hoverAct === r[1] ? " hov" : "";
+  const fn = withFn && r[3] ? `<span class="fn">${r[3]} · l.${r[4]}</span>` : "";
+  return `<button class="act${hov}" ${r[5] ? `data-path="${r[5]}"` : ""} title="${esc(r[2])}"><span class="m">${r[0]}</span><span class="lab">${esc(r[1])}</span>${fn}${!withFn ? `<span class="rt">${esc(r[2])}</span>` : ""}${r[5] ? `<span class="go">chemin →</span>` : ""}</button>`;
+}
+function bindActs(root) {
+  root.querySelectorAll(".act").forEach(b => b.onclick = () => {
+    if (b.dataset.path === "A") go({ view: "api", panel: null, card: false, path: "A", step: 1 });
+    else toast("Ce chemin n'est pas encore dessiné : seul « Créer un item » l'est.");
+  });
+}
+function bottom() {
+  const btn = document.getElementById("actionsBtn");
+  btn.innerHTML = `Ce qu'on peut faire <b>(${REPOS[S.repo].n})</b>`;
+  btn.style.display = S.panel === "actions" || (S.view === "L0" && S.ver === "raw") ? "none" : "";
+  const gp = document.getElementById("gaps");
+  const raw = S.view === "L0" && S.ver === "raw";
+  gp.className = "gaps" + (raw ? " on" : "");
+  gp.innerHTML = raw ? `<b>Manque pour la carte visée :</b>` + REPOS[S.repo].raw.gaps.map(t => `<span>${esc(t)}</span>`).join("") : "";
+  const hp = document.getElementById("helpPop");
+  hp.classList.toggle("on", S.help);
+  hp.innerHTML = `<div class="h">Lire la carte</div>
+    <div class="row"><svg width="22" height="16"><path d="M2,8 H18" stroke="currentColor" stroke-width="2"/><path d="M14,4 L19,8 L14,12" fill="none" stroke="currentColor" stroke-width="2"/></svg>une flèche = un verbe : ce qu'une boîte fait à l'autre</div>
+    <div class="row"><svg width="22" height="16"><circle cx="11" cy="8" r="6" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="11" cy="8" r="2.4" fill="currentColor"/></svg>ce qui sort du projet (colonne SORTIES)</div>
+    <div class="row"><svg width="22" height="16"><rect x="2" y="2" width="18" height="12" rx="3" fill="none" stroke="currentColor" stroke-width="1.6" stroke-dasharray="4 3"/></svg>pointillés = supposé, pas lu dans le code</div>
+    <div class="row"><svg width="22" height="16"><circle cx="11" cy="8" r="7" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M9.5,5 L12.5,8 L9.5,11" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>clic sur une boîte avec ce rond : voir dedans</div>
+    <div class="row"><span class="mono" style="width:22px;text-align:center;flex:none">Esc</span><span>remonter d'un niveau</span></div>
+    <div class="row"><span class="mono" style="width:22px;text-align:center;flex:none">←→</span><span>avancer sur un chemin allumé</span></div>`;
+}
+const TERM = {
+  launch: `<span class="usr">&gt; /umbra</span><span class="ln"><span class="acc">●</span> Carte de full-stack-fastapi-template ouverte</span><span class="ln dim">  ⎿ 127.0.0.1:7420</span>`,
+  question: `<span class="usr">&gt; où j'ajoute un champ prix à Item ?</span><span class="ln"><span class="ok">●</span> Umbra · montre sur la carte</span><div class="sp"></div><span class="ln"><span class="acc">●</span> Du modèle à l'écran → regarde la carte.</span>`,
+  copy: `<span class="usr">&gt; Ajoute un champ prix (décimal) à Item. [Pasted text #1 +6 lines]</span><span class="ln"><span class="ok">●</span> Task <span class="dim">(Ajouter le champ prix à Item)</span></span><span class="ln dim">  ⎿ agent lancé sur les fichiers copiés</span>`
+};
+function term() {
+  const app = document.getElementById("app");
+  app.classList.toggle("split", !!S.split);
+  if (!S.split) return;
+  let html = TERM.launch;
+  if (S.split === "question" || S.split === "copy") html += TERM.question;
+  if (S.split === "copy") html += TERM.copy;
+  html += `<div class="box">&gt; <span style="color:#e6e6e6">▌</span></div><div class="foot">? pour l'aide · umbra connecté</div>`;
+  document.getElementById("termBody").innerHTML = html;
+}
+
+/* ============ render + events ============ */
+function render() {
+  const mw = document.getElementById("mapwrap");
+  mw.innerHTML = S.view === "L0" ? (S.ver === "raw" ? renderRaw() : renderL0()) : renderL1();
+  crumbs(); head(); caption(); strip(); panel(); bottom(); term();
+  const ap = document.getElementById("aroundPop");
+  ap.classList.toggle("on", !!S.autour);
+  if (S.autour) placeAround();
+  hideTip();
+  bindMap();
+  if (S.force) requestAnimationFrame(forceTip);
+}
+function go(patch) { Object.assign(S, patch); render(); }
+function levelData() { return S.view === "L0" ? REPOS[S.repo].L0 : (S.view === "web" ? L1_WEB : L1_API); }
+
+function bindMap() {
+  const svg = document.querySelector("#mapwrap svg");
+  const L = levelData();
+  svg.querySelectorAll(".n[data-id]").forEach(el => {
+    const id = el.dataset.id;
+    const data = L.nodes[id];
+    el.addEventListener("mouseenter", e => { if (data.tip) showTip(e, data.tip, !!data.open); });
+    el.addEventListener("mousemove", moveTip);
+    el.addEventListener("mouseleave", hideTip);
+    el.addEventListener("click", () => {
+      if (data.back) { go({ view: "L0", card: false, path: null, sel: data.back }); return; }
+      if (data.open === "api" || data.open === "web") { go({ view: data.open, sel: null, path: null, card: false }); return; }
+      if (data.open === "none") { toast("L'intérieur de cette boîte n'est pas encore dessiné."); return; }
+      if (id === "routes") return;
+      go({ sel: S.sel === id ? null : id });
+    });
+  });
+  svg.querySelectorAll(".chip").forEach(el => el.addEventListener("click", e => {
+    e.stopPropagation();
+    if (el.dataset.chip === "items") go({ card: true, path: null });
+    else toast("Seule items.py a sa carte ici.");
+  }));
+  svg.querySelectorAll(".a[data-arrow]").forEach(el => {
+    const a = L.arrows.find(x => x.id === el.dataset.arrow);
+    if (!a || !a.info) return;
+    el.addEventListener("mouseenter", e => showTip(e, [a.info[0], a.info[1], a.info[2] || ""]));
+    el.addEventListener("mousemove", moveTip);
+    el.addEventListener("mouseleave", hideTip);
+  });
+  svg.querySelectorAll(".callout .row").forEach(el => {
+    el.addEventListener("mouseenter", e => showTip(e, ["Pourquoi ici", el.dataset.why, el.dataset.file]));
+    el.addEventListener("mousemove", moveTip);
+    el.addEventListener("mouseleave", hideTip);
+  });
+  const ar = svg.querySelector("#aroundChip");
+  if (ar) {
+    ar.addEventListener("mouseenter", () => { S.autour = ar.dataset.list; document.getElementById("aroundPop").classList.add("on"); placeAround(); });
+    ar.addEventListener("mouseleave", () => { setTimeout(() => { if (!aroundHover) { S.autour = false; document.getElementById("aroundPop").classList.remove("on"); } }, 120); });
+  }
+}
+let aroundHover = false;
+function placeAround() {
+  const pop = document.getElementById("aroundPop");
+  const list = AROUND[typeof S.autour === "string" ? S.autour : levelData().around.list];
+  pop.innerHTML = `<div style="padding:6px 10px 8px;font-size:12.5px;color:var(--ink-3)">Autour du projet : ne fait pas tourner l'appli</div>` +
+    list.map(r => `<div class="r" title="${esc(r[2])}"><b>${esc(r[0])}</b><span>${esc(r[1])}</span></div>`).join("");
+  const chip = document.querySelector("#aroundChip rect");
+  if (!chip) return;
+  const r = chip.getBoundingClientRect();
+  const appR = document.getElementById("app").getBoundingClientRect();
+  pop.style.top = "0px";
+  if (S.view === "L0") {
+    pop.style.left = (r.left - appR.left) + "px";
+    pop.style.top = Math.max(8, r.top - pop.offsetHeight - 8 - appR.top) + "px";
+  } else {
+    pop.style.left = (r.right + 12 - appR.left) + "px";
+    pop.style.top = Math.max(8, r.bottom - pop.offsetHeight - appR.top) + "px";
+  }
+}
+document.getElementById("aroundPop").addEventListener("mouseenter", () => { aroundHover = true; });
+document.getElementById("aroundPop").addEventListener("mouseleave", () => { aroundHover = false; S.autour = false; document.getElementById("aroundPop").classList.remove("on"); });
+
+const tip = document.getElementById("tip");
+function showTip(e, t, open) {
+  tip.innerHTML = `<div class="h">${esc(t[0])}</div><div>${esc(t[1])}</div>${t[2] ? `<div class="mono">${esc(t[2])}</div>` : ""}` +
+    (open ? `<div class="hint">clic : voir dedans →</div>` : "");
+  tip.classList.add("on"); moveTip(e);
+}
+function moveTip(e) {
+  const appR = document.getElementById("app").getBoundingClientRect();
+  let x = e.clientX - appR.left + 16, y = e.clientY - appR.top + 16;
+  if (x + 390 > appR.width) x = e.clientX - appR.left - 390;
+  tip.style.left = x + "px"; tip.style.top = y + "px";
+}
+function hideTip() { tip.classList.remove("on"); }
+/* For screenshots: show the hover state of one element without a mouse. */
+function forceTip() {
+  let el, t, open = false;
+  if (S.force.startsWith("why")) {
+    el = document.querySelector(`.callout .row[data-n="${S.force.slice(3)}"]`);
+    if (!el) return;
+    t = ["Pourquoi ici", el.dataset.why, el.dataset.file];
+  } else {
+    el = document.querySelector(`.n[data-id="${S.force}"]`);
+    const d = levelData().nodes[S.force];
+    if (!el || !d) return;
+    t = d.tip; open = !!d.open;
+  }
+  const r = el.getBoundingClientRect();
+  const below = S.force.startsWith("why") ? r.bottom + 40 : r.bottom - 8;
+  showTip({ clientX: r.left + r.width * 0.55, clientY: below }, t, open);
+}
+
+let toastT;
+function toast(msg, sticky) {
+  const t = document.getElementById("toast");
+  t.textContent = msg; t.classList.add("on");
+  clearTimeout(toastT); if (!sticky) toastT = setTimeout(() => t.classList.remove("on"), 2600);
+}
+function copyFiles() {
+  const isA = S.path === "A";
+  const title = isA ? "Chemin : Créer un item (POST /api/v1/items/)" : "Tâche : " + PATH_B.q;
+  const files = isA ? PATH_A.files : PATH_B.files;
+  const text = title + "\nFichiers (" + files.length + ") :\n" + files.map(f => "- " + f).join("\n");
+  try { navigator.clipboard.writeText(text).catch(() => {}); } catch (e) { /* clipboard blocked: still confirm */ }
+  toast("Copié");
+}
+
+document.getElementById("actionsBtn").onclick = () => go({ panel: S.panel === "actions" ? null : "actions" });
+document.getElementById("helpBtn").onclick = () => go({ help: !S.help });
+document.addEventListener("keydown", e => {
+  if (e.key === "Escape") {
+    if (S.help) go({ help: false });
+    else if (S.panel) go({ panel: null });
+    else if (S.path) go({ path: null });
+    else if (S.card) go({ card: false });
+    else if (S.view !== "L0") go({ view: "L0", sel: S.view });
+  }
+  if (S.path === "A" && e.key === "ArrowRight") go({ step: Math.min(5, S.step + 1) });
+  if (S.path === "A" && e.key === "ArrowLeft") go({ step: Math.max(1, S.step - 1) });
+});
+window.addEventListener("resize", () => { if (S.autour) placeAround(); });
+
+const HASH = {
+  carte: {}, autour: { autour: "tpl" }, actions: { panel: "actions", hoverAct: "Créer un item" },
+  survol: { force: "api" }, aide: { help: true },
+  moteur: { ver: "raw" },
+  sqlite: { repo: "sql" }, "sqlite-moteur": { repo: "sql", ver: "raw" },
+  serveur: { view: "api" }, web: { view: "web" },
+  items: { view: "api", card: true, hoverAct: "Créer un item" },
+  chemin: { view: "api", path: "A", step: 3 }, "chemin-fin": { view: "api", path: "A", step: 5 },
+  lancement: { split: "launch" }, question: { split: "question", path: "B" },
+  pourquoi: { split: "question", path: "B", force: "why4" },
+  copie: { split: "copy", path: "B" }
+};
+function fromHash() {
+  const h = location.hash.replace("#", "");
+  Object.assign(S, FRESH, HASH[h] || {});
+  render();
+  if (h === "copie") toast("Copié", true);
+}
+window.addEventListener("hashchange", fromHash);
+fromHash();
+</script>
+</body>
+</html>
