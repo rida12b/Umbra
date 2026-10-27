@@ -32,6 +32,7 @@ def default_analyzers() -> list[Analyzer]:
     from umbra_engine.analyzers.dockerfile import DockerfileAnalyzer
     from umbra_engine.analyzers.kubernetes import KubernetesAnalyzer
     from umbra_engine.analyzers.manifests import ManifestAnalyzer
+    from umbra_engine.analyzers.signals import SignalsAnalyzer
     from umbra_engine.analyzers.terraform import TerraformAnalyzer
 
     return [
@@ -40,5 +41,6 @@ def default_analyzers() -> list[Analyzer]:
         DockerfileAnalyzer(),
         KubernetesAnalyzer(),
         ManifestAnalyzer(),
+        SignalsAnalyzer(),
         TerraformAnalyzer(),
     ]

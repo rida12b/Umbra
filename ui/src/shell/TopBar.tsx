@@ -1,65 +1,53 @@
-import { Moon, Search, Sun } from "lucide-react";
+import { Moon, Sun } from "lucide-react";
 import type { Project } from "../api";
-import { LiveStatus } from "../LiveStatus";
-import { ACTIVITY_VIEW, ARCHITECTURE_VIEW, navigate } from "../route";
+import { ACTIVITY_VIEW, MAP_VIEW, navigate } from "../route";
 import type { Theme } from "../theme";
 
 interface Props {
   project: Project | undefined;
-  activity: boolean; // which tab is open
+  activity: boolean; // which view of the Project is open
   theme: Theme;
   onToggleTheme: () => void;
-  onSearch: () => void;
 }
 
-/** Umbra, the Project, the search, whether Umbra follows the code live, and the theme. */
-export function TopBar({ project, activity, theme, onToggleTheme, onSearch }: Props) {
+/** Umbra, where you are, Claude's activity and the theme (mock: `.top` of prototype.html). */
+export function TopBar({ project, activity, theme, onToggleTheme }: Props) {
+  const open = (node: string) => project && navigate({ projectId: project.id, node });
   return (
-    <header className="flex h-12 items-center gap-4 border-b border-line-soft px-4">
-      <a href="#/" className="flex shrink-0 items-center gap-2.5 font-semibold tracking-[-0.01em] text-ink">
-        <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true">
-          <circle cx="9" cy="9" r="7.5" fill="none" stroke="currentColor" strokeWidth="1.4" />
-          <path d="M9 1.5a7.5 7.5 0 0 1 0 15z" fill="currentColor" />
+    <header className="flex h-12 flex-none items-center gap-3.5 border-b border-line bg-panel px-5">
+      <a href="#/" className="flex shrink-0 items-center gap-2 text-[15px] font-bold tracking-[0.2px] text-ink">
+        <svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true">
+          <rect x="1.5" y="5" width="6" height="10" rx="1.5" fill="none" stroke="currentColor" strokeWidth="1.6" />
+          <rect x="12.5" y="5" width="6" height="10" rx="1.5" fill="none" stroke="currentColor" strokeWidth="1.6" />
+          <path d="M7.5 10h5" stroke="currentColor" strokeWidth="1.6" />
         </svg>
         Umbra
       </a>
-      {project && <span className="-ml-2 truncate text-muted">/ {project.name}</span>}
       {project && (
-        <nav className="flex gap-1" aria-label="Vues">
-          {[
-            { node: ARCHITECTURE_VIEW, label: "Carte", on: !activity },
-            { node: ACTIVITY_VIEW, label: "Activité de Claude", on: activity },
-          ].map((tab) => (
-            <button
-              key={tab.node}
-              type="button"
-              aria-current={tab.on ? "page" : undefined}
-              className={`rounded-md px-3 py-1 text-[14px] ${tab.on ? "bg-raised text-ink" : "text-muted hover:text-ink"}`}
-              onClick={() => navigate({ projectId: project.id, node: tab.node, expand: false })}
-            >
-              {tab.label}
-            </button>
-          ))}
+        <nav className={`flex min-w-0 items-center gap-1.5 whitespace-nowrap text-[14px] text-muted ${activity ? "" : "max-sm:hidden"}`} aria-label="Où vous êtes">
+          {activity ? (
+            <>
+              <button type="button" className="rounded-md px-1.5 py-1 hover:bg-raised hover:text-ink" onClick={() => open(MAP_VIEW)}>
+                Vue d'ensemble
+              </button>
+              <span className="text-faint max-sm:hidden">›</span>
+              <span aria-current="page" className="px-1.5 py-1 font-semibold text-ink max-sm:hidden">
+                Activité de Claude
+              </span>
+            </>
+          ) : (
+            <span aria-current="page" className="px-1.5 py-1 font-semibold text-ink">
+              Vue d'ensemble
+            </span>
+          )}
         </nav>
       )}
-      {project && (
-        <button
-          type="button"
-          onClick={onSearch}
-          className="ml-2 hidden h-[30px] max-w-[460px] flex-1 items-center gap-2 rounded-md border border-line bg-panel px-2.5 text-faint hover:text-muted sm:flex"
-        >
-          <Search size={14} aria-hidden="true" />
-          <span className="truncate">Chercher un chemin, une pièce, un fichier</span>
-          <kbd className="ml-auto rounded border border-line px-1.5 font-mono text-[11px] text-muted">Ctrl K</kbd>
-        </button>
-      )}
-      <div className="ml-auto flex items-center gap-3">
-        {project && (
-          <button type="button" onClick={onSearch} className="text-muted sm:hidden" aria-label="Chercher">
-            <Search size={16} />
+      <div className="ml-auto flex items-center gap-2">
+        {project && !activity && (
+          <button type="button" className="whitespace-nowrap rounded-md px-2 py-1 text-[13px] text-muted hover:bg-raised hover:text-ink" onClick={() => open(ACTIVITY_VIEW)}>
+            Activité de Claude
           </button>
         )}
-        {project && <LiveStatus />}
         <button
           type="button"
           onClick={onToggleTheme}

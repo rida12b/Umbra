@@ -58,6 +58,14 @@ CREATE TABLE IF NOT EXISTS events (
     tool TEXT NOT NULL,
     prompt_id TEXT NOT NULL DEFAULT ''
 );
+-- Where each box of a map level sits (column, row): placed once, kept across index runs and days (ADR-0007).
+CREATE TABLE IF NOT EXISTS layout (
+    level TEXT NOT NULL,
+    element TEXT NOT NULL,
+    col INTEGER NOT NULL,
+    row INTEGER NOT NULL,
+    PRIMARY KEY (level, element)
+);
 CREATE INDEX IF NOT EXISTS events_by_time ON events(at);
 CREATE INDEX IF NOT EXISTS claims_by_file ON claims(file);
 CREATE INDEX IF NOT EXISTS claims_by_subject ON claims(subject);

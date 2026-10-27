@@ -55,10 +55,11 @@ a browser session: a secret the page keeps in its own storage and sends in a hea
 browsers would also send to other servers on 127.0.0.1). The API token itself never goes in a URL.
 Restarting the engine signs every browser out: run `umbra-engine open`.
 
-In the web app: click an element for its details and Evidence (file, lines, version, guarded excerpt),
-double-click (or **Open**) to go one level down, click a `+N more` group to show everything. Line
-style tells the status: solid = Fact, dashed = Hypothesis, dotted = Declared (configuration, not proof
-that anything runs). Below 720 px wide the graph becomes a list.
+In the web app a project opens on its map (ADR-0007, `GET /v1/projects/<id>/system`), built from what the
+files say without any LLM: who comes in (ENTRÉE), the parts that run left to right, the arrows between them
+(each a verb), what leaves the project (◉ SORTIES), and the tools around (`+ N outils autour`). Hover any box,
+arrow or output for its proof (file and lines); dashed means deduced, not read. Boxes keep their place across
+reloads and re-indexing.
 
 Every `/v1/projects` endpoint needs the token, as `Authorization: Bearer <token>`. `POST /v1/projects` only accepts absolute paths.
 

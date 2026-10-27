@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { parseLogin } from "./route.ts";
+import { ACTIVITY_VIEW, MAP_VIEW, parseLogin, parseRoute, routeHash } from "./route.ts";
 
 // The login link of `umbra-engine start` (#98) lands on the Project it just registered.
 
@@ -17,4 +17,13 @@ test("anything else is not a login link; a broken code is no code", () => {
   assert.equal(parseLogin("#/p/x"), null);
   assert.deepEqual(parseLogin("#login=%E0"), { code: null, landing: "#/" });
   assert.deepEqual(parseLogin("#login=&p="), { code: null, landing: "#/" });
+});
+
+test("a Project opens on its map; links made for the old explorer open the map too", () => {
+  assert.deepEqual(parseRoute("#/p/shop"), { projectId: "shop", node: MAP_VIEW });
+  assert.deepEqual(parseRoute("#/p/shop?node=x%3Apart%3Aapi&journey=order&step=2"), { projectId: "shop", node: MAP_VIEW });
+  assert.deepEqual(parseRoute("#/p/shop?node=backend%2Fapp%2Fmain.py"), { projectId: "shop", node: MAP_VIEW });
+  assert.deepEqual(parseRoute("#/p/shop?node=activite%3A"), { projectId: "shop", node: ACTIVITY_VIEW });
+  assert.equal(routeHash({ projectId: "shop", node: MAP_VIEW }), "#/p/shop");
+  assert.equal(routeHash({ projectId: "shop", node: ACTIVITY_VIEW }), "#/p/shop?node=activite%3A");
 });

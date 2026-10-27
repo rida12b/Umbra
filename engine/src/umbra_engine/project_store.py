@@ -159,6 +159,26 @@ class ProjectStore:
         )
         return [StoredClaim(*row) for row in rows]
 
+    def claims_of_kind(self, relation: str, object_kind: str) -> list[StoredClaim]:
+        """`defines` of classes only, say: far fewer rows than every definition of a large Project."""
+        rows = self._db.execute(
+            f"SELECT {', '.join(CLAIM_FIELDS)} FROM claims"
+            " WHERE relation = ? AND object_kind = ? ORDER BY key",
+            (relation, object_kind),
+        )
+        return [StoredClaim(*row) for row in rows]
+
+    def layout(self, level: str) -> dict[str, tuple[int, int]]:
+        """`element -> (column, row)` of every box ever placed on this map level."""
+        rows = self._db.execute("SELECT element, col, row FROM layout WHERE level = ?", (level,))
+        return {element: (col, row) for element, col, row in rows}
+
+    def save_layout(self, level: str, cells: dict[str, tuple[int, int]]) -> None:
+        self._db.executemany(
+            "INSERT OR REPLACE INTO layout(level, element, col, row) VALUES (?, ?, ?, ?)",
+            [(level, element, col, row) for element, (col, row) in sorted(cells.items())],
+        )
+
     def claims_by_key(self, keys: list[str]) -> list[StoredClaim]:
         query = f"SELECT {', '.join(CLAIM_FIELDS)} FROM claims WHERE key = ?"
         rows = [self._db.execute(query, (key,)).fetchone() for key in keys]

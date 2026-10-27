@@ -29,7 +29,7 @@ def package(ecosystem: str, name: str) -> str:
 
 
 class ManifestAnalyzer:
-    producer = "manifests@1.1"
+    producer = "manifests@1.2"
 
     def accepts(self, file: GuardedFile) -> bool:
         name = posixpath.basename(file.rel_path).lower()
@@ -53,23 +53,23 @@ class ManifestAnalyzer:
         return ["editable installs (-e) are not read as dependencies"] if options else []
 
 
-def _line(text: str, position: int) -> int:
+def line_of(text: str, position: int) -> int:
     return text.count("\n", 0, position) + 1
 
 
-def _section(text: str, header: str) -> tuple[int, int] | None:
+def toml_section(text: str, header: str) -> tuple[int, int] | None:
     """Character range of a TOML table: from its `[header]` line to the next header."""
-    match = re.search(rf"(?m)^[ \t]*\[{re.escape(header)}\][ \t]*(#.*)?$", text)
+    match = re.search(rf"(?m)^[ \t]*\[{re.escape(header)}\][ \t]*(#.*)?\r?$", text)  # CRLF files too
     if not match:
         return None
     following = _HEADER.search(text, match.end())
     return match.start(), following.start() if following else len(text)
 
 
-def _key_line(text: str, span: tuple[int, int], name: str) -> int | None:
+def toml_key_line(text: str, span: tuple[int, int], name: str) -> int | None:
     """Line of `name = ...` (bare or quoted key) inside a TOML table."""
     found = re.compile(rf"(?m)^[ \t]*[\"']?{re.escape(name)}[\"']?[ \t]*=").search(text, span[0], span[1])
-    return _line(text, found.start()) if found else None
+    return line_of(text, found.start()) if found else None
 
 
 def _npm(text: str) -> Found:
@@ -86,7 +86,7 @@ def _npm(text: str) -> Found:
         for dep in names:
             key = re.compile(rf'"{re.escape(dep)}"\s*:').search(text, start.end())
             if key:
-                found.append(("npm", dep, _line(text, key.start())))
+                found.append(("npm", dep, line_of(text, key.start())))
     return found
 
 
@@ -97,7 +97,7 @@ def _pyproject(text: str) -> Found:
         return []
     found: Found = []
     project = data.get("project", {})
-    project_span = _section(text, "project")
+    project_span = toml_section(text, "project")
     specs = list(project.get("dependencies", []))
     for extra in project.get("optional-dependencies", {}).values():
         specs += extra
@@ -107,16 +107,16 @@ def _pyproject(text: str) -> Found:
             text, project_span[0] if project_span else 0
         )
         if name and quoted:
-            found.append(("pypi", name.group(1), _line(text, quoted.start())))
+            found.append(("pypi", name.group(1), line_of(text, quoted.start())))
     poetry = data.get("tool", {}).get("poetry", {})
     tables = {"tool.poetry.dependencies": poetry.get("dependencies", {})}
     tables["tool.poetry.dev-dependencies"] = poetry.get("dev-dependencies", {})
     for group, content in poetry.get("group", {}).items():
         tables[f"tool.poetry.group.{group}.dependencies"] = content.get("dependencies", {})
     for header, names in tables.items():
-        span = _section(text, header)
+        span = toml_section(text, header)
         for dep in (n for n in names if n.lower() != "python"):
-            line = _key_line(text, span, dep) if span else None
+            line = toml_key_line(text, span, dep) if span else None
             if line is not None:
                 found.append(("pypi", dep, line))
     return found
@@ -166,12 +166,12 @@ def _cargo(text: str) -> Found:
         tables += [(f"{quoted}.{section}", content.get(section, {})) for section in CARGO_SECTIONS]
     found: Found = []
     for header, names in tables:
-        span = _section(text, header)
+        span = toml_section(text, header)
         for dep in names:
-            line = _key_line(text, span, dep) if span else None
+            line = toml_key_line(text, span, dep) if span else None
             if line is None:  # `[dependencies.serde]`: the dependency is its own table
-                own = _section(text, f"{header}.{dep}")
-                line = _line(text, own[0]) if own else None
+                own = toml_section(text, f"{header}.{dep}")
+                line = line_of(text, own[0]) if own else None
             if line is not None:
                 found.append(("cargo", dep, line))
     return found

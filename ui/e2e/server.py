@@ -1,7 +1,7 @@
 """The real engine and web app on a small fixture Project, for browser tests.
 
-Claude Code is replaced by a fixed model (no network, no subscription): the tests check what the
-web app does with a model, not what Claude writes. Writes e2e/.state.json (Project id, token file).
+Claude Code is replaced by fakes that fail (no network, no subscription): the map is built from hard
+signals only, and nothing the page does may call Claude. Writes e2e/.state.json (Project id, token file).
 Usage: python ui/e2e/server.py PORT
 """
 
@@ -18,83 +18,53 @@ from umbra_engine.registry import Registry
 from umbra_engine.settings import Settings
 
 FILES = {
-    "compose.yml": "services:\n  api:\n    build: ./api\n    depends_on: [db]\n  db:\n    image: postgres:16\n",
-    "api/Dockerfile": "FROM python:3.12\n",
-    "api/app/main.py": "from .orders import create_order\n\n\ndef handle(request):\n    return create_order(request)\n",
-    "api/app/orders.py": (
-        "from .store import save\n\n\ndef validate(order):\n    return bool(order)\n\n\n"
-        "def create_order(order):\n    validate(order)\n    return save(order)\n"
+    "compose.yml": (
+        "services:\n  api:\n    build: ./api\n    depends_on: [db]\n  web:\n    build: ./web\n"
+        "  db:\n    image: postgres:16\n"
     ),
-    "api/app/store.py": "def save(order):\n    return order\n",
-    "api/app/limits.py": "class Limits:\n    def check(self, order):\n        return len(order) < 100\n",
+    "api/Dockerfile": "FROM python:3.12\n",
+    "api/pyproject.toml": '[project]\nname = "shop"\ndependencies = ["fastapi", "sqlalchemy"]\n',
+    "api/app/main.py": (
+        "from fastapi import FastAPI\n\nfrom .orders import create_order\n\napp = FastAPI()\n\n\n"
+        "@app.post('/orders')\ndef post_order(order):\n    return create_order(order)\n"
+    ),
+    "api/app/orders.py": (
+        "from sqlalchemy.orm import Session\n\n\ndef create_order(order, session: Session):\n"
+        "    session.add(order)\n    session.commit()\n    return order\n"
+    ),
+    "web/Dockerfile": "FROM node:22\n",
+    "web/package.json": '{\n  "name": "web",\n  "dependencies": {\n    "react": "19.0.0"\n  }\n}\n',
+    "web/src/main.tsx": "import { createRoot } from 'react-dom/client'\n\ncreateRoot(document.body).render(null)\n",
     "web/src/app.ts": "export function submit(order: string) {\n  return fetch('/orders', { body: order })\n}\n",
+    "README.md": "# Shop\n",
 }
 
-MODEL = {
-    "resume": "Une boutique de test : le site envoie une commande, l'API la valide et l'enregistre.",
-    "blocs": [
-        {"id": "user", "nom": "Client", "type": "user", "role": "Passe une commande.", "code": []},
-        {"id": "web", "nom": "Site web", "type": "frontend", "role": "Envoie la commande.", "code": ["web"]},
-        {"id": "api", "nom": "API commandes", "type": "backend", "role": "Valide et enregistre.", "code": ["api/app"]},
-        {"id": "db", "nom": "Base PostgreSQL", "type": "database", "role": "Garde les commandes.", "code": []},
-        {"id": "docs", "nom": "Guide du projet", "type": "docs", "role": "Explique comment lancer la boutique.", "code": []},
-    ],
-    "flux": [
-        {"de": "user", "vers": "web", "quoi": "clic sur Commander"},
-        {"de": "web", "vers": "api", "quoi": "POST /orders"},
-        {"de": "api", "vers": "db", "quoi": "INSERT commande"},
-        {"de": "docs", "vers": "api", "quoi": "décrit l'API", "verbe": "décrit"},
-    ],
-    "composants": [
-        {"id": "orders", "nom": "Commandes", "bloc": "api", "role": "Crée les commandes.",
-         "expose": [{"quoi": "create_order", "fichier": "api/app/orders.py", "lignes": [8, 10]}],
-         "fichiers": ["api/app/orders.py"],
-         "entre": ["la commande envoyée par le site"], "sort": ["la commande enregistrée", "ou un refus si elle est vide"],
-         "reglages": [{"nom": "Contrôle de la commande", "code": "validate(order)", "sorte": "branchement", "valeur": "validate",
-                       "effet": "Refuse une commande vide", "fichier": "api/app/orders.py", "lignes": [9, 9]},
-                      {"nom": "Rangement", "code": "save_to_disk(order)", "sorte": "branchement", "valeur": "disk",
-                       "effet": "Range la commande", "fichier": "api/app/orders.py", "lignes": [40, 41]},
-                      {"nom": "Taille maximale", "code": "return len(order) < 100", "sorte": "limite", "valeur": "100",
-                       "effet": "Refuse une commande trop longue", "fichier": "api/app/limits.py", "lignes": [3, 3]}]},
-    ],
-    "parcours": [
-        {"id": "order", "nom": "Passer une commande", "declencheur": "Le client clique sur Commander.",
-         "etapes": [
-             {"texte": "Le site envoie la commande.", "action": "Envoie POST /orders", "composant": "web", "touche": ["api"],
-              "fichier": "web/src/app.ts", "lignes": [1, 3]},
-             {"texte": "L'API valide puis enregistre.", "composant": "orders", "touche": ["db"],
-              "fichier": "api/app/orders.py", "lignes": [8, 10]},
-         ],
-         "resultat": "La commande est enregistrée."},
-    ],
-    "reglages_projet": [{"nom": "Image de la base", "code": "image: postgres:16", "valeur": "postgres:16",
-                          "fichier": "compose.yml", "lignes": [6, 6], "lu_par_le_code": "non"}],
-    "modules": {"api/app/orders.py": "Crée et valide les commandes.", "api/app/main.py": "Point d'entrée de l'API."},
-    "dossiers": {"api/app": "Le code de l'API."},
-    "incertitudes": [],
-}  # fmt: skip
+
+def no_claude(*_: object) -> str:
+    raise RuntimeError("the browser tests must never call Claude")
+
+
+def write(root: Path) -> None:
+    for rel, text in FILES.items():
+        (root / rel).parent.mkdir(parents=True, exist_ok=True)
+        (root / rel).write_text(text, encoding="utf-8")
 
 
 def main() -> None:
     port = int(sys.argv[1])
     work = Path(tempfile.mkdtemp(prefix="umbra-e2e-"))
     root = work / "shop"
-    for rel, text in FILES.items():
-        (root / rel).parent.mkdir(parents=True, exist_ok=True)
-        (root / rel).write_text(text, encoding="utf-8")
-    # A second copy, not registered: a test adds it while the engine runs (#85).
-    spare = work / "spare"
-    for rel, text in FILES.items():
-        (spare / rel).parent.mkdir(parents=True, exist_ok=True)
-        (spare / rel).write_text(text, encoding="utf-8")
+    write(root)
+    spare = (
+        work / "spare"
+    )  # a second copy, not registered: a test adds it while the engine runs (#85)
+    write(spare)
     settings = Settings(home=work / "home", port=port)
     with Registry(settings) as registry:
         project, _ = registry.add(root)
         with registry.open_store(project) as store:
             index_project(project, store)
-    app = create_app(
-        settings, ask=lambda prompt: "{}", study=lambda prompt, folder: json.dumps(MODEL)
-    )
+    app = create_app(settings, ask=no_claude, study=no_claude)
     state = {"project": project.id, "token": str(settings.home / "token"), "spare": str(spare)}
     (Path(__file__).parent / ".state.json").write_text(json.dumps(state), encoding="utf-8")
     uvicorn.run(app, host="127.0.0.1", port=port, log_level="warning")

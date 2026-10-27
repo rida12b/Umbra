@@ -41,7 +41,7 @@ jobs:
           cache: npm
           cache-dependency-path: ui/package-lock.json
       - run: npm ci
-      - run: npm test # pure layout and floor rules, on real study models (Node strips the types)
+      - run: npm test # pure map geometry, on real engine output (Node strips the types)
       - run: npm run build # type-check, then build into the engine package
       - run: npm audit --omit=dev
 
@@ -64,5 +64,5 @@ jobs:
         working-directory: ui
       - run: npx playwright install --with-deps chromium
         working-directory: ui
-      - run: npx playwright test --reporter=line # the real engine, Claude Code replaced by a fixed model
+      - run: npx playwright test --reporter=line # the real engine on a fixture Project, Claude Code replaced by fakes that fail
         working-directory: ui

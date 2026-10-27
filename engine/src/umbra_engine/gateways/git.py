@@ -7,6 +7,7 @@ from pathlib import Path
 from umbra_engine.guard import redact_output
 
 GIT_TIMEOUT_S = 10
+_DAY = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 _COMMIT = re.compile(r"^[0-9a-f]{40}([0-9a-f]{24})?$")
 
 
@@ -23,6 +24,16 @@ def head_commit(root: Path) -> str | None:
         return None
     commit = redact_output(result.stdout.strip(), "git rev-parse")
     return commit if result.returncode == 0 and _COMMIT.match(commit) else None
+
+
+def head_info(root: Path) -> tuple[str, str]:
+    """`(branch, date of the last commit as YYYY-MM-DD)`; empty strings when git cannot tell (a detached
+    HEAD has no branch name)."""
+    branch = _run(root, "rev-parse", "--abbrev-ref", "HEAD")
+    date = _run(root, "log", "-1", "--format=%cs")
+    name = redact_output(branch.strip(), "git rev-parse") if branch else ""
+    day = redact_output(date.strip(), "git log") if date else ""
+    return ("" if name == "HEAD" else name), (day if _DAY.match(day) else "")
 
 
 def changed_files(root: Path) -> set[str] | None:

@@ -9,7 +9,6 @@ export default defineConfig({
   build: {
     outDir: "../engine/src/umbra_engine/web",
     emptyOutDir: true,
-    chunkSizeWarningLimit: 2500, // elkjs is one large file, loaded once from the local disk
   },
   server: {
     host: "127.0.0.1",
