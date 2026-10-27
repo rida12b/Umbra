@@ -6,10 +6,13 @@ from collections.abc import Callable
 from fastapi import FastAPI, HTTPException, params, status
 
 from umbra_engine.analyzers.signals import SignalsAnalyzer
-from umbra_engine.claims import DEFINES
+from umbra_engine.claims import DEFINES, StoredClaim
+from umbra_engine.guard import GuardedFile, SecretGuard
 from umbra_engine.indexer import ANALYZERS, GIT_BRANCH, GIT_DATE
 from umbra_engine.project_store import ProjectStore
-from umbra_engine.projection.inside import has_inside, inside_map
+from umbra_engine.projection.card import part_card
+from umbra_engine.projection.card_model import PartCard
+from umbra_engine.projection.inside import has_inside, read_inside
 from umbra_engine.projection.inside_model import InsideMap
 from umbra_engine.projection.system import system_map
 from umbra_engine.projection.system_facts import SYSTEM_RELATIONS, Facts, facts_of
@@ -91,10 +94,38 @@ def add_system_routes(
         found, _, facts, units = read(project_id)
         with indexed_store(project_id) as store, lock:
             level = LEVEL_1 + box
-            inside = inside_map(facts, units, found, box, store.layout(level))
-            if inside is None:
+            read_box = read_inside(facts, units, found, box, store.layout(level))
+            if read_box is None:
                 raise HTTPException(status.HTTP_404_NOT_FOUND, f"no inside for box {box!r}")
+            inside = read_box.map
             store.save_layout(level, {p.id: (p.col, p.row) for p in inside.parts if p.kind != "stub"})
         return inside
+
+    @app.get("/v1/projects/{project_id}/system/card", dependencies=authorized)
+    def project_card(project_id: str, box: str, part: str, file: str = "") -> PartCard:
+        """Level 2: one part of a box, or one file of it (a chip), in four lines and its functions, read
+        in the code through the Secret Guard. 404 when the part is not drawn inside the box."""
+        found, _, facts, units = read(project_id)
+        guard = SecretGuard(known_project(project_id).root)
+        texts: dict[str, str | None] = {}
+
+        def text_of(path: str) -> str | None:
+            if path not in texts:
+                released = guard.read(path)
+                texts[path] = released.text if isinstance(released, GuardedFile) else None
+            return texts[path]
+
+        with indexed_store(project_id) as store, lock:
+            read_box = read_inside(facts, units, found, box, store.layout(LEVEL_1 + box))
+            if read_box is None:
+                raise HTTPException(status.HTTP_404_NOT_FOUND, f"no inside for box {box!r}")
+
+            def definitions_of(path: str) -> list[StoredClaim]:
+                return store.claims(limit=5000, file=path, relation=DEFINES)
+
+            card = part_card(read_box, facts, found, units, part, file, text_of, definitions_of)
+        if card is None:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, f"no part {part!r} {file!r} in box {box!r}")
+        return card
 
     return system_of

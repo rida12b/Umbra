@@ -6,7 +6,9 @@ interface Props {
   inside: InsideMap;
   drawn: InsideGeometry;
   selected: string | null;
+  litFile: string | null; // the file whose card is open: its chip is lit
   onSelect: (id: string) => void;
+  onFile: (part: string, file: string) => void; // a chip: the card of that one file
   onStub: (neighbour: string) => void;
   onHint: (hint: Hint | null, at?: Pointer) => void;
   onAround: (at: Pointer) => void;
@@ -14,7 +16,7 @@ interface Props {
 }
 
 /** Level 1 as SVG, drawn as the mock: ENTRÉE over the stub on the left, parts left → right, SORTIES over the stubs on the right. */
-export function InsideDrawing({ inside, drawn, selected, onSelect, onStub, onHint, onAround, onAroundLeave }: Props) {
+export function InsideDrawing({ inside, drawn, selected, litFile, onSelect, onFile, onStub, onHint, onAround, onAroundLeave }: Props) {
   const names = Object.fromEntries(inside.parts.map((p) => [p.id, p.kind === "stub" ? stubName(p.title, p.detail) : p.title]));
   const hover = (hint: Hint): HoverHandlers => ({
     onMouseEnter: (e: Pointer) => onHint(hint, e),
@@ -53,7 +55,7 @@ export function InsideDrawing({ inside, drawn, selected, onSelect, onStub, onHin
         );
       })}
       {drawn.parts.map((part) => (
-        <Part key={part.part.id} drawn={part} selected={selected === part.part.id} onSelect={onSelect} onStub={onStub} hover={hover} />
+        <Part key={part.part.id} drawn={part} selected={selected === part.part.id} litFile={litFile} onSelect={onSelect} onFile={onFile} onStub={onStub} hover={hover} />
       ))}
       {drawn.outputs.map(({ output, path, at: [x, y] }) => {
         const hint = { title: `${names[output.box]} → ${output.label}`, text: "Ce qui sort du projet.", proofs: output.proofs, guess: false };
@@ -88,7 +90,9 @@ function stubName(title: string, detail: string): string {
 interface PartProps {
   drawn: DrawnPart;
   selected: boolean;
+  litFile: string | null;
   onSelect: (id: string) => void;
+  onFile: (part: string, file: string) => void;
   onStub: (neighbour: string) => void;
   hover: (hint: Hint) => HoverHandlers;
 }
@@ -101,7 +105,7 @@ interface HoverHandlers {
   onBlur: () => void;
 }
 
-function Part({ drawn: { part, rect, chips }, selected, onSelect, onStub, hover }: PartProps) {
+function Part({ drawn: { part, rect, chips }, selected, litFile, onSelect, onFile, onStub, hover }: PartProps) {
   const cx = rect.x + rect.w / 2;
   const stub = part.kind === "stub";
   const act = () => (stub ? onStub(part.neighbour) : onSelect(part.id));
@@ -160,9 +164,21 @@ function Part({ drawn: { part, rect, chips }, selected, onSelect, onStub, hover 
       {chips.map((chip) => (
         <g
           key={chip.file}
-          className="pm-chip"
+          className={`pm-chip${litFile === chip.file ? " lit" : ""}`}
           tabIndex={0}
+          role="button"
           aria-label={chip.label}
+          aria-pressed={litFile === chip.file}
+          onClick={(e) => {
+            e.stopPropagation(); // the file's card, not the part's
+            onFile(part.id, chip.file);
+          }}
+          onKeyDown={(e) => {
+            if (e.key !== "Enter" && e.key !== " ") return;
+            e.preventDefault();
+            e.stopPropagation();
+            onFile(part.id, chip.file);
+          }}
           {...chipHover(hover({ title: chip.label, text: "", proofs: [{ file: chip.file, start: 0, end: 0 }], guess: false }))}
         >
           <rect x={chip.rect.x} y={chip.rect.y} width={chip.rect.w} height={chip.rect.h} rx={6} />

@@ -3,6 +3,7 @@ same shapes and words as Level 0, its neighbours as grey stubs at the edges, wha
 into « + N autour ». Hard signals only (no LLM). Cells are stored apart, as Level 0: nothing moves."""
 
 import posixpath
+from dataclasses import dataclass
 
 from umbra_engine.projection.inside_links import Placed, Wiring, part_links, stub_links
 from umbra_engine.projection.inside_model import InsideMap, InsidePart
@@ -41,9 +42,19 @@ def has_inside(facts: Facts, unit: Unit, folder: str) -> bool:
     return len(cut(facts, unit, folder).groups) >= 2
 
 
-def inside_map(
+@dataclass
+class InsideRead:
+    """Level 1 as drawn, with what each part holds and the imports between them (the card, #106)."""
+
+    map: InsideMap
+    placed: list[Placed]
+    wiring: Wiring
+    unit: Unit
+
+
+def read_inside(
     facts: Facts, units: list[Unit], shown: SystemMap, box_id: str, stored: dict[str, Cell]
-) -> InsideMap | None:
+) -> InsideRead | None:
     """None when the box has no inside worth a level (fewer than 2 parts, or not a part that runs)."""
     unit = next((u for u in units if u.id == box_id), None)
     box = next((b for b in shown.boxes if b.id == box_id), None)
@@ -74,7 +85,7 @@ def inside_map(
     result.around = _around(facts, found, web) + [
         _folded(facts, g, found.root, web, i) for i, g in enumerate(overflow)
     ]
-    return result
+    return InsideRead(result, placed, wiring, unit)
 
 
 def _part(facts: Facts, group: Group, root: str, box_id: str, web: bool, routes: int) -> InsidePart:

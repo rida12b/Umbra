@@ -7,13 +7,16 @@ interface Props {
   project: Project | undefined;
   activity: boolean; // which view of the Project is open
   inside: string | null; // the box whose inside is shown (Level 1): « Vue d'ensemble › Serveur »
+  card: string | null; // the part or file whose card is open (Level 2): « … › Serveur › items.py »
+  box: string | null; // the box of `inside`: its crumb goes back to it when a card is open
   theme: Theme;
   onToggleTheme: () => void;
 }
 
 /** Umbra, where you are, Claude's activity and the theme (mock: `.top` of prototype.html). */
-export function TopBar({ project, activity, inside, theme, onToggleTheme }: Props) {
+export function TopBar({ project, activity, inside, card, box, theme, onToggleTheme }: Props) {
   const open = (node: string) => project && navigate({ projectId: project.id, node });
+  const crumb = "rounded-md px-1.5 py-1 hover:bg-raised hover:text-ink";
   return (
     <header className="flex h-12 flex-none items-center gap-3.5 border-b border-line bg-panel px-5">
       <a href="#/" className="flex shrink-0 items-center gap-2 text-[15px] font-bold tracking-[0.2px] text-ink">
@@ -28,13 +31,25 @@ export function TopBar({ project, activity, inside, theme, onToggleTheme }: Prop
         <nav className={`flex min-w-0 items-center gap-1.5 whitespace-nowrap text-[14px] text-muted ${activity || inside ? "" : "max-sm:hidden"}`} aria-label="Où vous êtes">
           {activity || inside ? (
             <>
-              <button type="button" className="rounded-md px-1.5 py-1 hover:bg-raised hover:text-ink" onClick={() => open(MAP_VIEW)}>
+              <button type="button" className={crumb} onClick={() => open(MAP_VIEW)}>
                 Vue d'ensemble
               </button>
               <span className="text-faint">›</span>
-              <span aria-current="page" className="truncate px-1.5 py-1 font-semibold text-ink">
-                {inside ?? "Activité de Claude"}
-              </span>
+              {card && inside ? (
+                <>
+                  <button type="button" className={`${crumb} max-sm:hidden`} onClick={() => project && navigate({ projectId: project.id, node: MAP_VIEW, box })}>
+                    {inside}
+                  </button>
+                  <span className="text-faint max-sm:hidden">›</span>
+                  <span aria-current="page" className="truncate px-1.5 py-1 font-semibold text-ink">
+                    {card}
+                  </span>
+                </>
+              ) : (
+                <span aria-current="page" className="truncate px-1.5 py-1 font-semibold text-ink">
+                  {inside ?? "Activité de Claude"}
+                </span>
+              )}
             </>
           ) : (
             <span aria-current="page" className="px-1.5 py-1 font-semibold text-ink">

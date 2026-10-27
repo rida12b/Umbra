@@ -83,9 +83,11 @@ def detail_of(facts: Facts, group: Group) -> str:
 
 def role_of(group: Group, web: bool, routes: int) -> str:
     if group.kind == "entry":
-        return (
-            "Lance l'appli et branche les pages." if web else "Crée l'appli et passe les appels aux routes."
-        )
+        if web:
+            return "Lance l'appli et branche les pages."
+        if routes:
+            return "Crée l'appli et passe les appels aux routes."
+        return "Le premier fichier lu : ce que le code donne à qui l'importe."
     if group.kind == "routes":
         return f"Une adresse = une fonction. {routes} adresses en {len(group.chips)} fichiers."
     if group.kind == "pages":
