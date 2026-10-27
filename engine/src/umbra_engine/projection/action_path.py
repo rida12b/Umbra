@@ -13,12 +13,14 @@ from umbra_engine.projection.inside import InsideRead
 from umbra_engine.projection.inside_model import InsidePart
 from umbra_engine.projection.lit_inside import inside_highlight
 from umbra_engine.projection.system_model import SystemMap
+from umbra_engine.projection.system_purpose import ACCOUNT_TABLES
 
 MAX_WRITES = 2
 GUESSES = {
     "name": "supposé : trouvé par son nom seul, le type de l'objet n'est pas lu dans le code",
     "class": "supposé : la classe le fait, l'appel exact n'est pas suivi dans le code",
 }
+WRITE_WORDS = {"db-write": "écrit la ligne", "smtp": "envoie le courriel", "sqlite": "écrit dans le fichier"}
 OUT_TO = {"db-write": ("store:",), "smtp": ("mail",), "sqlite": ("sqlite-file",)}
 
 
@@ -66,16 +68,22 @@ def action_path(
 def _client_step(action: Action, client: ClientCall, stub: InsidePart, box: str) -> LitStep:
     here = f"{posixpath.basename(client.file)}:{client.line}"
     label = f"{posixpath.basename(client.caller[0])}:{client.caller[1]} → {here}" if client.caller else here
-    note, why = f"envoie {action.verb} {action.address}", f"lu dans {client.file}:{client.line}"
+    sender = "le formulaire envoie" if client.form else "envoie"
+    note, why = f"{sender} {action.verb} {action.address}", f"lu dans {client.file}:{client.line}"
     return LitStep(0, box, label, client.file, note, why, part=stub.id)
 
 
 def _step(action: Action, read: InsideRead, steps: list[LitStep], part: InsidePart, hit: Hit) -> LitStep:
     label = f"{posixpath.basename(hit.file)}:{hit.line} {hit.name}"
-    if hit.kind == "handler":
-        note = "lance la commande" if action.kind == COMMANDS else "reçoit la demande"
+    if hit.kind == "handler":  # « create_item reçoit la demande  routes/items.py:62 »
+        does = "lance la commande" if action.kind == COMMANDS else "reçoit la demande"
+        note, label = f"{hit.name} {does}", f"{_near(hit.file)}:{hit.line}"
     else:
         note = _verb(read, [s.part for s in steps], part.id) or "appelle"
+        if hit.kind == "class" and part.id.endswith("/models"):  # a data model used by the route: its fields
+            note = f"{hit.name} vérifie les champs"
+        if hit.reads:
+            note += f", retrouve {_the(hit.reads)}"
     why = _why(hit)
     chip = hit.file if hit.file in {c.file for c in part.chips} else ""
     return LitStep(0, read.map.box, label, hit.file, note, why, part=part.id, guess=hit.guess, chip=chip)
@@ -90,12 +98,21 @@ def _write_step(
     )
     if stub is None:
         return None
-    holder = read.wiring.owner.get(hit.file, "")
-    verb = _verb(read, [holder], stub.id).split(" (")[0]  # « écrit (items) »: the table is said by the line
-    note = f"{verb} : {stub.detail.removeprefix('◉ ')}" if verb else stub.detail.removeprefix("◉ ")
-    label = f"{posixpath.basename(hit.file)}:{hit.line} {hit.name}"
+    note = f"{hit.name} {WRITE_WORDS.get(hit.signal, 'écrit')}"  # the box it lands in says the rest
+    label = f"{_near(hit.file)}:{hit.line}"
     why = _why(hit)
     return LitStep(0, read.map.box, label, hit.file, note, why, part=stub.id, guess=hit.guess)
+
+
+def _near(file: str) -> str:
+    """« routes/items.py »: the action's own file with its folder, as the card names it."""
+    return "/".join(file.split("/")[-2:])
+
+
+def _the(table: str) -> str:
+    """`User` → « le compte », `Item` → « l'item »."""
+    word = "compte" if table.lower().rstrip("s") in ACCOUNT_TABLES else table.lower()
+    return f"l'{word}" if word[:1] in "aeiouh" else f"le {word}"
 
 
 def _why(hit: Hit) -> str:

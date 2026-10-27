@@ -132,7 +132,7 @@ export interface CardFunction {
   line: number;
   verb: string;
   path: string;
-  label: string; // « Voir un item » for a plain shape; empty otherwise
+  label: string; // « Voir un item », « Voir son profil »; empty when no rule names it (#108)
   action: string; // a route: its id in « Ce qu'on peut faire », whose path « chemin → » lights (#107)
 }
 
@@ -141,7 +141,7 @@ export interface Action {
   id: string; // the function's file and line: « backend/app/api/routes/items.py:62 »
   kind: "routes" | "commands";
   verb: string; // « POST »; empty for a command
-  label: string; // « Créer un item » for a plain shape; empty otherwise
+  label: string; // « Créer un item », « Voir son profil »; empty when no rule names it (#108)
   address: string; // « /api/v1/items/ », or the command as typed: « insert »
   name: string;
   file: string;
@@ -151,7 +151,7 @@ export interface Action {
 /** « Ce qu'on peut faire », grouped by the file that holds them. */
 export interface ActionList {
   total: number;
-  groups: { file: string; kind: "routes" | "commands"; actions: Action[] }[];
+  groups: { file: string; kind: "routes" | "commands"; role: string; actions: Action[] }[];
 }
 
 /** Level 2 (ADR-0007, #106): one part of a box, or one file of it, in four lines and its functions. */

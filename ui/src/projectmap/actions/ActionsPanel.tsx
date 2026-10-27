@@ -44,10 +44,10 @@ export function ActionsPanel({ projectId, name, onClose }: Props) {
         <div className="sub">
           {commands ? (
             <>
-              Les commandes de <span className="mono">{name}</span>, lues dans le code. Pas encore nommées en français. Clic : voir le chemin.
+              Les commandes de <span className="mono">{name}</span>, lues dans {readIn(list)}. Pas encore nommées en français.
             </>
           ) : (
-            "Les adresses que le serveur accepte, rangées par fichier. Noms en français quand l'adresse le dit, l'adresse exacte au survol. Clic : voir le chemin."
+            "Les adresses que le serveur accepte, rangées par fichier. Noms en français lus dans le code, l'adresse exacte au survol. Clic : voir le chemin."
           )}
         </div>
         {failed && (
@@ -64,6 +64,12 @@ export function ActionsPanel({ projectId, name, onClose }: Props) {
   );
 }
 
+/** « cli.py »: the file the commands are read in, or « le code » when they are spread over several. */
+function readIn(list: ActionList | null): string {
+  const files = list ? list.groups.map((g) => g.file.split("/").pop() ?? g.file) : [];
+  return files.length === 1 && files[0] ? files[0] : "le code";
+}
+
 function Groups({ list, onPick }: { list: ActionList; onPick: (action: Action) => void }) {
   const under = commonAddress(list.groups.flatMap((g) => g.actions.filter((a) => a.kind === "routes").map((a) => a.address)));
   return (
@@ -71,14 +77,13 @@ function Groups({ list, onPick }: { list: ActionList; onPick: (action: Action) =
       {list.groups.map((group) => {
         const file = group.file.split("/").pop() ?? group.file;
         const count = group.actions.length;
-        const unit = group.kind === "commands" ? (count > 1 ? "commandes" : "commande") : count > 1 ? "adresses" : "adresse";
+        // « items · 5 » as the mock reads; a file of commands: « 47 commandes »
+        const said = group.kind === "commands" ? `${count} ${count > 1 ? "commandes" : "commande"}` : `${group.role || "adresses"} · ${count}`;
         return (
-          <section key={group.file} className="grp" aria-label={`${file} : ${count} ${unit}`}>
+          <section key={group.file} className="grp" aria-label={`${file} : ${said}`}>
             <div className="gh" title={group.file}>
               <b>{file}</b>
-              <span>
-                {count} {unit}
-              </span>
+              <span>{said}</span>
             </div>
             {group.kind === "commands" ? (
               <div className="cmds">

@@ -34,7 +34,7 @@ def add_action_routes(
     @app.get("/v1/projects/{project_id}/system/actions", dependencies=authorized)
     def actions(project_id: str) -> ActionList:
         """The addresses the server answers and the commands the CLI offers, grouped by file, in the code's
-        own words (French only for a plain shape: « Créer un item »)."""
+        own words (French from `route_words`: « Créer un item », « Voir son profil »)."""
         _, _, facts, units = reader.read(project_id)
         return list_actions(facts, units, released_text(SecretGuard(known_project(project_id).root)))
 

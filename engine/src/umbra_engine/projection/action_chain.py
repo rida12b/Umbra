@@ -29,6 +29,7 @@ class Hit:
     guess: bool = False
     signal: str = ""  # a write: « db-write », « smtp », « sqlite »
     reason: str = ""  # a guess: « name » (a method found by its name alone) or « class » (inside a class)
+    reads: str = ""  # a table class it fetches a row of: `session.get(User, …)` → « User »
 
 
 NAME = "name"
@@ -41,6 +42,7 @@ def chain(code: Code, facts: Facts, file: str, line: int) -> list[Hit]:
     if handler is None:
         return []
     hits = [Hit(file, handler.lineno, handler.name, "handler", 0)]
+    tables = {c.object.split(":", 2)[2] for c in facts.signals_starting("table:")}
     queue = deque([(Definition(file, handler, code.class_of(file, handler)), 0, "")])
     seen = {(file, handler.lineno)}
     while queue and len(seen) <= MAX_FUNCTIONS:
@@ -56,7 +58,10 @@ def chain(code: Code, facts: Facts, file: str, line: int) -> list[Hit]:
             kind = "class" if isinstance(node, ast.ClassDef) else "function"
             name = f"{target.owner}.{node.name}" if target.owner else node.name
             why = reason or (NAME if guessed else "")
-            hits.append(Hit(target.file, target.node.lineno, name, kind, depth + 1, bool(why), reason=why))
+            reads = _reads(node, tables) if kind == "function" else ""
+            hits.append(
+                Hit(target.file, node.lineno, name, kind, depth + 1, bool(why), reason=why, reads=reads)
+            )
             if kind == "class":  # its methods are not followed: what it writes is only supposed
                 hits += _writes(code, facts, target, depth + 1, why or CLASS)
             else:
@@ -172,3 +177,12 @@ def _called(func: ast.expr) -> str:
     if isinstance(func, ast.Name):
         return func.id
     return func.attr if isinstance(func, ast.Attribute) else ""
+
+
+def _reads(node: ast.AST, tables: set[str]) -> str:
+    """The table class a function fetches one row of: `session.get(User, token)` → « User »."""
+    for call in (n for n in ast.walk(node) if isinstance(n, ast.Call) and n.args):
+        first = call.args[0]
+        if isinstance(first, ast.Name) and first.id in tables:
+            return first.id
+    return ""

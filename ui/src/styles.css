@@ -254,7 +254,7 @@ a.pm-link { display: inline-block; text-decoration: none; font-size: 13px; font-
 .pm-stage { flex: 1; min-height: 0; display: flex; position: relative; }
 .pm-stage > .pm-mapwrap, .pm-mapcol { flex: 1; min-width: 0; }
 .pm-mapcol { display: flex; flex-direction: column; min-height: 0; }
-.pm-panel { width: 460px; flex: none; border-left: 1px solid var(--u-line); background: var(--u-panel); overflow-y: auto; overflow-x: hidden; }
+.pm-panel { width: 460px; flex: none; scrollbar-gutter: stable; border-left: 1px solid var(--u-line); background: var(--u-panel); overflow-y: auto; overflow-x: hidden; }
 .pm-panel .hd { padding: 18px 22px 12px; border-bottom: 1px solid var(--u-line); position: sticky; top: 0; background: var(--u-panel); z-index: 1; }
 .pm-panel h3 { margin: 0; font-size: 18px; font-weight: 700; display: flex; align-items: center; }
 .pm-panel h3 .n { color: var(--u-faint); font-weight: 500; margin-left: 8px; }
@@ -266,7 +266,7 @@ a.pm-link { display: inline-block; text-decoration: none; font-size: 13px; font-
 .pm-panel .grp { padding: 10px 14px 2px; }
 .pm-panel .gh { font-size: 12.5px; color: var(--u-faint); padding: 4px 8px 6px; display: flex; gap: 8px; }
 .pm-panel .gh b { color: var(--u-ink); font-family: var(--font-mono); font-weight: 600; }
-.pm-panel .act { display: flex; max-width: 100%; align-items: center; gap: 10px; padding: 5px 8px; border-radius: 8px; border: 0; background: none; text-align: left; font-size: 14px; color: var(--u-ink); min-width: 0; }
+.pm-panel .act { display: flex; max-width: 100%; align-items: center; gap: 10px; padding: 5px 8px; line-height: normal; border-radius: 8px; border: 0; background: none; text-align: left; font-size: 14px; color: var(--u-ink); min-width: 0; }
 .pm-panel .act:hover, .pm-panel .act:focus-visible { background: var(--u-raised); }
 .pm-panel .m { font-family: var(--font-mono); font-size: 11px; font-weight: 700; width: 54px; flex: none; color: var(--u-muted); border: 1px solid var(--u-line); border-radius: 5px; text-align: center; padding: 2px 0; }
 .pm-panel .act .lab { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }

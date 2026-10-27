@@ -19,6 +19,7 @@ FUNCTION = re.compile(
     r"^\s*(?:export\s+)?(?:public\s+|private\s+)?(?:static\s+)?(?:async\s+)?(?:function\s+)?"
     r"(?:const\s+|let\s+)?(?P<name>[A-Za-z_$][\w$]*)\s*(?:=\s*(?:async\s*)?\(|\(|:\s*\()"
 )
+FORM = re.compile(r"<form[\s>]|[^\w$]onSubmit[^\w$]")
 NOT_NAMES = {"if", "for", "while", "switch", "return", "catch", "function"}
 
 
@@ -28,6 +29,7 @@ class ClientCall:
     line: int  # the function holding the address (« createItem »), or the address itself
     name: str  # « createItem »; empty when the address is not inside a named function
     caller: tuple[str, int] | None  # the first place that calls it: (« …/AddItem.tsx », 57)
+    form: bool = False  # that place is a form (`<form`, `onSubmit`): « le formulaire envoie »
 
 
 def client_call(files: list[str], text_of: TextOf, verb: str, address: str) -> ClientCall | None:
@@ -48,7 +50,8 @@ def client_call(files: list[str], text_of: TextOf, verb: str, address: str) -> C
                 continue
             name, start = _holder(lines, at)
             caller = _caller(scripts, text_of, file, name) if name else None
-            return ClientCall(file, start + 1, name, caller)
+            form = caller is not None and bool(FORM.search(text_of(caller[0]) or ""))
+            return ClientCall(file, start + 1, name, caller, form)
     return None
 
 

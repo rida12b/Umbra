@@ -58,6 +58,7 @@ ADD_ITEM = (
     "    mutationFn: (data: ItemCreate) =>\n"
     "      ItemsService.createItem({ requestBody: data }),\n"
     "  })\n"
+    "  return <form onSubmit={submit}></form>\n"
     "}\n"
 )
 ACTIONS = {
@@ -94,7 +95,8 @@ def test_the_routes_are_listed_by_file_with_plain_words_and_their_address(client
     ]  # fmt: skip
     rows = [(a["verb"], a["label"], a["address"], a["name"]) for a in found["groups"][0]["actions"]]
     assert rows[2] == ("POST", "Créer un item", "/api/v1/items/", "create_item")
-    assert found["groups"][1]["actions"][0]["label"] == ""  # not a plain shape: its address is shown instead
+    assert found["groups"][1]["actions"][0]["label"] == "Se connecter"  # the common words of signing in
+    assert [g["role"] for g in found["groups"]] == ["items", "connexion"]
     assert found["groups"][0]["actions"][2]["id"] == f"{ITEMS_PY}:{line_of(ITEMS, 'def create_item(')}"
 
 
@@ -112,14 +114,20 @@ def test_creer_un_item_lights_its_real_chain_inside_the_server(client, auth, mak
         (
             1,
             "stub:web:frontend",
-            "envoie POST /api/v1/items/",
+            "le formulaire envoie POST /api/v1/items/",
             f"AddItem.tsx:{add} → sdk.gen.ts:{sdk}",
             False,
         ),
-        (2, f"{SERVER}/routes", "reçoit la demande", f"items.py:{create} create_item", False),
-        (3, f"{SERVER}/access", "vérifie la connexion", f"deps.py:{user} get_current_user", False),
-        (4, f"{SERVER}/models", "valide", f"models.py:{item} Item", False),
-        (5, "stub:store:db", "écrit : ligne enregistrée", f"items.py:{commit} session.commit", False),
+        (2, f"{SERVER}/routes", "create_item reçoit la demande", f"routes/items.py:{create}", False),
+        (
+            3,
+            f"{SERVER}/access",
+            "vérifie la connexion, retrouve le compte",
+            f"deps.py:{user} get_current_user",
+            False,
+        ),
+        (4, f"{SERVER}/models", "Item vérifie les champs", f"models.py:{item} Item", False),
+        (5, "stub:store:db", "session.commit écrit la ligne", f"routes/items.py:{commit}", False),
     ]
     assert lit["steps"][1]["chip"] == ITEMS_PY  # the items.py chip lights in Routes
     assert lit["passed"] == [f"{SERVER}/entry"]  # the request goes through main.py without a number
@@ -142,8 +150,8 @@ def test_a_command_goes_through_the_library_and_a_guess_says_so(client, auth, ma
     steps = [(s["part"], s["note"], s["label"], s["guess"]) for s in lit["steps"]]
     assert steps[0] == (
         "stub:cli:sqlite-utils",
-        "lance la commande",
-        f"cli.py:{insert['line']} insert",
+        "insert lance la commande",
+        f"sqlite_utils/cli.py:{insert['line']}",
         False,
     )
     assert steps[1][0] == "library:sqlite_utils/data" and steps[1][2].endswith("Database")

@@ -96,6 +96,9 @@ function Inside({ inside, projectId, name, root, card, cardState, onCard, action
   const overList = useRef(false);
   const highlight = lit.highlight?.inside === inside.box ? lit.highlight : null;
   const drawnLit = useMemo(() => (highlight ? insideLit(highlight, inside.links, lit.step) : null), [highlight, inside.links, lit.step]);
+  // A tap on a phone opens a hint that stays: none while a path is lit, and none left over from the step before.
+  const touch = typeof window.matchMedia === "function" && window.matchMedia("(hover: none)").matches;
+  useEffect(() => setHint(null), [highlight?.serial, lit.step]);
 
   const place = (at: Pointer): Place => {
     const area = stage.current?.getBoundingClientRect();
@@ -155,7 +158,7 @@ function Inside({ inside, projectId, name, root, card, cardState, onCard, action
               onSelect={(id) => onCard({ part: id, file: null })}
               onFile={(id, file) => onCard({ part: id, file })}
               onStub={onStub}
-              onHint={(next, at) => setHint(next && at ? { hint: next, at: place(at) } : null)}
+              onHint={(next, at) => setHint(next && at && !(touch && highlight) ? { hint: next, at: place(at) } : null)}
               onAround={(at) => {
                 setHint(null);
                 setAround(place(at));
