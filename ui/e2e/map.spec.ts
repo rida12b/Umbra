@@ -98,3 +98,30 @@ test("Claude's activity is one click away and comes back to the map", async ({ p
   await page.getByRole("button", { name: "Vue d'ensemble" }).click();
   await expect(page.getByRole("button", { name: /^Serveur/ })).toBeVisible();
 });
+
+test("a question asked in Claude Code lights its answer on the open map within 2 s; « effacer » goes back (#104)", async ({ page, isMobile }) => {
+  test.skip(isMobile, "one tab is enough: the highlight is shared by every tab of the Project");
+  const project = await signIn(page);
+  const { token } = state();
+  const headers = { Authorization: `Bearer ${readFileSync(token, "utf-8").trim()}` };
+  await page.goto(`/#/p/${project}`);
+  await expect(page.getByRole("button", { name: /^Serveur/ })).toBeVisible();
+  // What the MCP tool `show` posts for Claude Code: an unknown box is refused with the valid ones.
+  const refused = await page.request.post(`/v1/projects/${project}/show`, { headers, data: { caption: "x", parts: ["Serveurs"] } });
+  expect(refused.status()).toBe(422);
+  expect(((await refused.json()) as { detail: string }).detail).toContain("Serveur");
+  const path = [{ part: "api/app/orders.py", note: "ajouter le champ", why: "Order décrit une commande." }, { part: "web/src/app.ts", note: "vérifier" }];
+  const shown = await page.request.post(`/v1/projects/${project}/show`, { headers, data: { caption: "où j'ajoute un champ prix à Order ?", parts: ["Base"], path } });
+  expect(shown.status()).toBe(200);
+  const bar = page.getByRole("region", { name: "Question posée dans Claude Code" });
+  await expect(bar).toContainText("« où j'ajoute un champ prix à Order ? »", { timeout: 2_000 });
+  await expect(page.getByLabel("2 app.ts : vérifier")).toBeVisible();
+  await expect(page.getByLabel("1 orders.py : ajouter le champ")).toBeVisible();
+  await page.getByLabel("1 orders.py : ajouter le champ").hover();
+  await expect(page.getByRole("tooltip")).toContainText("Order décrit une commande.");
+  await bar.getByRole("button", { name: "copier pour Claude" }).click();
+  await expect(page.getByRole("status")).toHaveText("Copié");
+  await bar.getByRole("button", { name: "effacer" }).click();
+  await expect(bar).toHaveCount(0);
+  expect(await (await page.request.get(`/v1/projects/${project}/show`, { headers })).json()).toBeNull();
+});

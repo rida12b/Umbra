@@ -80,6 +80,25 @@ export interface SystemMap {
   actions: number;
 }
 
+/** One numbered place of a lit path, under its box: « 3 models.py — ajouter le champ ». */
+export interface LitStep {
+  n: number;
+  box: string;
+  label: string; // short, in the box's own terms
+  path: string; // repo path, a folder ends with "/"; empty for a box without a folder
+  note: string;
+  why: string; // « pourquoi ici », on hover; empty when Claude gave none
+}
+
+/** What Claude Code lit on the map with `show` (#104): boxes lit, ≤ 6 numbered steps, the rest dimmed. */
+export interface Highlight {
+  caption: string;
+  boxes: string[];
+  steps: LitStep[];
+  files: string[]; // what « copier pour Claude » copies
+  serial: number;
+}
+
 /** Why a request failed, in the terms the page shows. */
 export class ApiError extends Error {
   constructor(
@@ -171,4 +190,8 @@ export const api = {
   /** `retry`: after a failed read, read the project again at once (« Réessayer »). */
   system: (id: string, retry = false) => call<SystemMap>(`${project(id)}/system${retry ? "?relire=true" : ""}`),
   activity: (id: string) => call<Turn[]>(`${project(id)}/activity`),
+  /** What is lit now (a tab opened after Claude's `show` call); null when nothing. */
+  shownNow: (id: string) => call<Highlight | null>(`${project(id)}/show`),
+  /** « effacer »: every open tab goes back to the plain map. */
+  clearShown: (id: string) => call<{ cleared: boolean }>(`${project(id)}/show`, { method: "DELETE" }),
 };

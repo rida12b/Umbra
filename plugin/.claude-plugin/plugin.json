@@ -1,6 +1,6 @@
 {
   "name": "umbra",
-  "description": "Reports what Claude Code changes (prompt, edited files, final message) to the local Umbra engine, so its map shows who changed what and why.",
+  "description": "Opens the Umbra map of the repo (/umbra) and lets Claude Code light its answers on it (MCP tool `show`); reports what Claude Code changes (prompt, edited files, final message) to the local Umbra engine.",
   "author": {
     "name": "rida12b"
   },

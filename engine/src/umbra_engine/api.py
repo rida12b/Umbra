@@ -18,6 +18,7 @@ from umbra_engine.api_explain import add_explain_routes
 from umbra_engine.api_live import add_live_routes
 from umbra_engine.api_map import add_map_routes
 from umbra_engine.api_model import add_model_routes
+from umbra_engine.api_show import add_show_routes
 from umbra_engine.api_system import add_system_routes
 from umbra_engine.claims import Relation, Status, StoredClaim
 from umbra_engine.coverage import CoverageReport, coverage_report
@@ -297,7 +298,8 @@ def create_app(
     refresh_cards = add_explain_routes(
         app, authorized, known_project, indexed_store, graph_of, app.state.explainer, ask
     )
-    add_system_routes(app, authorized, known_project, indexed_store, ensure_indexed)
+    system_of = add_system_routes(app, authorized, known_project, indexed_store, ensure_indexed)
+    add_show_routes(app, authorized, known_project, system_of, events)
     refresh_model = add_model_routes(
         app, authorized, known_project, indexed_store, graph_of, app.state.explainer, study, ensure_indexed
     )

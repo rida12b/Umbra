@@ -1,6 +1,8 @@
 import type { FocusEvent, MouseEvent } from "react";
 import type { Proof, SystemMap } from "../api";
 import { aroundText, type DrawnBox, type Geometry } from "./geometry";
+import { gapsUnder, labelY, viewBoxWith, type Callout } from "./lit";
+import { CalloutRows } from "./MapCallout";
 
 /** What a hover or a keyboard focus shows: what it is, in a sentence, and the lines that prove it. */
 export interface Hint {
@@ -21,10 +23,11 @@ interface Props {
   onHint: (hint: Hint | null, at?: Pointer) => void;
   onAround: (at: Pointer) => void;
   onAroundLeave: () => void;
+  lit?: { boxes: Set<string>; callouts: Callout[]; current: number | null } | null; // a path Claude lit (#104)
 }
 
 /** The Level 0 map as SVG, drawn as the mock: ENTRÉE left, boxes left → right, ◉ SORTIES right. */
-export function MapDrawing({ map, drawn, selected, onSelect, onHint, onAround, onAroundLeave }: Props) {
+export function MapDrawing({ map, drawn, selected, onSelect, onHint, onAround, onAroundLeave, lit = null }: Props) {
   const titles = Object.fromEntries(map.boxes.map((b) => [b.id, b.title]));
   const hover = (hint: Hint) => ({
     onMouseEnter: (e: Pointer) => onHint(hint, e),
@@ -34,7 +37,13 @@ export function MapDrawing({ map, drawn, selected, onSelect, onHint, onAround, o
     onBlur: () => onHint(null),
   });
   return (
-    <svg className="pm-map" viewBox={drawn.viewBox} preserveAspectRatio="xMidYMid meet" role="group" aria-label={`Carte de ${map.name}`}>
+    <svg
+      className={`pm-map${lit ? " pathmode" : ""}`}
+      viewBox={lit ? viewBoxWith(drawn.viewBox, lit.callouts) : drawn.viewBox}
+      preserveAspectRatio="xMidYMid meet"
+      role="group"
+      aria-label={`Carte de ${map.name}`}
+    >
       <defs>
         <marker id="pm-ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
           <path d="M0,1 L9,5 L0,9 z" />
@@ -43,8 +52,8 @@ export function MapDrawing({ map, drawn, selected, onSelect, onHint, onAround, o
           <path d="M0,1 L9,5 L0,9 z" />
         </marker>
       </defs>
-      {drawn.entries.map((entry) => (
-        <g key={entry.y} aria-hidden="true">
+      {drawn.entries.map((entry, i) => (
+        <g key={entry.y} className={i > 0 ? "pm-dimmable" : undefined} aria-hidden="true">
           <text className="pm-entry" x={24} y={entry.y + 18}>
             ENTRÉE
           </text>
@@ -60,22 +69,22 @@ export function MapDrawing({ map, drawn, selected, onSelect, onHint, onAround, o
         const [from, to] = back ? [link.target, link.source] : [link.source, link.target];
         const hint = { title: `${titles[from]} → ${titles[to]}`, text: link.detail, proofs: link.proofs, guess: link.inferred };
         return (
-          <g key={key} className={`pm-arrow${link.inferred ? " dash" : ""}`} tabIndex={0} aria-label={`${titles[from]} ${label.text} ${titles[to]}`} {...hover(hint)}>
+          <g key={key} className={`pm-arrow pm-dimmable${link.inferred ? " dash" : ""}`} tabIndex={0} aria-label={`${titles[from]} ${label.text} ${titles[to]}`} {...hover(hint)}>
             <path className="hitp" d={path} />
             <path className="l" d={path} markerEnd="url(#pm-ah)" />
-            <text className="pm-lbl" x={label.x} y={label.y} textAnchor={label.anchor}>
+            <text className="pm-lbl" x={label.x} y={lit ? labelY(label.x, label.y, lit.callouts) : label.y} textAnchor={label.anchor}>
               {label.text}
             </text>
           </g>
         );
       })}
       {drawn.boxes.map((drawnBox) => (
-        <Box key={drawnBox.box.id} drawn={drawnBox} selected={selected === drawnBox.box.id} onSelect={onSelect} hover={hover} />
+        <Box key={drawnBox.box.id} drawn={drawnBox} selected={selected === drawnBox.box.id} lit={!!lit?.boxes.has(drawnBox.box.id)} onSelect={onSelect} hover={hover} />
       ))}
       {drawn.outputs.map(({ output, path, at: [x, y] }) => {
         const hint = { title: `${titles[output.box]} → ${output.label}`, text: "Ce qui sort du projet.", proofs: output.proofs, guess: false };
         return (
-          <g key={output.id} className="pm-out" tabIndex={0} aria-label={`Sortie : ${output.label}`} {...hover(hint)}>
+          <g key={output.id} className="pm-out pm-dimmable" tabIndex={0} aria-label={`Sortie : ${output.label}`} {...hover(hint)}>
             <path d={path} />
             <circle className="o" cx={x} cy={y} r={8} />
             <circle className="i" cx={x} cy={y} r={3.2} />
@@ -92,7 +101,7 @@ export function MapDrawing({ map, drawn, selected, onSelect, onHint, onAround, o
       })}
       {drawn.around && (
         <g
-          className="pm-around"
+          className="pm-around pm-dimmable"
           tabIndex={0}
           role="button"
           aria-label={`${aroundText(map)} : ne font pas tourner l'appli`}
@@ -107,6 +116,8 @@ export function MapDrawing({ map, drawn, selected, onSelect, onHint, onAround, o
           </text>
         </g>
       )}
+      {lit && gapsUnder(lit.callouts).map((gap) => <rect key={`${gap.x},${gap.y}`} className="pm-gap" x={gap.x} y={gap.y} width={gap.w} height={gap.h} aria-hidden="true" />)}
+      {lit?.callouts.map((callout) => <CalloutRows key={callout.box} callout={callout} current={lit.current} hover={hover} />)}
     </svg>
   );
 }
@@ -127,7 +138,7 @@ function OpenMark({ rect }: { rect: DrawnBox["rect"] }) {
   );
 }
 
-function Box({ drawn: { box, rect }, selected, onSelect, hover }: { drawn: DrawnBox; selected: boolean; onSelect: (id: string) => void; hover: (hint: Hint) => object }) {
+function Box({ drawn: { box, rect }, selected, lit, onSelect, hover }: { drawn: DrawnBox; selected: boolean; lit: boolean; onSelect: (id: string) => void; hover: (hint: Hint) => object }) {
   const cx = rect.x + rect.w / 2;
   const hint = { title: [box.title, box.detail].filter(Boolean).join(" · "), text: box.role, proofs: box.proofs, guess: box.inferred, opens: box.opens };
   const common = {
@@ -149,7 +160,7 @@ function Box({ drawn: { box, rect }, selected, onSelect, hover }: { drawn: Drawn
   // A person is never read in the code: always deduced, said on hover; drawn plain as in the mock.
   if (box.kind === "actor")
     return (
-      <g className={`pm-box pm-actor${selected ? " sel" : ""}`} {...common}>
+      <g className={`pm-box pm-actor pm-dimmable${lit ? " lit" : ""}${selected ? " sel" : ""}`} {...common}>
         <rect className="hit" x={rect.x} y={rect.y} width={rect.w} height={rect.h} />
         <circle className="head" cx={cx} cy={rect.y + 18} r={12} />
         <path className="body" d={`M${cx - 22},${rect.y + 60} C${cx - 22},${rect.y + 36} ${cx + 22},${rect.y + 36} ${cx + 22},${rect.y + 60}`} />
@@ -165,7 +176,7 @@ function Box({ drawn: { box, rect }, selected, onSelect, hover }: { drawn: Drawn
   const detailY = titleY + 23;
   const folderY = box.detail ? detailY + 22 : titleY + 26;
   return (
-    <g className={`pm-box${dash}${box.opens ? " open" : ""}${selected ? " sel" : ""}`} {...common}>
+    <g className={`pm-box pm-dimmable${dash}${box.opens ? " open" : ""}${lit ? " lit" : ""}${selected ? " sel" : ""}`} {...common}>
       <rect className="b" x={rect.x} y={rect.y} width={rect.w} height={rect.h} rx={10} />
       <text className="tt" x={cx} y={titleY} textAnchor="middle">
         {box.title}

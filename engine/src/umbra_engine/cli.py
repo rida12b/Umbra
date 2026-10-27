@@ -38,7 +38,9 @@ def main(argv: list[str] | None = None) -> int:
     start.add_argument("--no-browser", action="store_true", help="print the login link, do not open it")
     serve = commands.add_parser("serve", help=f"run the local API and web app on {API_HOST}")
     serve.add_argument("--no-browser", action="store_true", help="print the login link, do not open it")
-    commands.add_parser("open", help="open the web app of a running engine in the browser")
+    open_ = commands.add_parser("open", help="open the web app of a running engine in the browser")
+    open_.add_argument("path", nargs="?", help="a folder: register it if needed and open its map")
+    commands.add_parser("mcp", help="run the MCP server Claude Code talks to (stdio): the `show` tool")
     commands.add_parser("token", help="print the local API token")
     args = parser.parse_args(argv)
 
@@ -68,7 +70,12 @@ def _run(args: argparse.Namespace) -> int:
         print(load_or_create_token(settings))
         return 0
     if args.command == "open":
-        return _open(settings)
+        return _open(settings, args.path)
+    if args.command == "mcp":
+        from umbra_engine.mcp_server import serve
+
+        serve()
+        return 0
     if args.command == "start":
         return _start(settings, args.path, open_browser=not args.no_browser)
     return _serve(settings, open_browser=not args.no_browser)
@@ -206,29 +213,56 @@ def _serve(settings: Settings, open_browser: bool, project_id: str | None = None
     return 0
 
 
-def _open(settings: Settings) -> int:
-    """Ask the running engine for a one-time login code: the token itself never leaves the terminal."""
-    import json
-    import urllib.error
-    import urllib.request
+def _open(settings: Settings, path: str | None = None) -> int:
+    """Ask the running engine for a one-time login code: the token itself never leaves the terminal.
+    With a folder, the engine registers it (and reads it if new) and the page lands on its map."""
     import webbrowser
+    from pathlib import Path
 
-    request = urllib.request.Request(
-        f"http://{API_HOST}:{settings.port}/v1/ui/login-codes",
-        method="POST",
-        headers={"Authorization": f"Bearer {load_or_create_token(settings)}"},
-    )
     try:
-        with urllib.request.urlopen(request, timeout=5) as response:
-            code = json.loads(response.read())["code"]
-    except (urllib.error.URLError, OSError, ValueError, KeyError) as error:
+        project_id = None
+        if path is not None:
+            folder = str(Path(path).expanduser().resolve())
+            project_id = _engine_call(settings, "/v1/projects", {"path": folder})["id"]
+        code = _engine_call(settings, "/v1/ui/login-codes", None)["code"]
+    except _EngineRefusedError as error:
+        print(f"umbra-engine: {error}", file=sys.stderr)
+        return 2
+    except (OSError, ValueError, KeyError) as error:
         print(f"umbra-engine: no engine answers on {API_HOST}:{settings.port} ({error})", file=sys.stderr)
         print("Start it with `umbra-engine serve`.", file=sys.stderr)
         return 1
-    link = _login_link(settings, code)
+    link = _login_link(settings, code, project_id)
     print(link)
     webbrowser.open_new_tab(link)
     return 0
+
+
+class _EngineRefusedError(Exception):
+    """The engine answered, and said no (a folder that cannot be a Project)."""
+
+
+def _engine_call(settings: Settings, route: str, body: dict[str, str] | None) -> dict:
+    import json
+    import urllib.error
+    import urllib.request
+
+    request = urllib.request.Request(
+        f"http://{API_HOST}:{settings.port}{route}",
+        data=json.dumps(body or {}).encode(),
+        method="POST",
+        headers={
+            "Authorization": f"Bearer {load_or_create_token(settings)}",
+            "Content-Type": "application/json",
+        },
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=5) as response:
+            return json.loads(response.read())
+    except urllib.error.HTTPError as error:
+        if error.code in (400, 409):
+            raise _EngineRefusedError(json.loads(error.read()).get("detail", error.reason)) from error
+        raise
 
 
 def _login_link(settings: Settings, code: str, project_id: str | None = None) -> str:
