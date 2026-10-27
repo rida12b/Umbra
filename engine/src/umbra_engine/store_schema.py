@@ -38,14 +38,6 @@ CREATE TABLE IF NOT EXISTS claims (
     producer TEXT NOT NULL,
     evidence_version TEXT NOT NULL
 );
--- Explanation cards survive re-indexing: each one is checked against the digest of its material.
-CREATE TABLE IF NOT EXISTS cards (
-    key TEXT PRIMARY KEY,
-    digest TEXT NOT NULL,
-    card TEXT NOT NULL,
-    producer TEXT NOT NULL,
-    created_at TEXT NOT NULL
-);
 -- What Claude Code did in the Project, as its hooks reported it: kept across re-indexing.
 CREATE TABLE IF NOT EXISTS events (
     id TEXT PRIMARY KEY,
@@ -85,6 +77,8 @@ CLAIM_FILTERS = ("file", "subject", "object", "relation", "status")
 
 # Tables whose columns changed meaning across versions: rebuilt (their rows are refused anyway).
 REBUILT_TABLES = {"files": FILE_FIELDS, "claims": CLAIM_FIELDS}
+# Tables an older Umbra wrote and nothing reads any more: dropped on open (`cards`: Claude's studies, #114).
+DROPPED_TABLES = ("cards",)
 
 
 def placeholders(fields: tuple[str, ...]) -> str:

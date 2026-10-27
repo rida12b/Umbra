@@ -2,22 +2,10 @@
 highlight, cleared by « effacer ». No Claude call anywhere (the engine never runs a model for this)."""
 
 import pytest
-from fastapi.testclient import TestClient
 from system_fixtures import SQLITE_UTILS, TEMPLATE
 from test_system import system_of
 
-from umbra_engine.api import create_app
-
 PRICE = "où j'ajoute un champ prix à Item ?"
-
-
-def no_claude(*_: object) -> str:
-    raise AssertionError("show must never call Claude")
-
-
-@pytest.fixture
-def client(settings) -> TestClient:
-    return TestClient(create_app(settings, ask=no_claude, study=no_claude), base_url="http://127.0.0.1")
 
 
 @pytest.fixture

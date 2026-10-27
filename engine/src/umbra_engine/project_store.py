@@ -10,6 +10,7 @@ from umbra_engine.claims import StoredClaim
 from umbra_engine.store_schema import (
     CLAIM_FIELDS,
     CLAIM_FILTERS,
+    DROPPED_TABLES,
     FILE_FIELDS,
     INDEXED_SCHEMA,
     LIST_SEPARATOR,
@@ -197,18 +198,6 @@ class ProjectStore:
         row = self._db.execute("SELECT value FROM meta WHERE key = ?", (INDEXED_SCHEMA,)).fetchone()
         return row is not None and row[0] == str(SCHEMA_VERSION)
 
-    def card(self, key: str) -> tuple[str, str, str, str] | None:
-        """`(digest, card JSON, producer, created_at)` of the explanation card of a map element."""
-        return self._db.execute(
-            "SELECT digest, card, producer, created_at FROM cards WHERE key = ?", (key,)
-        ).fetchone()
-
-    def save_card(self, key: str, digest: str, card: str, producer: str, created_at: str) -> None:
-        self._db.execute(
-            "INSERT OR REPLACE INTO cards(key, digest, card, producer, created_at) VALUES (?, ?, ?, ?, ?)",
-            (key, digest, card, producer, created_at),
-        )
-
     def add_event(self, row: tuple[str, ...]) -> bool:
         """Store one journal event; False when this event id was already stored (replays are harmless)."""
         cursor = self._db.execute(
@@ -226,12 +215,6 @@ class ProjectStore:
             (-1 if latest is None else latest,),
         ).fetchall()
         return rows[::-1]
-
-    def card_keys(self) -> list[str]:
-        return [row[0] for row in self._db.execute("SELECT key FROM cards ORDER BY key")]
-
-    def cards_written_since(self, since: str) -> int:
-        return self._db.execute("SELECT COUNT(*) FROM cards WHERE created_at >= ?", (since,)).fetchone()[0]
 
     def meta(self) -> dict[str, str]:
         return dict(self._db.execute("SELECT key, value FROM meta").fetchall())
@@ -251,6 +234,8 @@ class ProjectStore:
             if columns and set(columns) != set(fields):
                 self._db.execute(f"DROP TABLE {table}")
                 self._db.execute("DELETE FROM meta WHERE key = ?", (INDEXED_SCHEMA,))
+        for table in DROPPED_TABLES:
+            self._db.execute(f"DROP TABLE IF EXISTS {table}")
         self._db.executescript(SCHEMA)
         if self._db.execute("SELECT 1 FROM meta WHERE key = 'schema_version'").fetchone():
             self._db.execute("UPDATE meta SET value = ? WHERE key = 'schema_version'", (str(SCHEMA_VERSION),))

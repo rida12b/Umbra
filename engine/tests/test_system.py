@@ -5,14 +5,11 @@ import subprocess
 import time
 from pathlib import Path
 
-import pytest
-from fastapi.testclient import TestClient
 from secret_fixtures import write_repo
 from system_fixtures import SQLITE_UTILS, TEMPLATE
 
 from umbra_engine.analyzers import default_analyzers
 from umbra_engine.analyzers.signals import SignalsAnalyzer
-from umbra_engine.api import create_app
 from umbra_engine.guard import GuardedFile, SecretGuard
 from umbra_engine.indexer import index_project
 from umbra_engine.registry import Registry
@@ -24,15 +21,6 @@ def commit(root: Path, day: str) -> None:
     subprocess.run([*base, "checkout", "-q", "-b", "main"], check=True, env=env)
     subprocess.run([*base, "add", "."], check=True, env=env)
     subprocess.run([*base, "commit", "-qm", "init"], check=True, env=env)
-
-
-def no_claude(*_: object) -> str:
-    raise AssertionError("the Level 0 map must never call Claude")
-
-
-@pytest.fixture
-def client(settings) -> TestClient:
-    return TestClient(create_app(settings, ask=no_claude, study=no_claude), base_url="http://127.0.0.1")
 
 
 def system_of(client, auth, make_repo, name: str, files: dict[str, str], day: str) -> tuple[str, dict]:

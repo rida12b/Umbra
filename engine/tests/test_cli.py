@@ -72,34 +72,15 @@ def test_start_registers_indexes_and_serves_a_link_that_lands_on_the_project(
     import uvicorn
 
     monkeypatch.setattr(uvicorn, "run", lambda app, host, port, log_level: seen.update(host=host))
-    monkeypatch.setattr("umbra_engine.gateways.claude.readiness_problem", lambda: None)
     assert cli.main(["start", str(repo), "--no-browser"]) == 0
     out = capsys.readouterr().out
     project_id = out.split("indexed ", 1)[1].split(":", 1)[0]
     assert project_id.startswith("watchdog-")
     assert "#login=" in out and f"&p={project_id}" in out
     assert seen["host"] == "127.0.0.1"
-    assert "Warning" not in out
 
     assert cli.main(["start", str(repo), "--no-browser"]) == 0  # a second run reuses the same Project
     assert f"indexed {project_id}:" in capsys.readouterr().out
-
-
-def test_start_says_when_claude_code_is_missing_and_still_serves(settings, make_repo, monkeypatch, capsys):
-    monkeypatch.setenv("UMBRA_HOME", str(settings.home))
-    repo = make_repo("watchdog")
-
-    import subprocess
-
-    import uvicorn
-
-    def no_claude(*args, **kwargs):
-        raise FileNotFoundError("claude")
-
-    monkeypatch.setattr(uvicorn, "run", lambda app, host, port, log_level: None)
-    monkeypatch.setattr(subprocess, "run", no_claude)
-    assert cli.main(["start", str(repo), "--no-browser"]) == 0
-    assert "Claude Code is not installed on this machine" in capsys.readouterr().out
 
 
 def test_start_on_a_missing_folder_exits_2(settings, tmp_path, monkeypatch, capsys):
