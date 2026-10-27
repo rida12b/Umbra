@@ -29,7 +29,6 @@ test("a project opens on its map: who comes in, the parts, what leaves; the proo
   await expect(page.getByLabel("Sortie : ligne enregistrée")).toBeVisible();
   await expect(page.getByLabel("Sortie : écran mis à jour")).toBeVisible();
   await expect(page.getByLabel("Où on en est")).toContainText(/pas d'historique git|branche/);
-  await expect(page.getByLabel("Où on en est")).toContainText("à définir avec toi");
   await expect(page.getByRole("button", { name: "Ce qu'on peut faire (1)" })).toBeVisible();
   // The page never scrolls; on a phone only the map itself slides sideways, its words kept readable.
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true);

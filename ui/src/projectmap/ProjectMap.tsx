@@ -77,11 +77,8 @@ function Loaded({ map }: { map: SystemMap }) {
           {map.sentence && <p className="pm-sentence">{map.sentence}</p>}
         </div>
         <section className="pm-status" aria-label="Où on en est">
-          <h2>
-            Où on en est <span>à définir avec toi</span>
-          </h2>
+          <h2>Où on en est</h2>
           <p>{where || "pas d'historique git"}</p>
-          <p className="q">Ce qui a bougé récemment, ou ce qui est fini / pas fini ?</p>
         </section>
       </header>
       <p className="pm-slide" aria-hidden="true">

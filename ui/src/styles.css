@@ -116,9 +116,7 @@
 .pm-head .pm-sentence { margin: 6px 0 0; font-size: 16.5px; color: var(--u-ink); }
 .pm-status { flex: none; width: 360px; border: 1px solid var(--u-warn-line); background: var(--u-warn-bg); border-radius: 10px; padding: 9px 13px; font-size: 13.5px; line-height: 1.4; }
 .pm-status h2 { margin: 0; font-weight: 700; font-size: 14.5px; display: flex; align-items: center; gap: 8px; }
-.pm-status h2 span { margin-left: auto; font-weight: 600; font-size: 11.5px; color: var(--u-warn-ink); border: 1px solid var(--u-warn-line); border-radius: 999px; padding: 1px 8px; white-space: nowrap; }
 .pm-status p { margin: 3px 0 0; color: var(--u-muted); }
-.pm-status p.q { color: var(--u-warn-ink); }
 .pm-slide { display: none; }
 .pm-mapwrap { flex: 1; min-height: 0; position: relative; padding: 6px 20px 4px; }
 .pm-mapwrap > svg { width: 100%; height: 100%; display: block; }
