@@ -6,6 +6,9 @@ const PORT = 7899;
 export default defineConfig({
   testDir: "e2e",
   timeout: 30_000,
+  // One worker: a `show` is shared by every tab of the Project and sends it back to Level 0,
+  // so a desktop show test running beside a mobile Level 1 test makes the latter fail (#105 CI).
+  workers: 1,
   use: { baseURL: `http://127.0.0.1:${PORT}`, trace: "retain-on-failure" },
   projects: [
     { name: "desktop", use: { ...devices["Desktop Chrome"], viewport: { width: 1280, height: 800 } } },
