@@ -20,10 +20,16 @@ test("anything else is not a login link; a broken code is no code", () => {
 });
 
 test("a Project opens on its map; links made for the old explorer open the map too", () => {
-  assert.deepEqual(parseRoute("#/p/shop"), { projectId: "shop", node: MAP_VIEW });
-  assert.deepEqual(parseRoute("#/p/shop?node=x%3Apart%3Aapi&journey=order&step=2"), { projectId: "shop", node: MAP_VIEW });
-  assert.deepEqual(parseRoute("#/p/shop?node=backend%2Fapp%2Fmain.py"), { projectId: "shop", node: MAP_VIEW });
-  assert.deepEqual(parseRoute("#/p/shop?node=activite%3A"), { projectId: "shop", node: ACTIVITY_VIEW });
+  assert.deepEqual(parseRoute("#/p/shop"), { projectId: "shop", node: MAP_VIEW, box: null });
+  assert.deepEqual(parseRoute("#/p/shop?node=x%3Apart%3Aapi&journey=order&step=2"), { projectId: "shop", node: MAP_VIEW, box: null });
+  assert.deepEqual(parseRoute("#/p/shop?node=backend%2Fapp%2Fmain.py"), { projectId: "shop", node: MAP_VIEW, box: null });
+  assert.deepEqual(parseRoute("#/p/shop?node=activite%3A"), { projectId: "shop", node: ACTIVITY_VIEW, box: null });
   assert.equal(routeHash({ projectId: "shop", node: MAP_VIEW }), "#/p/shop");
-  assert.equal(routeHash({ projectId: "shop", node: ACTIVITY_VIEW }), "#/p/shop?node=activite%3A");
+  assert.equal(routeHash({ projectId: "shop", node: ACTIVITY_VIEW, box: null }), "#/p/shop?node=activite%3A");
+});
+
+test("the inside of a box is a page of its own: Back goes up, a link opens it (#105)", () => {
+  assert.deepEqual(parseRoute("#/p/shop?box=server%3Aapi"), { projectId: "shop", node: MAP_VIEW, box: "server:api" });
+  assert.equal(routeHash({ projectId: "shop", node: MAP_VIEW, box: "server:api" }), "#/p/shop?box=server%3Aapi");
+  assert.deepEqual(parseRoute("#/p/shop?node=activite%3A&box=server%3Aapi"), { projectId: "shop", node: ACTIVITY_VIEW, box: null });
 });

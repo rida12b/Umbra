@@ -6,12 +6,13 @@ import type { Theme } from "../theme";
 interface Props {
   project: Project | undefined;
   activity: boolean; // which view of the Project is open
+  inside: string | null; // the box whose inside is shown (Level 1): « Vue d'ensemble › Serveur »
   theme: Theme;
   onToggleTheme: () => void;
 }
 
 /** Umbra, where you are, Claude's activity and the theme (mock: `.top` of prototype.html). */
-export function TopBar({ project, activity, theme, onToggleTheme }: Props) {
+export function TopBar({ project, activity, inside, theme, onToggleTheme }: Props) {
   const open = (node: string) => project && navigate({ projectId: project.id, node });
   return (
     <header className="flex h-12 flex-none items-center gap-3.5 border-b border-line bg-panel px-5">
@@ -24,15 +25,15 @@ export function TopBar({ project, activity, theme, onToggleTheme }: Props) {
         Umbra
       </a>
       {project && (
-        <nav className={`flex min-w-0 items-center gap-1.5 whitespace-nowrap text-[14px] text-muted ${activity ? "" : "max-sm:hidden"}`} aria-label="Où vous êtes">
-          {activity ? (
+        <nav className={`flex min-w-0 items-center gap-1.5 whitespace-nowrap text-[14px] text-muted ${activity || inside ? "" : "max-sm:hidden"}`} aria-label="Où vous êtes">
+          {activity || inside ? (
             <>
               <button type="button" className="rounded-md px-1.5 py-1 hover:bg-raised hover:text-ink" onClick={() => open(MAP_VIEW)}>
                 Vue d'ensemble
               </button>
-              <span className="text-faint max-sm:hidden">›</span>
-              <span aria-current="page" className="px-1.5 py-1 font-semibold text-ink max-sm:hidden">
-                Activité de Claude
+              <span className="text-faint">›</span>
+              <span aria-current="page" className="truncate px-1.5 py-1 font-semibold text-ink">
+                {inside ?? "Activité de Claude"}
               </span>
             </>
           ) : (
@@ -44,7 +45,7 @@ export function TopBar({ project, activity, theme, onToggleTheme }: Props) {
       )}
       <div className="ml-auto flex items-center gap-2">
         {project && !activity && (
-          <button type="button" className="whitespace-nowrap rounded-md px-2 py-1 text-[13px] text-muted hover:bg-raised hover:text-ink" onClick={() => open(ACTIVITY_VIEW)}>
+          <button type="button" className={`whitespace-nowrap rounded-md px-2 py-1 text-[13px] text-muted hover:bg-raised hover:text-ink ${inside ? "max-sm:hidden" : ""}`} onClick={() => open(ACTIVITY_VIEW)}>
             Activité de Claude
           </button>
         )}

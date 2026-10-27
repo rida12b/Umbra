@@ -40,6 +40,7 @@ class Facts:
     requires: dict[str, list[StoredClaim]]  # manifest directory ("" = root) -> what it asks for
     module_links: list[StoredClaim]
     classes: list[StoredClaim]
+    functions: list[StoredClaim] = field(default_factory=list)  # read for the inside of a box only (#105)
 
     def signal(self, name: str, files: set[str] | None = None) -> list[StoredClaim]:
         found = self.signals.get(name, [])

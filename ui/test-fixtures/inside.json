@@ -1,0 +1,1334 @@
+{
+ "server": {
+  "box": "server:backend",
+  "title": "Serveur",
+  "folder": "backend/app/",
+  "sentence": "Reçoit les appels de l'application web, vérifie qui appelle, lit et écrit la base.",
+  "parts": [
+   {
+    "id": "server:backend/entry",
+    "kind": "entry",
+    "title": "Porte d'entrée",
+    "detail": "",
+    "folders": [
+     "main.py"
+    ],
+    "role": "Crée l'appli et passe les appels aux routes.",
+    "proofs": [
+     {
+      "file": "backend/app/main.py",
+      "start": 17,
+      "end": 17
+     }
+    ],
+    "chips": [],
+    "neighbour": "",
+    "side": "",
+    "opens": false,
+    "inferred": false,
+    "col": 1,
+    "row": 0
+   },
+   {
+    "id": "server:backend/routes",
+    "kind": "routes",
+    "title": "Routes",
+    "detail": "",
+    "folders": [
+     "api/routes/"
+    ],
+    "role": "Une adresse = une fonction. 23 adresses en 5 fichiers.",
+    "proofs": [
+     {
+      "file": "backend/app/api/main.py",
+      "start": 7,
+      "end": 7
+     },
+     {
+      "file": "backend/app/api/routes/items.py",
+      "start": 13,
+      "end": 13
+     },
+     {
+      "file": "backend/app/api/routes/login.py",
+      "start": 23,
+      "end": 23
+     }
+    ],
+    "chips": [
+     {
+      "file": "backend/app/api/routes/login.py",
+      "start": 0,
+      "end": 0
+     },
+     {
+      "file": "backend/app/api/routes/users.py",
+      "start": 0,
+      "end": 0
+     },
+     {
+      "file": "backend/app/api/routes/items.py",
+      "start": 0,
+      "end": 0
+     },
+     {
+      "file": "backend/app/api/routes/utils.py",
+      "start": 0,
+      "end": 0
+     },
+     {
+      "file": "backend/app/api/routes/private.py",
+      "start": 0,
+      "end": 0
+     }
+    ],
+    "neighbour": "",
+    "side": "",
+    "opens": false,
+    "inferred": false,
+    "col": 2,
+    "row": 0
+   },
+   {
+    "id": "server:backend/access",
+    "kind": "access",
+    "title": "Contrôle d'accès",
+    "detail": "",
+    "folders": [
+     "api/deps.py",
+     "core/security.py"
+    ],
+    "role": "Vérifie qui appelle avant de répondre.",
+    "proofs": [
+     {
+      "file": "backend/app/api/deps.py",
+      "start": 16,
+      "end": 16
+     },
+     {
+      "file": "backend/app/core/security.py",
+      "start": 25,
+      "end": 25
+     }
+    ],
+    "chips": [],
+    "neighbour": "",
+    "side": "",
+    "opens": false,
+    "inferred": false,
+    "col": 1,
+    "row": 1
+   },
+   {
+    "id": "server:backend/models",
+    "kind": "models",
+    "title": "Modèles",
+    "detail": "User · Item",
+    "folders": [
+     "models.py"
+    ],
+    "role": "La forme des données : champs, longueurs, tables.",
+    "proofs": [
+     {
+      "file": "backend/app/models.py",
+      "start": 49,
+      "end": 49
+     }
+    ],
+    "chips": [],
+    "neighbour": "",
+    "side": "",
+    "opens": false,
+    "inferred": false,
+    "col": 2,
+    "row": 1
+   },
+   {
+    "id": "server:backend/data",
+    "kind": "data",
+    "title": "Accès aux données",
+    "detail": "comptes",
+    "folders": [
+     "crud.py"
+    ],
+    "role": "Lit et écrit les données.",
+    "proofs": [
+     {
+      "file": "backend/app/crud.py",
+      "start": 14,
+      "end": 14
+     }
+    ],
+    "chips": [],
+    "neighbour": "",
+    "side": "",
+    "opens": false,
+    "inferred": false,
+    "col": 3,
+    "row": 1
+   },
+   {
+    "id": "stub:web:frontend",
+    "kind": "stub",
+    "title": "depuis",
+    "detail": "Application web",
+    "folders": [],
+    "role": "Application web : Les écrans dans le navigateur.",
+    "proofs": [
+     {
+      "file": "frontend/package.json",
+      "start": 41,
+      "end": 41
+     },
+     {
+      "file": "frontend/src/main.tsx",
+      "start": 43,
+      "end": 43
+     },
+     {
+      "file": "compose.override.yml",
+      "start": 96,
+      "end": 105
+     }
+    ],
+    "chips": [],
+    "neighbour": "web:frontend",
+    "side": "in",
+    "opens": true,
+    "inferred": false,
+    "col": 0,
+    "row": 0
+   },
+   {
+    "id": "stub:store:db",
+    "kind": "stub",
+    "title": "vers Base",
+    "detail": "◉ ligne enregistrée",
+    "folders": [],
+    "role": "Base : Garde les données du projet.",
+    "proofs": [
+     {
+      "file": "compose.override.yml",
+      "start": 48,
+      "end": 51
+     },
+     {
+      "file": "compose.yml",
+      "start": 3,
+      "end": 20
+     }
+    ],
+    "chips": [],
+    "neighbour": "store:db",
+    "side": "out",
+    "opens": false,
+    "inferred": false,
+    "col": 0,
+    "row": 0
+   },
+   {
+    "id": "stub:mail",
+    "kind": "stub",
+    "title": "vers Courriel",
+    "detail": "◉ courriel envoyé",
+    "folders": [],
+    "role": "Courriel : Envoie les courriels. En local, mailcatcher les attrape.",
+    "proofs": [
+     {
+      "file": "backend/app/utils.py",
+      "start": 7,
+      "end": 7
+     },
+     {
+      "file": "compose.override.yml",
+      "start": 90,
+      "end": 94
+     }
+    ],
+    "chips": [],
+    "neighbour": "mail",
+    "side": "out",
+    "opens": false,
+    "inferred": false,
+    "col": 0,
+    "row": 0
+   }
+  ],
+  "links": [
+   {
+    "id": "server:backend/entry>server:backend/routes",
+    "source": "server:backend/entry",
+    "target": "server:backend/routes",
+    "verb": "passe",
+    "back": "",
+    "detail": "routes",
+    "proofs": [
+     {
+      "file": "backend/app/main.py",
+      "start": 33,
+      "end": 33
+     }
+    ],
+    "inferred": false
+   },
+   {
+    "id": "server:backend/routes>server:backend/access",
+    "source": "server:backend/routes",
+    "target": "server:backend/access",
+    "verb": "vérifie la connexion",
+    "back": "",
+    "detail": "11 imports",
+    "proofs": [
+     {
+      "file": "backend/app/api/routes/items.py",
+      "start": 7,
+      "end": 7
+     },
+     {
+      "file": "backend/app/api/routes/login.py",
+      "start": 9,
+      "end": 9
+     },
+     {
+      "file": "backend/app/api/routes/login.py",
+      "start": 10,
+      "end": 10
+     }
+    ],
+    "inferred": false
+   },
+   {
+    "id": "server:backend/routes>server:backend/models",
+    "source": "server:backend/routes",
+    "target": "server:backend/models",
+    "verb": "valide",
+    "back": "",
+    "detail": "5 imports",
+    "proofs": [
+     {
+      "file": "backend/app/api/routes/items.py",
+      "start": 8,
+      "end": 8
+     },
+     {
+      "file": "backend/app/api/routes/login.py",
+      "start": 12,
+      "end": 12
+     },
+     {
+      "file": "backend/app/api/routes/private.py",
+      "start": 8,
+      "end": 11
+     }
+    ],
+    "inferred": false
+   },
+   {
+    "id": "server:backend/routes>server:backend/data",
+    "source": "server:backend/routes",
+    "target": "server:backend/data",
+    "verb": "utilise",
+    "back": "",
+    "detail": "2 imports",
+    "proofs": [
+     {
+      "file": "backend/app/api/routes/login.py",
+      "start": 8,
+      "end": 8
+     },
+     {
+      "file": "backend/app/api/routes/users.py",
+      "start": 7,
+      "end": 7
+     }
+    ],
+    "inferred": false
+   },
+   {
+    "id": "stub:web:frontend>server:backend/entry",
+    "source": "stub:web:frontend",
+    "target": "server:backend/entry",
+    "verb": "appelle",
+    "back": "",
+    "detail": "HTTP + JSON",
+    "proofs": [
+     {
+      "file": "frontend/src/main.tsx",
+      "start": 16,
+      "end": 16
+     },
+     {
+      "file": "frontend/playwright.config.ts",
+      "start": 27,
+      "end": 27
+     },
+     {
+      "file": "frontend/tests/utils/privateApi.ts",
+      "start": 5,
+      "end": 5
+     }
+    ],
+    "inferred": false
+   },
+   {
+    "id": "server:backend/routes>stub:store:db",
+    "source": "server:backend/routes",
+    "target": "stub:store:db",
+    "verb": "écrit (items)",
+    "back": "",
+    "detail": "SQL via SQLAlchemy, SQLModel",
+    "proofs": [
+     {
+      "file": "backend/app/api/routes/items.py",
+      "start": 69,
+      "end": 69
+     },
+     {
+      "file": "backend/app/api/routes/items.py",
+      "start": 70,
+      "end": 70
+     },
+     {
+      "file": "backend/app/api/routes/items.py",
+      "start": 93,
+      "end": 93
+     }
+    ],
+    "inferred": false
+   },
+   {
+    "id": "server:backend/data>stub:store:db",
+    "source": "server:backend/data",
+    "target": "stub:store:db",
+    "verb": "écrit (comptes)",
+    "back": "",
+    "detail": "SQL via SQLAlchemy, SQLModel",
+    "proofs": [
+     {
+      "file": "backend/app/crud.py",
+      "start": 14,
+      "end": 14
+     },
+     {
+      "file": "backend/app/crud.py",
+      "start": 15,
+      "end": 15
+     },
+     {
+      "file": "backend/app/crud.py",
+      "start": 28,
+      "end": 28
+     }
+    ],
+    "inferred": false
+   },
+   {
+    "id": "server:backend/routes>stub:mail",
+    "source": "server:backend/routes",
+    "target": "stub:mail",
+    "verb": "envoie",
+    "back": "",
+    "detail": "SMTP, attrapé en local",
+    "proofs": [
+     {
+      "file": "backend/app/api/routes/login.py",
+      "start": 13,
+      "end": 18
+     },
+     {
+      "file": "backend/app/api/routes/users.py",
+      "start": 27,
+      "end": 27
+     },
+     {
+      "file": "backend/app/api/routes/utils.py",
+      "start": 6,
+      "end": 6
+     }
+    ],
+    "inferred": false
+   }
+  ],
+  "outputs": [],
+  "around": [
+   {
+    "id": "settings",
+    "title": "Réglages",
+    "short": "réglages",
+    "detail": "lit le fichier .env",
+    "proofs": [
+     {
+      "file": "backend/app/core/config.py",
+      "start": 26,
+      "end": 26
+     },
+     {
+      "file": "backend/app/core/config.py",
+      "start": 29,
+      "end": 29
+     }
+    ]
+   },
+   {
+    "id": "migrations",
+    "title": "Migrations",
+    "short": "migrations",
+    "detail": "créent et modifient les tables, 5 fichiers",
+    "proofs": [
+     {
+      "file": "backend/app/alembic/versions/1a31ce608336_add_cascade_delete_relationships.py",
+      "start": 0,
+      "end": 0
+     },
+     {
+      "file": "backend/app/alembic/versions/9c0a54914c78_add_max_length_for_string_varchar_.py",
+      "start": 0,
+      "end": 0
+     },
+     {
+      "file": "backend/app/alembic/versions/d98dd8ec85a3_edit_replace_id_integers_in_all_models_.py",
+      "start": 0,
+      "end": 0
+     }
+    ]
+   }
+  ]
+ },
+ "web": {
+  "box": "web:frontend",
+  "title": "Application web",
+  "folder": "frontend/src/",
+  "sentence": "Les écrans dans le navigateur : ils affichent les pages et appellent le serveur.",
+  "parts": [
+   {
+    "id": "web:frontend/entry",
+    "kind": "entry",
+    "title": "Démarrage",
+    "detail": "",
+    "folders": [
+     "main.tsx"
+    ],
+    "role": "Lance l'appli et branche les pages.",
+    "proofs": [
+     {
+      "file": "frontend/src/main.tsx",
+      "start": 43,
+      "end": 43
+     }
+    ],
+    "chips": [],
+    "neighbour": "",
+    "side": "",
+    "opens": false,
+    "inferred": false,
+    "col": 1,
+    "row": 0
+   },
+   {
+    "id": "web:frontend/pages",
+    "kind": "pages",
+    "title": "Pages",
+    "detail": "connexion · items · admin",
+    "folders": [
+     "routes/"
+    ],
+    "role": "Une adresse du navigateur = une page. 10 fichiers.",
+    "proofs": [
+     {
+      "file": "frontend/src/routes/__root.tsx",
+      "start": 7,
+      "end": 7
+     },
+     {
+      "file": "frontend/src/routes/_layout.tsx",
+      "start": 12,
+      "end": 12
+     },
+     {
+      "file": "frontend/src/routes/_layout/admin.tsx",
+      "start": 19,
+      "end": 19
+     }
+    ],
+    "chips": [],
+    "neighbour": "",
+    "side": "",
+    "opens": false,
+    "inferred": false,
+    "col": 2,
+    "row": 0
+   },
+   {
+    "id": "web:frontend/screens",
+    "kind": "screens",
+    "title": "Écrans",
+    "detail": "Items · Admin · Profil",
+    "folders": [
+     "components/"
+    ],
+    "role": "Formulaires, tableaux, menus de chaque page.",
+    "proofs": [
+     {
+      "file": "frontend/src/components/Admin/AddUser.tsx",
+      "start": 0,
+      "end": 0
+     },
+     {
+      "file": "frontend/src/components/Admin/DeleteUser.tsx",
+      "start": 0,
+      "end": 0
+     },
+     {
+      "file": "frontend/src/components/Admin/EditUser.tsx",
+      "start": 0,
+      "end": 0
+     }
+    ],
+    "chips": [],
+    "neighbour": "",
+    "side": "",
+    "opens": false,
+    "inferred": false,
+    "col": 3,
+    "row": 0
+   },
+   {
+    "id": "web:frontend/client",
+    "kind": "client",
+    "title": "Client",
+    "detail": "généré",
+    "folders": [
+     "client/"
+    ],
+    "role": "Fonctions d'appel au serveur. Recréées depuis le serveur, pas écrites à la main.",
+    "proofs": [
+     {
+      "file": "frontend/src/client/sdk.gen.ts",
+      "start": 0,
+      "end": 0
+     },
+     {
+      "file": "frontend/src/client/schemas.gen.ts",
+      "start": 0,
+      "end": 0
+     },
+     {
+      "file": "frontend/src/client/types.gen.ts",
+      "start": 0,
+      "end": 0
+     }
+    ],
+    "chips": [],
+    "neighbour": "",
+    "side": "",
+    "opens": false,
+    "inferred": false,
+    "col": 4,
+    "row": 0
+   },
+   {
+    "id": "web:frontend/session",
+    "kind": "session",
+    "title": "Connexion",
+    "detail": "garde la preuve",
+    "folders": [
+     "hooks/useAuth.ts"
+    ],
+    "role": "Garde la preuve de connexion dans le navigateur.",
+    "proofs": [
+     {
+      "file": "frontend/src/hooks/useAuth.ts",
+      "start": 45,
+      "end": 45
+     }
+    ],
+    "chips": [],
+    "neighbour": "",
+    "side": "",
+    "opens": false,
+    "inferred": false,
+    "col": 1,
+    "row": 1
+   },
+   {
+    "id": "stub:actor:user",
+    "kind": "stub",
+    "title": "depuis",
+    "detail": "Utilisateur",
+    "folders": [],
+    "role": "Utilisateur : Une personne dans un navigateur. Supposé : déduit de l'application web.",
+    "proofs": [
+     {
+      "file": "frontend/package.json",
+      "start": 41,
+      "end": 41
+     },
+     {
+      "file": "frontend/src/main.tsx",
+      "start": 43,
+      "end": 43
+     }
+    ],
+    "chips": [],
+    "neighbour": "actor:user",
+    "side": "in",
+    "opens": false,
+    "inferred": false,
+    "col": 0,
+    "row": 0
+   },
+   {
+    "id": "stub:server:backend",
+    "kind": "stub",
+    "title": "vers",
+    "detail": "Serveur",
+    "folders": [],
+    "role": "Serveur : Reçoit les appels, vérifie qui appelle, lit et écrit la base.",
+    "proofs": [
+     {
+      "file": "backend/app/main.py",
+      "start": 17,
+      "end": 17
+     },
+     {
+      "file": "compose.override.yml",
+      "start": 58,
+      "end": 88
+     }
+    ],
+    "chips": [],
+    "neighbour": "server:backend",
+    "side": "out",
+    "opens": true,
+    "inferred": false,
+    "col": 0,
+    "row": 0
+   }
+  ],
+  "links": [
+   {
+    "id": "web:frontend/entry>web:frontend/pages",
+    "source": "web:frontend/entry",
+    "target": "web:frontend/pages",
+    "verb": "branche",
+    "back": "",
+    "detail": "1 import",
+    "proofs": [
+     {
+      "file": "frontend/src/main.tsx",
+      "start": 14,
+      "end": 14
+     }
+    ],
+    "inferred": false
+   },
+   {
+    "id": "web:frontend/pages>web:frontend/screens",
+    "source": "web:frontend/pages",
+    "target": "web:frontend/screens",
+    "verb": "affiche",
+    "back": "",
+    "detail": "19 imports",
+    "proofs": [
+     {
+      "file": "frontend/src/routes/__root.tsx",
+      "start": 4,
+      "end": 4
+     },
+     {
+      "file": "frontend/src/routes/__root.tsx",
+      "start": 5,
+      "end": 5
+     },
+     {
+      "file": "frontend/src/routes/_layout.tsx",
+      "start": 3,
+      "end": 3
+     }
+    ],
+    "inferred": false
+   },
+   {
+    "id": "web:frontend/screens>web:frontend/client",
+    "source": "web:frontend/screens",
+    "target": "web:frontend/client",
+    "verb": "appelle",
+    "back": "",
+    "detail": "23 imports",
+    "proofs": [
+     {
+      "file": "frontend/src/components/Admin/AddUser.tsx",
+      "start": 8,
+      "end": 8
+     },
+     {
+      "file": "frontend/src/components/Admin/AddUser.tsx",
+      "start": 32,
+      "end": 32
+     },
+     {
+      "file": "frontend/src/components/Admin/DeleteUser.tsx",
+      "start": 6,
+      "end": 6
+     }
+    ],
+    "inferred": false
+   },
+   {
+    "id": "web:frontend/pages>web:frontend/session",
+    "source": "web:frontend/pages",
+    "target": "web:frontend/session",
+    "verb": "qui est connecté ?",
+    "back": "",
+    "detail": "8 imports",
+    "proofs": [
+     {
+      "file": "frontend/src/routes/_layout.tsx",
+      "start": 10,
+      "end": 10
+     },
+     {
+      "file": "frontend/src/routes/_layout/admin.tsx",
+      "start": 10,
+      "end": 10
+     },
+     {
+      "file": "frontend/src/routes/_layout/index.tsx",
+      "start": 3,
+      "end": 3
+     }
+    ],
+    "inferred": false
+   },
+   {
+    "id": "web:frontend/session>web:frontend/client",
+    "source": "web:frontend/session",
+    "target": "web:frontend/client",
+    "verb": "joint la preuve",
+    "back": "",
+    "detail": "2 imports",
+    "proofs": [
+     {
+      "file": "frontend/src/hooks/useAuth.ts",
+      "start": 4,
+      "end": 10
+     },
+     {
+      "file": "frontend/src/hooks/useAuth.ts",
+      "start": 11,
+      "end": 11
+     }
+    ],
+    "inferred": false
+   },
+   {
+    "id": "stub:actor:user>web:frontend/entry",
+    "source": "stub:actor:user",
+    "target": "web:frontend/entry",
+    "verb": "ouvre",
+    "back": "",
+    "detail": "clavier et souris",
+    "proofs": [
+     {
+      "file": "frontend/package.json",
+      "start": 41,
+      "end": 41
+     },
+     {
+      "file": "frontend/src/main.tsx",
+      "start": 43,
+      "end": 43
+     }
+    ],
+    "inferred": false
+   },
+   {
+    "id": "web:frontend/client>stub:server:backend",
+    "source": "web:frontend/client",
+    "target": "stub:server:backend",
+    "verb": "envoie",
+    "back": "",
+    "detail": "HTTP + JSON",
+    "proofs": [
+     {
+      "file": "frontend/src/client/sdk.gen.ts",
+      "start": 0,
+      "end": 0
+     },
+     {
+      "file": "frontend/src/client/schemas.gen.ts",
+      "start": 0,
+      "end": 0
+     },
+     {
+      "file": "frontend/src/client/types.gen.ts",
+      "start": 0,
+      "end": 0
+     }
+    ],
+    "inferred": false
+   }
+  ],
+  "outputs": [
+   {
+    "id": "out:web:frontend",
+    "box": "web:frontend/screens",
+    "label": "écran mis à jour",
+    "detail": "",
+    "proofs": [
+     {
+      "file": "frontend/src/main.tsx",
+      "start": 43,
+      "end": 43
+     }
+    ]
+   }
+  ],
+  "around": [
+   {
+    "id": "tests",
+    "title": "Tests des écrans",
+    "short": "tests",
+    "detail": "Playwright",
+    "proofs": [
+     {
+      "file": "frontend/playwright.config.ts",
+      "start": 0,
+      "end": 0
+     },
+     {
+      "file": "frontend/tests/admin.spec.ts",
+      "start": 0,
+      "end": 0
+     },
+     {
+      "file": "frontend/tests/auth.setup.ts",
+      "start": 0,
+      "end": 0
+     }
+    ]
+   },
+   {
+    "id": "ui-kit",
+    "title": "Kit d'interface",
+    "short": "kit d'interface",
+    "detail": "boutons, champs, tableaux réutilisés",
+    "proofs": [
+     {
+      "file": "frontend/src/components/ui/alert.tsx",
+      "start": 0,
+      "end": 0
+     },
+     {
+      "file": "frontend/src/components/ui/avatar.tsx",
+      "start": 0,
+      "end": 0
+     },
+     {
+      "file": "frontend/src/components/ui/badge.tsx",
+      "start": 0,
+      "end": 0
+     }
+    ]
+   }
+  ]
+ },
+ "library": {
+  "box": "library:sqlite_utils",
+  "title": "Bibliothèque",
+  "folder": "sqlite_utils/",
+  "sentence": "Le code que d'autres programmes importent.",
+  "parts": [
+   {
+    "id": "library:sqlite_utils/entry",
+    "kind": "entry",
+    "title": "Porte d'entrée",
+    "detail": "",
+    "folders": [
+     "__init__.py"
+    ],
+    "role": "Crée l'appli et passe les appels aux routes.",
+    "proofs": [
+     {
+      "file": "sqlite_utils/__init__.py",
+      "start": 1,
+      "end": 1
+     }
+    ],
+    "chips": [],
+    "neighbour": "",
+    "side": "",
+    "opens": false,
+    "inferred": false,
+    "col": 1,
+    "row": 0
+   },
+   {
+    "id": "library:sqlite_utils/data",
+    "kind": "data",
+    "title": "Accès aux données",
+    "detail": "Database · Table",
+    "folders": [
+     "db.py"
+    ],
+    "role": "Lit et écrit les données.",
+    "proofs": [
+     {
+      "file": "sqlite_utils/db.py",
+      "start": 592,
+      "end": 592
+     }
+    ],
+    "chips": [],
+    "neighbour": "",
+    "side": "",
+    "opens": false,
+    "inferred": false,
+    "col": 2,
+    "row": 0
+   },
+   {
+    "id": "library:sqlite_utils/code:migrations.py",
+    "kind": "code",
+    "title": "Migrations",
+    "detail": "",
+    "folders": [
+     "migrations.py"
+    ],
+    "role": "Une partie du code, rangée à part dans le dossier.",
+    "proofs": [
+     {
+      "file": "sqlite_utils/migrations.py",
+      "start": 0,
+      "end": 0
+     }
+    ],
+    "chips": [],
+    "neighbour": "",
+    "side": "",
+    "opens": false,
+    "inferred": false,
+    "col": 1,
+    "row": 1
+   },
+   {
+    "id": "library:sqlite_utils/plugins",
+    "kind": "plugins",
+    "title": "Extensions",
+    "detail": "",
+    "folders": [
+     "hookspecs.py",
+     "plugins.py"
+    ],
+    "role": "D'autres paquets s'y branchent pour ajouter ce qu'ils font.",
+    "proofs": [
+     {
+      "file": "sqlite_utils/hookspecs.py",
+      "start": 4,
+      "end": 4
+     },
+     {
+      "file": "sqlite_utils/plugins.py",
+      "start": 3,
+      "end": 3
+     }
+    ],
+    "chips": [],
+    "neighbour": "",
+    "side": "",
+    "opens": false,
+    "inferred": false,
+    "col": 2,
+    "row": 1
+   },
+   {
+    "id": "library:sqlite_utils/code:create_table_parser.py",
+    "kind": "code",
+    "title": "Lecture",
+    "detail": "Check · Unique",
+    "folders": [
+     "create_table_parser.py"
+    ],
+    "role": "Une partie du code, rangée à part dans le dossier.",
+    "proofs": [
+     {
+      "file": "sqlite_utils/create_table_parser.py",
+      "start": 0,
+      "end": 0
+     }
+    ],
+    "chips": [],
+    "neighbour": "",
+    "side": "",
+    "opens": false,
+    "inferred": false,
+    "col": 3,
+    "row": 1
+   },
+   {
+    "id": "library:sqlite_utils/code:utils.py",
+    "kind": "code",
+    "title": "Outils",
+    "detail": "TypeTracker · ValueTracker",
+    "folders": [
+     "utils.py"
+    ],
+    "role": "Une partie du code, rangée à part dans le dossier.",
+    "proofs": [
+     {
+      "file": "sqlite_utils/utils.py",
+      "start": 0,
+      "end": 0
+     }
+    ],
+    "chips": [],
+    "neighbour": "",
+    "side": "",
+    "opens": false,
+    "inferred": false,
+    "col": 4,
+    "row": 1
+   },
+   {
+    "id": "stub:actor:program",
+    "kind": "stub",
+    "title": "depuis",
+    "detail": "Programme Python",
+    "folders": [],
+    "role": "Programme Python : Un autre programme qui utilise la bibliothèque. Supposé : déduit de ce qu'elle exporte.",
+    "proofs": [
+     {
+      "file": "sqlite_utils/__init__.py",
+      "start": 1,
+      "end": 1
+     }
+    ],
+    "chips": [],
+    "neighbour": "actor:program",
+    "side": "in",
+    "opens": false,
+    "inferred": false,
+    "col": 0,
+    "row": 0
+   },
+   {
+    "id": "stub:cli:sqlite-utils",
+    "kind": "stub",
+    "title": "depuis",
+    "detail": "Commande",
+    "folders": [],
+    "role": "Commande : Lit ce qui est tapé dans le terminal et fait le travail demandé.",
+    "proofs": [
+     {
+      "file": "pyproject.toml",
+      "start": 72,
+      "end": 72
+     }
+    ],
+    "chips": [],
+    "neighbour": "cli:sqlite-utils",
+    "side": "in",
+    "opens": false,
+    "inferred": false,
+    "col": 0,
+    "row": 0
+   },
+   {
+    "id": "stub:sqlite-file",
+    "kind": "stub",
+    "title": "vers Fichier SQLite",
+    "detail": "◉ fichier .db modifié",
+    "folders": [],
+    "role": "Fichier SQLite : La base est un simple fichier, ouvert avec sqlite3.",
+    "proofs": [
+     {
+      "file": "sqlite_utils/db.py",
+      "start": 592,
+      "end": 592
+     },
+     {
+      "file": "sqlite_utils/db.py",
+      "start": 611,
+      "end": 611
+     }
+    ],
+    "chips": [],
+    "neighbour": "sqlite-file",
+    "side": "out",
+    "opens": false,
+    "inferred": false,
+    "col": 0,
+    "row": 0
+   }
+  ],
+  "links": [
+   {
+    "id": "library:sqlite_utils/entry>library:sqlite_utils/data",
+    "source": "library:sqlite_utils/entry",
+    "target": "library:sqlite_utils/data",
+    "verb": "expose",
+    "back": "",
+    "detail": "1 import",
+    "proofs": [
+     {
+      "file": "sqlite_utils/__init__.py",
+      "start": 1,
+      "end": 1
+     }
+    ],
+    "inferred": false
+   },
+   {
+    "id": "library:sqlite_utils/data>library:sqlite_utils/plugins",
+    "source": "library:sqlite_utils/data",
+    "target": "library:sqlite_utils/plugins",
+    "verb": "utilise",
+    "back": "",
+    "detail": "1 import",
+    "proofs": [
+     {
+      "file": "sqlite_utils/db.py",
+      "start": 27,
+      "end": 27
+     }
+    ],
+    "inferred": false
+   },
+   {
+    "id": "library:sqlite_utils/data>library:sqlite_utils/code:create_table_parser.py",
+    "source": "library:sqlite_utils/data",
+    "target": "library:sqlite_utils/code:create_table_parser.py",
+    "verb": "utilise",
+    "back": "",
+    "detail": "1 import",
+    "proofs": [
+     {
+      "file": "sqlite_utils/db.py",
+      "start": 29,
+      "end": 42
+     }
+    ],
+    "inferred": false
+   },
+   {
+    "id": "library:sqlite_utils/data>library:sqlite_utils/code:utils.py",
+    "source": "library:sqlite_utils/data",
+    "target": "library:sqlite_utils/code:utils.py",
+    "verb": "utilise",
+    "back": "",
+    "detail": "1 import",
+    "proofs": [
+     {
+      "file": "sqlite_utils/db.py",
+      "start": 43,
+      "end": 55
+     }
+    ],
+    "inferred": false
+   },
+   {
+    "id": "library:sqlite_utils/entry>library:sqlite_utils/code:migrations.py",
+    "source": "library:sqlite_utils/entry",
+    "target": "library:sqlite_utils/code:migrations.py",
+    "verb": "expose",
+    "back": "",
+    "detail": "1 import",
+    "proofs": [
+     {
+      "file": "sqlite_utils/__init__.py",
+      "start": 3,
+      "end": 3
+     }
+    ],
+    "inferred": false
+   },
+   {
+    "id": "stub:actor:program>library:sqlite_utils/entry",
+    "source": "stub:actor:program",
+    "target": "library:sqlite_utils/entry",
+    "verb": "importe",
+    "back": "",
+    "detail": "import",
+    "proofs": [
+     {
+      "file": "sqlite_utils/__init__.py",
+      "start": 1,
+      "end": 1
+     }
+    ],
+    "inferred": false
+   },
+   {
+    "id": "stub:cli:sqlite-utils>library:sqlite_utils/entry",
+    "source": "stub:cli:sqlite-utils",
+    "target": "library:sqlite_utils/entry",
+    "verb": "appelle",
+    "back": "",
+    "detail": "8 imports",
+    "proofs": [
+     {
+      "file": "sqlite_utils/cli.py",
+      "start": 22,
+      "end": 22
+     },
+     {
+      "file": "sqlite_utils/cli.py",
+      "start": 23,
+      "end": 23
+     }
+    ],
+    "inferred": false
+   },
+   {
+    "id": "library:sqlite_utils/data>stub:sqlite-file",
+    "source": "library:sqlite_utils/data",
+    "target": "stub:sqlite-file",
+    "verb": "lit et écrit",
+    "back": "",
+    "detail": "sqlite3.connect(fichier)",
+    "proofs": [
+     {
+      "file": "sqlite_utils/db.py",
+      "start": 592,
+      "end": 592
+     },
+     {
+      "file": "sqlite_utils/db.py",
+      "start": 611,
+      "end": 611
+     }
+    ],
+    "inferred": false
+   }
+  ],
+  "outputs": [],
+  "around": [
+   {
+    "id": "more-0",
+    "title": "recipes",
+    "short": "recipes",
+    "detail": "recipes.py",
+    "proofs": [
+     {
+      "file": "sqlite_utils/recipes.py",
+      "start": 0,
+      "end": 0
+     }
+    ]
+   },
+   {
+    "id": "more-1",
+    "title": "Lancement",
+    "short": "lancement",
+    "detail": "__main__.py",
+    "proofs": [
+     {
+      "file": "sqlite_utils/__main__.py",
+      "start": 0,
+      "end": 0
+     }
+    ]
+   }
+  ]
+ }
+}

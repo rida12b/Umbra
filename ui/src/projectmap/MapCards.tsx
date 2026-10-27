@@ -33,6 +33,7 @@ export function HintCard({ hint, at }: { hint: Hint; at: Place }) {
       {hint.proofs.length > SHOWN_PROOFS && <div className="mono">+ {hint.proofs.length - SHOWN_PROOFS} autres</div>}
       {hint.guess && <div className="guess">Supposé : déduit, pas lu tel quel dans le code.</div>}
       {hint.opens && <div className="hint">clic : voir dedans →</div>}
+      {hint.action && <div className="hint">{hint.action}</div>}
     </div>
   );
 }

@@ -21,6 +21,7 @@ export function App() {
   const route = useRoute();
   const [projects, setProjects] = useState<Projects>(null);
   const outdated = useNewVersion();
+  const [crumb, setCrumb] = useState<string | null>(null); // the box whose inside is open (Level 1)
 
   useEffect(() => {
     whenSignedOut(() => setProjects({ error: new ApiError(401, "signed out") }));
@@ -61,6 +62,7 @@ export function App() {
         <TopBar
           project={project}
           activity={route.node === ACTIVITY_VIEW}
+          inside={route.node === ACTIVITY_VIEW || !route.box ? null : crumb}
           theme={theme}
           onToggleTheme={toggleTheme}
         />
@@ -77,7 +79,7 @@ export function App() {
           </StateMessage>
         )}
         {project && (
-          <ProjectPage key={project.id} project={project} route={route} />
+          <ProjectPage key={project.id} project={project} route={route} onCrumb={setCrumb} />
         )}
       </div>
     </LiveContext.Provider>

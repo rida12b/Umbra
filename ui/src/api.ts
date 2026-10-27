@@ -80,6 +80,36 @@ export interface SystemMap {
   actions: number;
 }
 
+/** One part inside a box (Level 1, #105), or a grey stub standing for a neighbour of the box on Level 0. */
+export interface InsidePart {
+  id: string;
+  kind: string; // « entry », « routes », « data »…, or « stub »
+  title: string;
+  detail: string;
+  folders: string[]; // mono lines, relative to the box's folder
+  role: string;
+  proofs: Proof[];
+  chips: Proof[]; // files drawn as chips inside the part (Routes)
+  neighbour: string; // a stub: the Level 0 box it stands for
+  side: "in" | "out" | "";
+  opens: boolean; // a stub whose neighbour has an inside too
+  inferred: boolean;
+  col: number; // stored by the engine: the parts never move
+  row: number;
+}
+
+/** Level 1 (ADR-0007): the inside of one box, ≤ 7 parts left → right, its neighbours as stubs. */
+export interface InsideMap {
+  box: string;
+  title: string;
+  folder: string;
+  sentence: string;
+  parts: InsidePart[];
+  links: SystemLink[];
+  outputs: SystemOutput[];
+  around: AroundItem[];
+}
+
 /** One numbered place of a lit path, under its box: « 3 models.py — ajouter le champ ». */
 export interface LitStep {
   n: number;
@@ -189,6 +219,8 @@ export const api = {
   projects: () => call<Project[]>("/v1/projects"),
   /** `retry`: after a failed read, read the project again at once (« Réessayer »). */
   system: (id: string, retry = false) => call<SystemMap>(`${project(id)}/system${retry ? "?relire=true" : ""}`),
+  /** Level 1: the inside of one box of the map; 404 when it has none. */
+  inside: (id: string, box: string) => call<InsideMap>(`${project(id)}/system/inside?box=${encodeURIComponent(box)}`),
   activity: (id: string) => call<Turn[]>(`${project(id)}/activity`),
   /** What is lit now (a tab opened after Claude's `show` call); null when nothing. */
   shownNow: (id: string) => call<Highlight | null>(`${project(id)}/show`),

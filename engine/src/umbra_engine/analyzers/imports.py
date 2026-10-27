@@ -14,6 +14,8 @@ _JS = re.compile(
     re.MULTILINE,
 )
 _PY_FROM = re.compile(r"^\s*from\s+(\.*[\w.]*)\s+import\b")
+_PY_FROM_NAMES = re.compile(r"^\s*from\s+(\.*[\w.]*)\s+import\s+(.+)$", re.DOTALL)
+_MODULE_NAME = re.compile(r"^[a-z_][a-z0-9_]*$")
 _PY_IMPORT = re.compile(r"^\s*import\s+(.+)$", re.DOTALL)
 _JAVA = re.compile(r"^\s*import\s+(?:static\s+)?(\w+(?:\.\w+)*(?:\.\*)?)\s*;?")
 _CSHARP = re.compile(r"^\s*(?:global\s+)?using\s+(?:static\s+)?(?:\w+\s*=\s*)?([\w.]+)\s*;")
@@ -60,6 +62,21 @@ def _targets(language: str, statement: str) -> list[str]:
     if language == "ruby":
         return _first(_RUBY, statement)
     return []
+
+
+def imported_names(language: str, statement: str) -> list[str]:
+    """`from app import crud, User` → `app.crud`: a lower-case name taken from a package may be one of
+    its modules. Only a guess (a function is lower-case too): the linker keeps the ones that are files."""
+    if language != "python":
+        return []
+    from_import = _PY_FROM_NAMES.match(statement)
+    if from_import is None:
+        return []
+    module, names = from_import.group(1), from_import.group(2)
+    names = names.replace("(", " ").replace(")", " ").replace("\\", " ")
+    found = [part.split(" as ")[0].strip() for part in names.split(",")]
+    joined = module if module.endswith(".") else f"{module}."
+    return [f"{joined}{name}" for name in found if _MODULE_NAME.match(name)]
 
 
 def _python(statement: str) -> list[str]:

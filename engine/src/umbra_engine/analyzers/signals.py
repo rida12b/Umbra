@@ -49,6 +49,11 @@ PY_SIGNALS: dict[str, re.Pattern[str]] = {
     "table": re.compile(r"^\s*class\s+(?P<name>\w+)\((?=[^)]*\btable\s*=\s*True|\s*models\.Model\s*\))"),
     "tablename": re.compile(r"^\s*__tablename__\s*=\s*[\"'](?P<name>\w+)[\"']"),
     "plugins": re.compile(r"^\s*import\s+pluggy\b|^\s*from\s+pluggy\s+import\b"),
+    "mount": re.compile(
+        r"\.include_router\(|\.register_blueprint\(|\.add_url_rule\("
+    ),  # routes hung on the app
+    "settings": re.compile(r"^\s*class\s+\w+\(\s*(?:BaseSettings|Settings)\b"),
+    "env-file": re.compile(r"\benv_file\s*="),
     "format:json": re.compile(r"^\s*import\s+json\b"),
     "format:csv": re.compile(r"^\s*import\s+csv\b"),
     "format:table": re.compile(r"^\s*import\s+tabulate\b|^\s*from\s+tabulate\s+import\b"),
@@ -64,13 +69,16 @@ JS_SIGNALS: dict[str, re.Pattern[str]] = {
     "db-driver": re.compile(rf"""(?:from\s+|require\()\s*['"](?P<name>{_DRIVER_JS})['"]"""),
     "smtp": re.compile(r"""(?:from\s+|require\()\s*['"]nodemailer['"]"""),
     "sentry": re.compile(r"""(?:from\s+|require\()\s*['"]@sentry/"""),
+    "routing": re.compile(r"\bcreateFileRoute\(|\bcreateRootRoute\w*\(|\bcreateBrowserRouter\(|<Route\b"),
+    "token-store": re.compile(r"""\b(?:localStorage|sessionStorage)\.setItem\(\s*["'`][\w-]*[Tt]oken"""),
+    "mount": re.compile(r"""\bapp\.use\(\s*["'`]/"""),
     "auth": re.compile(r"""(?:from\s+|require\()\s*['"](?:next-auth|passport|jsonwebtoken)['"]"""),
 }
 _EXPORTS = re.compile(r"^__all__\s*=|^from\s+\.\w*\s+import\s+[A-Z_]")
 
 
 class SignalsAnalyzer:
-    producer = "signals@1.1"
+    producer = "signals@1.2"
 
     def accepts(self, file: GuardedFile) -> bool:
         name = posixpath.basename(file.rel_path).lower()

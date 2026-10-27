@@ -137,7 +137,8 @@ def test_command_and_library_over_an_sqlite_file_without_compose(client, auth, m
         "Un outil en ligne de commande et une bibliothèque Python"
         " pour remplir et modifier des fichiers SQLite."
     )
-    assert {b["title"] for b in system["boxes"] if b["opens"]} == {"Commande", "Bibliothèque"}
+    # The command is one file: no inside to zoom into (#105), so no « voir dedans » mark.
+    assert {b["title"] for b in system["boxes"] if b["opens"]} == {"Bibliothèque"}
 
 
 def test_every_box_and_arrow_has_its_proof(client, auth, make_repo):
