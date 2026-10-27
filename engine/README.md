@@ -62,6 +62,13 @@ files say without any LLM: who comes in (ENTRÉE), the parts that run left to ri
 arrow or output for its proof (file and lines); dashed means deduced, not read. Boxes keep their place across
 reloads and re-indexing.
 
+Click a box with the round mark (or press Enter on it) to see its inside (Level 1,
+`GET /v1/projects/<id>/system/inside?box=<box id>`): up to 7 parts in the same shapes and words, from hard signals
+only (a server: entry, routes, access control, models, data access; a web app: start, pages, screens, client,
+sign-in; anything else: entry, data access, then its biggest files), its neighbours on the map as grey stubs at the
+edges (a click goes to them), and what sits around folded into `+ N autour`. Esc goes back up. A box with fewer than
+2 parts has no inside and no mark.
+
 ## Ask in Claude Code, see the answer on the map (`/umbra`)
 
 The Claude Code plugin in `plugin/` registers the `umbra` MCP server (`umbra-engine mcp`, so `umbra-engine` must

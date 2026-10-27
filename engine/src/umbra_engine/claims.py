@@ -7,7 +7,7 @@ Status = Literal["fact", "hypothesis", "observation"]
 Kind = Literal[
     "module", "function", "class", "method", "type", "namespace", "symbol", "import",
     "service", "image", "port", "directory", "workload", "k8s-service", "ingress", "labels", "resource",
-    "package", "signal",
+    "package", "signal", "import-name",
 ]  # fmt: skip
 Relation = Literal[
     "defines", "imports", "calls",
@@ -18,6 +18,7 @@ Relation = Literal[
 
 DEFINES = "defines"
 IMPORTS = "imports"
+IMPORTED_NAME: Kind = "import-name"  # object kind of `from pkg import name`: maybe the module `pkg.name`
 CALLS = "calls"
 # Declarations (Facts about what configuration says, never proof that anything runs):
 DECLARES = "declares"

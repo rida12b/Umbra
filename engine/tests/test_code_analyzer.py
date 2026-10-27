@@ -85,10 +85,13 @@ def test_definitions_are_facts_with_qualified_names_and_exact_lines(repo):
 
 
 def test_imports_are_facts_naming_their_target(repo):
-    py = {c.object for c in claims_of(repo, "app/service.py") if c.relation == IMPORTS}
+    py = {c.object for c in claims_of(repo, "app/service.py") if c.relation == IMPORTS and c.status == "fact"}
     ts = {c.object for c in claims_of(repo, "web/auth.ts") if c.relation == IMPORTS}
     go = {c.object for c in claims_of(repo, "cmd/main.go") if c.relation == IMPORTS}
     assert py == {"os", "app.core"}
+    # `from app.core import db`: maybe the module `app.core.db`, only ever a guess (#105)
+    names = [c for c in claims_of(repo, "app/service.py") if c.object_kind == "import-name"]
+    assert [(c.object, c.status) for c in names] == [("app.core.db", "hypothesis")]
     assert ts == {"@tanstack/react-query", "../client"}
     assert go == {"net/http"}
 

@@ -130,7 +130,7 @@ def _command_and_library(facts: Facts, root: str, files: set[str], services: lis
     if exports:
         package = posixpath.dirname(exports[0].file)
         lib_files = {f for f in files if under(package, f)} - cli_files
-        detail, main = _main_classes(facts, lib_files)
+        detail, main = main_classes(facts, lib_files)
         name = posixpath.basename(package) or facts.name
         folder = posixpath.basename(main) if main else _slash(package)
         units.append(Unit(f"library:{name}", "library", package, lib_files, exports, detail or name, folder))
@@ -151,7 +151,7 @@ def _module_files(root: str, target: str, files: set[str]) -> set[str]:
     }
 
 
-def _main_classes(facts: Facts, files: set[str]) -> tuple[str, str]:
+def main_classes(facts: Facts, files: set[str]) -> tuple[str, str]:
     """The two largest classes of the library's file holding the most class lines, and that file."""
     sizes: dict[str, list[tuple[int, int, str]]] = {}
     for claim in facts.classes:

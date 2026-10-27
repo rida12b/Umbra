@@ -125,3 +125,53 @@ test("a question asked in Claude Code lights its answer on the open map within 2
   await expect(bar).toHaveCount(0);
   expect(await (await page.request.get(`/v1/projects/${project}/show`, { headers })).json()).toBeNull();
 });
+
+test("a click on a box zooms into it: its parts, its neighbours as stubs, the proof on hover; Esc goes up (#105)", async ({ page }) => {
+  const project = await signIn(page);
+  await page.goto(`/#/p/${project}`);
+  await page.getByRole("button", { name: /^Serveur/ }).click();
+  await expect(page).toHaveURL(/box=server/);
+  const crumbs = page.getByRole("navigation", { name: "Où vous êtes" });
+  await expect(crumbs.getByRole("button", { name: "Vue d'ensemble" })).toBeVisible();
+  await expect(crumbs.locator("[aria-current=page]")).toHaveText("Serveur");
+  await expect(page.getByRole("heading", { name: /Serveur/ })).toContainText("api/app/");
+  await expect(page.getByRole("button", { name: /^Porte d'entrée/ })).toBeVisible();
+  await expect(page.getByRole("button", { name: "depuis, Application web" })).toBeVisible();
+  await expect(page.getByText("ENTRÉE", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: /^Porte d'entrée/ }).focus(); // keyboard too: the same card as the mouse
+  await expect(page.getByRole("tooltip")).toContainText("api/app/main.py:5");
+  await page.keyboard.press("Escape"); // nothing selected: up to Level 0
+  await expect(page).not.toHaveURL(/box=/);
+  await expect(page.getByRole("button", { name: /^Serveur/ })).toBeVisible();
+
+  // Enter on a focused box zooms in too; a stub goes back to that neighbour, selected on Level 0.
+  await page.getByRole("button", { name: /^Serveur/ }).focus();
+  await page.keyboard.press("Enter");
+  await page.getByRole("button", { name: /^vers Base/ }).click();
+  await expect(page).not.toHaveURL(/box=/);
+  await expect(page.getByRole("button", { name: /^Base/ })).toHaveAttribute("aria-pressed", "true");
+});
+
+test("Back after zooming in comes back to the whole map; a link to an inside opens it (#105)", async ({ page }) => {
+  const project = await signIn(page);
+  await page.goto(`/#/p/${project}?box=server%3Aapi`);
+  await expect(page.getByRole("button", { name: /^Porte d'entrée/ })).toBeVisible();
+  await page.getByRole("button", { name: "Vue d'ensemble" }).click();
+  await expect(page.getByRole("button", { name: /^Serveur/ })).toBeVisible();
+  await page.goBack();
+  await expect(page.getByRole("button", { name: /^Porte d'entrée/ })).toBeVisible();
+});
+
+test("a question answered from Claude Code while a box is open lights it on the whole map; a file inside lights its box (#104, #105)", async ({ page, isMobile }) => {
+  test.skip(isMobile, "one tab is enough: the highlight is shared by every tab of the Project");
+  const project = await signIn(page);
+  const headers = { Authorization: `Bearer ${readFileSync(state().token, "utf-8").trim()}` };
+  await page.goto(`/#/p/${project}?box=server%3Aapi`);
+  await expect(page.getByRole("button", { name: /^Porte d'entrée/ })).toBeVisible();
+  const shown = await page.request.post(`/v1/projects/${project}/show`, { headers, data: { caption: "où est créée une commande ?", path: [{ part: "api/app/orders.py" }] } });
+  expect(shown.status()).toBe(200);
+  await expect(page.getByRole("region", { name: "Question posée dans Claude Code" })).toBeVisible({ timeout: 2_000 });
+  await expect(page).not.toHaveURL(/box=/);
+  await expect(page.getByLabel("1 orders.py")).toBeVisible();
+  await page.request.delete(`/v1/projects/${project}/show`, { headers });
+});

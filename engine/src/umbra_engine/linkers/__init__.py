@@ -17,7 +17,7 @@ from umbra_engine.claims import (
 )
 from umbra_engine.linkers.imports import ModuleIndex, resolve_imports
 
-PRODUCER = "linker@1.1"
+PRODUCER = "linker@1.2"
 
 
 def link(claims: list[StoredClaim], readable_files: set[str]) -> list[tuple[str, Claim]]:

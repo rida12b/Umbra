@@ -18,8 +18,8 @@ from umbra_engine.analyzers.definitions import (
     definitions,
     innermost,
 )
-from umbra_engine.analyzers.imports import JS_LIKE, has_import_rule, import_targets
-from umbra_engine.claims import CALLS, DEFINES, IMPORTS, Claim
+from umbra_engine.analyzers.imports import JS_LIKE, has_import_rule, import_targets, imported_names
+from umbra_engine.claims import CALLS, DEFINES, IMPORTED_NAME, IMPORTS, Claim
 from umbra_engine.guard import GuardedFile
 
 # The upstream TypeScript tags query only adds TS-specific rules on top of the JavaScript one.
@@ -42,7 +42,7 @@ NOT_CALLS = {"elixir": {"def", "defp", "defmodule", "defmacro", "alias", "import
 
 
 class CodeAnalyzer:
-    producer = f"code-tree-sitter@1.2+tslp-{tslp.__version__}"
+    producer = f"code-tree-sitter@1.3+tslp-{tslp.__version__}"
 
     def __init__(self) -> None:
         self._queries: dict[str, ts.Query | None] = {}
@@ -97,6 +97,10 @@ class CodeAnalyzer:
             Claim(path, "module", IMPORTS, target, "import", "fact", start + 1, end + 1)
             for statement, start, end in statements
             for target in import_targets(language, statement)
+        ] + [  # `from app import crud`: maybe the module `app.crud` (#105: links between the parts of a box)
+            Claim(path, "module", IMPORTS, name, IMPORTED_NAME, "hypothesis", start + 1, end + 1)
+            for statement, start, end in statements
+            for name in imported_names(language, statement)
         ]
 
     def _calls(self, language: str, tree: ts.Tree, found: list[Definition], path: str) -> list[Claim]:

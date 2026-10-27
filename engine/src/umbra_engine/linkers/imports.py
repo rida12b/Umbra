@@ -9,13 +9,14 @@ left unresolved rather than guessed.
 import posixpath
 from collections import defaultdict
 
-from umbra_engine.claims import IMPORTS, IMPORTS_MODULE, Claim, Kind, Status, StoredClaim
+from umbra_engine.claims import IMPORTED_NAME, IMPORTS, IMPORTS_MODULE, Claim, Kind, Status, StoredClaim
 
 JS_EXTENSIONS = (".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs", ".d.ts")
 JS_SOURCES = (".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs", ".vue", ".svelte")
 # TypeScript ESM imports name the emitted file: `./util.js` is `util.ts` in the sources.
 TS_SOURCE_OF = {".js": (".ts", ".tsx"), ".jsx": (".tsx",), ".mjs": (".mts",), ".cjs": (".cts",)}
 JVM_EXTENSIONS = (".java", ".kt", ".scala")
+SOURCE_ALIASES = ("@/", "~/")
 
 
 class ModuleIndex:
@@ -53,6 +54,8 @@ def resolve_imports(claims: list[StoredClaim], modules: ModuleIndex) -> list[tup
         if resolved is None:
             continue
         target, kind, status = resolved
+        if claim.object_kind == IMPORTED_NAME:
+            status = "hypothesis"  # the name was only maybe a module: never more than a guess
         if target != claim.file:
             links.append(
                 (
@@ -110,7 +113,23 @@ def _javascript(file: str, target: str, modules: ModuleIndex) -> tuple[str, Kind
         found = _relative(file, stem, modules, TS_SOURCE_OF[extension], ())
         if found:
             return found
+    if target.startswith(SOURCE_ALIASES):
+        return _source_alias(file, target, modules)
     return _relative(file, target, modules, ("", *JS_EXTENSIONS), ["/index" + e for e in JS_EXTENSIONS])
+
+
+def _source_alias(file: str, target: str, modules: ModuleIndex) -> tuple[str, Kind, Status] | None:
+    """`@/client` → `<the file's src folder>/client`: the usual `paths` alias of tsconfig and Vite. A
+    Hypothesis: the alias is not read from the config."""
+    parts = posixpath.dirname(file).split("/")
+    if "src" not in parts:
+        return None
+    root = "/".join(parts[: len(parts) - parts[::-1].index("src")])
+    base = f"{root}/{target[2:]}"
+    for candidate in [base + e for e in ("", *JS_EXTENSIONS)] + [f"{base}/index{e}" for e in JS_EXTENSIONS]:
+        if candidate in modules.files:
+            return candidate, "module", "hypothesis"
+    return None
 
 
 def _relative(

@@ -11,6 +11,7 @@ export interface Hint {
   proofs: Proof[];
   guess: boolean; // « supposé »: deduced, not read in the code
   opens?: boolean; // a click shows its inside: « clic : voir dedans → »
+  action?: string; // what a click does, when it is something else (a stub: « clic : revenir à la vue d'ensemble »)
 }
 
 export type Pointer = MouseEvent<SVGGElement> | FocusEvent<SVGGElement>;

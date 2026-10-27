@@ -7,6 +7,7 @@ import { useEffect, useState } from "react";
 export interface Route {
   projectId: string | null;
   node: string;
+  box?: string | null; // Level 1: the box whose inside is shown (`?box=server:backend`)
 }
 
 export const MAP_VIEW = "arch:"; // a Project opens on its map; links made for older views open it too
@@ -31,10 +32,13 @@ export function takeLoginCode(): string | null {
 export function parseRoute(hash: string): Route {
   const [path = "", query = ""] = hash.replace(/^#/, "").split("?", 2);
   const match = /^\/p\/([^/]+)$/.exec(path);
-  const node = new URLSearchParams(query).get("node");
+  const params = new URLSearchParams(query);
+  const node = params.get("node");
+  const view = node === ACTIVITY_VIEW ? ACTIVITY_VIEW : MAP_VIEW;
   return {
     projectId: match?.[1] ? safeDecode(match[1]) : null,
-    node: node === ACTIVITY_VIEW ? ACTIVITY_VIEW : MAP_VIEW,
+    node: view,
+    box: view === MAP_VIEW ? params.get("box") || null : null,
   };
 }
 
@@ -49,7 +53,8 @@ function safeDecode(text: string): string | null {
 
 export function routeHash(route: Route): string {
   if (!route.projectId) return "#/";
-  const query = route.node === MAP_VIEW ? "" : `?${new URLSearchParams({ node: route.node })}`;
+  const params: Record<string, string> | null = route.node === MAP_VIEW ? (route.box ? { box: route.box } : null) : { node: route.node };
+  const query = params ? `?${new URLSearchParams(params)}` : "";
   return `#/p/${encodeURIComponent(route.projectId)}${query}`;
 }
 

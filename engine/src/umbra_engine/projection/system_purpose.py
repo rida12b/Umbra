@@ -30,14 +30,14 @@ def purpose(facts: Facts, units: list[Unit], links: list[SystemLink]) -> str:
 
 def _accounts_and_things(facts: Facts, subject: str) -> str:
     """« Une appli web avec comptes : on se connecte, on gère ses « items ». »"""
-    things = _things(facts)
-    named = " et ".join(f"« {t} »" for t in things)
+    kept = things(facts)
+    named = " et ".join(f"« {t} »" for t in kept)
     if facts.signal("auth"):
-        return f"{subject} avec comptes : on se connecte" + (f", on gère ses {named}." if things else ".")
-    return f"{subject} : on gère des {named}." if things else f"{subject}."
+        return f"{subject} avec comptes : on se connecte" + (f", on gère ses {named}." if kept else ".")
+    return f"{subject} : on gère des {named}." if kept else f"{subject}."
 
 
-def _things(facts: Facts) -> list[str]:
+def things(facts: Facts) -> list[str]:
     """What the app keeps, from its table classes (SQLModel, Django, SQLAlchemy), accounts left out."""
     names = [c.object.split(":", 2)[2] for c in facts.signals_starting("table:")]
     names += [c.object.split(":", 2)[2] for c in facts.signals_starting("tablename:")]
