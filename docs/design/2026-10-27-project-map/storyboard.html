@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Umbra — comment ça marche</title>
+<style>
+:root{
+  --bg:#f5f6f8; --surface:#ffffff; --ink:#15181d; --ink-2:#4a5160; --ink-3:#6f7786; --line:#d6dbe3; --accent:#2457e6;
+  --warn-bg:#fff6e0; --warn-line:#e7b74a; --warn-ink:#6b4b00;
+  --sans:"Segoe UI Variable Text","Segoe UI",system-ui,-apple-system,"Helvetica Neue",Arial,sans-serif;
+  color-scheme:light;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){--bg:#0f1115;--surface:#161a20;--ink:#e7eaef;--ink-2:#aab1bd;--ink-3:#8a93a3;--line:#2a3039;--accent:#7096ff;--warn-bg:#2a2210;--warn-line:#8a6a1f;--warn-ink:#f1d48a;color-scheme:dark}
+}
+:root[data-theme="dark"]{--bg:#0f1115;--surface:#161a20;--ink:#e7eaef;--ink-2:#aab1bd;--ink-3:#8a93a3;--line:#2a3039;--accent:#7096ff;--warn-bg:#2a2210;--warn-line:#8a6a1f;--warn-ink:#f1d48a;color-scheme:dark}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);-webkit-font-smoothing:antialiased}
+main{max-width:1180px;margin:0 auto;padding:40px 16px 56px}
+header h1{margin:0;font-size:30px;letter-spacing:-.3px}
+header p{margin:8px 0 0;font-size:17px;color:var(--ink-2)}
+.panel{margin-top:38px}
+.cap{display:flex;align-items:baseline;gap:14px;margin-bottom:12px}
+.num{flex:none;width:32px;height:32px;border-radius:50%;background:var(--accent);color:#fff;display:grid;place-items:center;font-weight:800;font-size:15px;transform:translateY(-2px)}
+.num.alt{background:var(--ink-3)}
+.cap h2{margin:0;font-size:20px;white-space:nowrap}
+.cap p{margin:0;font-size:17px;color:var(--ink-2)}
+.cap p em{color:var(--ink);font-style:normal;font-weight:600}
+.shot{display:block;width:100%;border-radius:12px;overflow:hidden;border:1px solid var(--line);background:var(--surface);box-shadow:0 1px 2px rgba(0,0,0,.05),0 10px 28px rgba(0,0,0,.08)}
+.shot img{display:block;width:100%;height:auto}
+.ask{border:1px solid var(--warn-line);background:var(--warn-bg);border-radius:12px;padding:18px 20px}
+.ask h2{margin:0 0 8px;font-size:20px}
+.ask p{margin:0;font-size:17px;color:var(--ink)}
+.ask ol{margin:10px 0 0;padding-left:22px;font-size:17px;line-height:1.6}
+@media (max-width:700px){.cap{flex-wrap:wrap}.cap p{flex-basis:100%}header h1{font-size:26px}}
+footer{margin-top:40px;font-size:13.5px;color:var(--ink-3);line-height:1.5}
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>Comment ça marche</h1>
+    <p>Lundi, nouveau client. À gauche ton terminal Claude Code, à droite la carte du projet. <a href="prototype.html">Ouvrir la maquette cliquable →</a></p>
+  </header>
+
+  <section class="panel">
+    <div class="cap"><span class="num">1</span><h2>La carte</h2><p>Tu tapes <code>/umbra</code> : l'entrée à gauche, les boîtes, les sorties à droite. <em>En 10 secondes, tu sais ce que fait le projet.</em></p></div>
+    <a class="shot" href="prototype.html"><picture><source media="(max-width:700px)" srcset="m-carte.png"><img src="p-carte.png" alt="La carte du projet : entrée, 4 boîtes, sorties"></picture></a>
+  </section>
+
+  <section class="panel">
+    <div class="cap"><span class="num">2</span><h2>Dans une boîte</h2><p>Clic sur Serveur : ses parties, puis une carte de 4 lignes. <em>Tu ne lis pas de code, tu zoomes.</em></p></div>
+    <a class="shot" href="prototype.html"><img src="m-serveur.png" alt="Les parties du serveur"></a>
+  </section>
+
+  <section class="panel">
+    <div class="cap"><span class="num">3</span><h2>La question dessinée</h2><p>Tu demandes « où j'ajoute un champ prix ? », Claude répond en une ligne et 5 endroits s'allument. <em>Le terminal parle, la carte montre.</em></p></div>
+    <a class="shot" href="prototype.html"><picture><source media="(max-width:700px)" srcset="m-question.png"><img src="p-question.png" alt="Terminal à gauche, carte allumée à droite"></picture></a>
+  </section>
+
+  <section class="panel">
+    <div class="cap"><span class="num">4</span><h2>La tâche pour l'agent</h2><p>Tu cliques « copier pour Claude » et tu lances l'agent sur ces fichiers. <em>Tu décides l'architecture, l'agent code.</em></p></div>
+    <a class="shot" href="prototype.html"><picture><source media="(max-width:700px)" srcset="m-copie.png"><img src="p-copie.png" alt="L'agent lancé sur les fichiers copiés"></picture></a>
+  </section>
+
+  <section class="panel">
+    <div class="cap"><span class="num alt">+</span><h2>Un autre projet</h2><p>sqlite-utils, sans serveur ni compose : une commande et une bibliothèque. <em>Même carte, même lecture.</em></p></div>
+    <a class="shot" href="prototype.html"><picture><source media="(max-width:700px)" srcset="m-sqlite.png"><img src="p-sqlite.png" alt="La carte de sqlite-utils"></picture></a>
+  </section>
+
+  <section class="panel">
+    <div class="cap"><span class="num alt">+</span><h2>Le moteur aujourd'hui</h2><p>Sans IA, il trouve les services et les liens déclarés. <em>L'entrée, les sorties et les noms restent à construire.</em></p></div>
+    <a class="shot" href="prototype.html"><picture><source media="(max-width:700px)" srcset="m-moteur.png"><img src="p-moteur.png" alt="Sortie brute du moteur sur le même projet"></picture></a>
+  </section>
+
+  <section class="panel ask">
+    <h2>Une question pour toi</h2>
+    <p>« Où on en est », pour toi, c'est quoi ?</p>
+    <ol>
+      <li>Ce qui a bougé récemment : changements, branches et PR en cours.</li>
+      <li>Ce qui est fini et ce qui ne l'est pas dans le projet.</li>
+    </ol>
+  </section>
+
+  <footer>Repos publics : full-stack-fastapi-template et sqlite-utils. Les cartes 1 à 4 et « Un autre projet » sont dessinées à la main à partir des fichiers du repo. « Le moteur aujourd'hui » est la sortie réelle du moteur, sans retouche.</footer>
+</main>
+</body>
+</html>
