@@ -84,24 +84,26 @@ def _routes(read: InsideRead, facts: Facts, files: list[str], text_of: TextOf) -
                 card_routes.full_prefix(file, route.router, text_of, mount_files, settings) if python else ""
             )
             full = card_routes.address(prefix, route.path)
-            found.append((file, route, full, card_routes.label(route.verb, full)))
+            found.append((file, route, full, card_routes.label(route.verb, full, route.owned)))
     return found
 
 
 def _route_receives(read: InsideRead, found: list[Route], known: set[str], files: list[str]) -> CardLine:
-    """« GET · POST · PUT · DELETE /api/v1/items/ + connexion + ItemCreate · ItemUpdate »."""
+    """« GET · POST · PUT · DELETE /api/v1/items/ + connexion », on one line as the mock draws it; the
+    models it takes (« ItemCreate · ItemUpdate ») are read too and shown on hover of the address."""
     used = {r.verb for _, r, _, _ in found}
+    taken = list(dict.fromkeys(t for _, r, _, _ in found for t in r.takes if t in known))
     words = [
         CardWord(" · ".join(v for v in card_routes.ORDER if v in used)),
-        CardWord(card_routes.common_address([full for _, _, full, _ in found]), mono=True),
-    ]
+        CardWord(
+            card_routes.common_address([full for _, _, full, _ in found]), mono=True,
+            hint=f"données reçues : {' · '.join(taken)}" if taken else "",
+        ),
+    ]  # fmt: skip
     access = [p for p in read.placed if p.part.kind == "access"]
     checks = [c for p in access for c in read.wiring.reach_from(set(files), p.group.files)]
     if checks:
         words.append(CardWord("+ connexion", hint=files_hint([c.object for c in checks])))
-    taken = list(dict.fromkeys(t for _, r, _, _ in found for t in r.takes if t in known))
-    if taken:
-        words += [CardWord("+"), *_names_shown(taken)]
     return CardLine(RECEIVES, words, [Proof(f, r.line, r.line) for f, r, _, _ in found][:PROOFS])
 
 

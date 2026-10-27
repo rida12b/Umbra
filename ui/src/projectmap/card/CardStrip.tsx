@@ -81,7 +81,7 @@ function Words({ line }: { line: CardLine }) {
   );
 }
 
-/** « GET  Lister les items  read_items · l.14 »; a route of another shape shows its address; any other
+/** « GET  Lister ses items  read_items · l.14 »; a route of another shape shows its address; any other
  * function its name and line (and its file when the part has several). */
 function FunctionRow({ fn, root, many, under }: { fn: CardFunction; root: string; many: boolean; under: string }) {
   const file = fn.file.split("/").pop() ?? fn.file;

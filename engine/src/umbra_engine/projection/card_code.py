@@ -22,6 +22,7 @@ class RouteDef:
     answers: list[str] = field(default_factory=list)  # response models: « ItemPublic »
     takes: list[str] = field(default_factory=list)  # annotated parameters: « ItemCreate »
     raises: bool = False
+    owned: bool = False  # keeps the caller's rows: `Item.owner_id == current_user.id`
 
 
 @dataclass
@@ -75,7 +76,25 @@ def _route_of(decorator: ast.expr, node: ast.FunctionDef | ast.AsyncFunctionDef)
     raises = any(isinstance(n, ast.Raise) for n in ast.walk(node))
     return RouteDef(
         verb.upper(), path, decorator.func.value.id, node.name, node.lineno,
-        [a for a in answers if a], [t for t in takes if t], raises,
+        [a for a in answers if a], [t for t in takes if t], raises, _owned(node),
+    )  # fmt: skip
+
+
+def _owned(node: ast.FunctionDef | ast.AsyncFunctionDef) -> bool:
+    """True when the body compares an `owner_id` with the `.id` of one of the function's parameters."""
+    params = {a.arg for a in node.args.args + node.args.kwonlyargs}
+
+    def side(e: ast.expr) -> str:
+        if not isinstance(e, ast.Attribute):
+            return ""
+        if e.attr == "owner_id":
+            return "owner"
+        return "caller" if e.attr == "id" and isinstance(e.value, ast.Name) and e.value.id in params else ""
+
+    return any(
+        isinstance(n, ast.Compare) and len(n.comparators) == 1 and isinstance(n.ops[0], ast.Eq)
+        and {side(n.left), side(n.comparators[0])} == {"owner", "caller"}
+        for n in ast.walk(node)
     )  # fmt: skip
 
 

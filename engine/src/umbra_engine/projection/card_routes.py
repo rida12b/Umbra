@@ -66,8 +66,9 @@ def common_address(addresses: list[str]) -> str:
     return common if common.endswith("/") else common.rsplit("/", 1)[0] + "/"
 
 
-def label(verb: str, full: str) -> str:
-    """French words for a plain shape only; « » for anything else (Claude names those, #108)."""
+def label(verb: str, full: str, owned: bool = False) -> str:
+    """French words for a plain shape only; « » for anything else (Claude names those, #108). A list
+    kept to the caller's own rows (`owned`) is « ses » items, else « les »."""
     segments = [s for s in full.split("/") if s]
     one = bool(segments) and segments[-1].startswith("{")
     statics = [s for s in segments if not s.startswith("{")]
@@ -78,7 +79,7 @@ def label(verb: str, full: str) -> str:
         return ""
     single = many[:-1]
     shapes = {
-        ("GET", False): f"Lister les {many}", ("GET", True): f"Voir {_a(single)}",
+        ("GET", False): f"Lister {'ses' if owned else 'les'} {many}", ("GET", True): f"Voir {_a(single)}",
         ("POST", False): f"Créer {_a(single)}", ("PUT", True): f"Modifier {_a(single)}",
         ("PATCH", True): f"Modifier {_a(single)}", ("DELETE", True): f"Supprimer {_a(single)}",
     }  # fmt: skip
@@ -86,14 +87,16 @@ def label(verb: str, full: str) -> str:
 
 
 def sentence(rows: list[tuple[RouteDef, str, str]]) -> str:
-    """« Les adresses pour lister, voir, créer, modifier et supprimer les items. » when every route has
-    plain words on the same things; else how many addresses and under which one."""
+    """« Les adresses pour lister, voir, créer, modifier et supprimer ses items. » when every route has
+    plain words on the same things (« ses » when the list is the caller's own); else how many addresses
+    and under which one."""
     things = {full.strip("/").split("/")[-1] if not full.endswith("}") else full.split("/")[-2]
               for _, full, _ in rows}  # fmt: skip
     words = list(dict.fromkeys(DOES[w.split(" ")[0]] for _, _, w in rows if w))
     if rows and all(w for _, _, w in rows) and len(things) == 1:
         listed = ", ".join(words[:-1]) + f" et {words[-1]}" if len(words) > 1 else words[0]
-        return f"Les adresses pour {listed} les {things.pop()}."
+        whose = "ses" if any(w.startswith("Lister ses ") for _, _, w in rows) else "les"
+        return f"Les adresses pour {listed} {whose} {things.pop()}."
     count = len(rows)
     under = common_address([full for _, full, _ in rows])
     return f"{count} adresse{'s' if count > 1 else ''} du serveur, sous {under}."

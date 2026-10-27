@@ -24,7 +24,7 @@ ITEMS = (
     "def read_items(\n"
     "    session: SessionDep, current_user: CurrentUser, skip: int = 0, limit: int = 100\n"
     ") -> Any:\n"
-    "    return ItemsPublic(data=[], count=0)\n"
+    "    return session.exec(select(Item).where(Item.owner_id == current_user.id)).all()\n"
     "\n"
     "\n"
     '@router.get("/{id}", response_model=ItemPublic)\n'
@@ -108,17 +108,17 @@ def test_a_route_file_says_what_it_receives_returns_who_calls_it_and_its_routes(
     assert (found["title"], found["folder"], found["path"]) == (
         "items.py", "backend/app/api/routes/", "backend/app/api/routes/items.py",
     )  # fmt: skip
-    assert found["sentence"] == "Les adresses pour lister, voir, créer, modifier et supprimer les items."
+    assert found["sentence"] == "Les adresses pour lister, voir, créer, modifier et supprimer ses items."
     assert [line["label"] for line in found["lines"]] == ["Reçoit", "Renvoie", "Appelé par", "Appelle"]
     assert said(found) == {
-        "Reçoit": "GET · POST · PUT · DELETE `/api/v1/items/` + connexion + `ItemCreate · ItemUpdate`",
+        "Reçoit": "GET · POST · PUT · DELETE `/api/v1/items/` + connexion",
         "Renvoie": "un item, une liste d'items, un message, ou une erreur",
         "Appelé par": "Application web",
         "Appelle": "Contrôle d'accès · Modèles · Base",
     }
     assert found["section"] == "Ce qu'on peut faire ici"
     assert [(f["verb"], f["label"], f["name"], f["line"], f["path"]) for f in found["functions"]] == [
-        ("GET", "Lister les items", "read_items", 14, "/api/v1/items/"),
+        ("GET", "Lister ses items", "read_items", 14, "/api/v1/items/"),
         ("GET", "Voir un item", "read_item", 21, "/api/v1/items/{id}"),
         ("POST", "Créer un item", "create_item", 29, "/api/v1/items/"),
         ("PUT", "Modifier un item", "update_item", 39, "/api/v1/items/{id}"),
@@ -171,6 +171,7 @@ def test_a_part_or_file_not_drawn_is_not_found(client, auth, make_repo):
 
 def test_plain_words_only_for_a_plain_shape():
     assert card_routes.label("GET", "/api/v1/items/") == "Lister les items"
+    assert card_routes.label("GET", "/api/v1/items/", owned=True) == "Lister ses items"
     assert card_routes.label("DELETE", "/api/v1/items/{id}") == "Supprimer un item"
     assert card_routes.label("GET", "/api/v1/users/me") == ""  # not a plain shape: Claude names it (#108)
     assert card_routes.label("POST", "/api/v1/login/access-token") == ""
