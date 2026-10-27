@@ -7,6 +7,7 @@ one part per top file or folder. Tests, migrations, settings and a UI kit go « 
 
 import posixpath
 import re
+from collections import Counter
 from collections.abc import Callable
 from dataclasses import dataclass, field
 
@@ -18,6 +19,7 @@ from umbra_engine.projection.system_units import CODE, Unit
 PAGE_DIRS = {"routes", "pages"}
 CLIENT_DIRS = {"client", "api", "services"}
 SCREEN_DIRS = {"components", "features", "screens", "views", "widgets"}
+SIGN_IN_STEMS = {"login", "signin", "sign_in", "auth", "session", "sessions"}
 UI_KIT_DIRS = {"ui"}  # under a screens folder: shared buttons and fields, not screens
 SIGNALS_OF = {
     "server": (
@@ -95,7 +97,7 @@ def _rule(facts: Facts, unit: Unit, part: str, signals: tuple[str, ...], free: s
     if part in picks:
         files |= {f for f in free if picks[part](f)}
     if part == "routes":  # a file that only hangs routes on the app (`api/main.py`) goes with them
-        chips = sorted({c.file for c in claims if c.object == "signal:route"})
+        chips = _chip_order([c.file for c in claims if c.object == "signal:route"])
         return Group(part, files, _ordered(claims), chips) if chips else None
     return Group(part, files, _ordered(claims)) if files else None
 
@@ -119,6 +121,17 @@ def _sizes(facts: Facts) -> dict[str, int]:
     for claim in facts.classes + facts.functions:
         sizes[claim.file] = max(sizes.get(claim.file, 0), claim.line_end)
     return sizes
+
+
+def _chip_order(route_lines: list[str]) -> list[str]:
+    """Route files: the sign-in first (the door people meet first), then the most routes, then by name."""
+    count = Counter(route_lines)
+
+    def rank(file: str) -> tuple[bool, int, str]:
+        stem = posixpath.splitext(posixpath.basename(file))[0].lower()
+        return stem not in SIGN_IN_STEMS, -count[file], file
+
+    return sorted(count, key=rank)
 
 
 def _ordered(claims: list[StoredClaim]) -> list[StoredClaim]:

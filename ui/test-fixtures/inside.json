@@ -57,17 +57,7 @@
     ],
     "chips": [
      {
-      "file": "backend/app/api/routes/items.py",
-      "start": 0,
-      "end": 0
-     },
-     {
       "file": "backend/app/api/routes/login.py",
-      "start": 0,
-      "end": 0
-     },
-     {
-      "file": "backend/app/api/routes/private.py",
       "start": 0,
       "end": 0
      },
@@ -77,7 +67,17 @@
       "end": 0
      },
      {
+      "file": "backend/app/api/routes/items.py",
+      "start": 0,
+      "end": 0
+     },
+     {
       "file": "backend/app/api/routes/utils.py",
+      "start": 0,
+      "end": 0
+     },
+     {
+      "file": "backend/app/api/routes/private.py",
       "start": 0,
       "end": 0
      }
@@ -374,7 +374,7 @@
     "id": "server:backend/routes>stub:store:db",
     "source": "server:backend/routes",
     "target": "stub:store:db",
-    "verb": "écrit",
+    "verb": "écrit (items)",
     "back": "",
     "detail": "SQL via SQLAlchemy, SQLModel",
     "proofs": [

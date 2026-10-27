@@ -142,9 +142,9 @@ def test_inside_the_server_entry_routes_access_models_data_and_stubs(client, aut
         ("Accès aux données", "comptes", ["crud.py"]),
     ]
     routes = next(p for p in found["parts"] if p["title"] == "Routes")
-    assert [c["file"] for c in routes["chips"]] == [
-        "backend/app/api/routes/items.py",
+    assert [c["file"] for c in routes["chips"]] == [  # sign-in first, then the most routes (mock order)
         "backend/app/api/routes/login.py",
+        "backend/app/api/routes/items.py",
     ]
     assert stubs(found) == {
         "web:frontend": ("in", "depuis", "Application web"),
@@ -157,7 +157,7 @@ def test_inside_the_server_entry_routes_access_models_data_and_stubs(client, aut
         ("Routes", "vérifie la connexion", "Contrôle d'accès"),
         ("Routes", "valide", "Modèles"),
         ("Routes", "utilise", "Accès aux données"),  # `from app import crud`: the module, not the package
-        ("Routes", "écrit", "Base"),
+        ("Routes", "écrit (items)", "Base"),  # what it writes that Accès aux données does not name
         ("Accès aux données", "écrit (comptes)", "Base"),
         ("Routes", "envoie", "Courriel"),  # through the mail helper `utils.py`, which is no part of its own
     }

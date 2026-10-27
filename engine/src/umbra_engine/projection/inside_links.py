@@ -2,11 +2,13 @@
 neighbours of the Level 0 map, drawn as grey stubs at the edges, from the lines that reach them (a write,
 an SMTP call, an HTTP client). One verb per arrow; a part on the lower row gets one arrow in, no more."""
 
+import posixpath
 from dataclasses import dataclass
 
 from umbra_engine.claims import StoredClaim
 from umbra_engine.projection.inside_model import InsidePart
 from umbra_engine.projection.inside_parts import Group
+from umbra_engine.projection.inside_words import table_words
 from umbra_engine.projection.system_facts import Facts
 from umbra_engine.projection.system_model import Proof, SystemBox, SystemLink, SystemMap, proof_of
 from umbra_engine.projection.system_units import Unit
@@ -162,10 +164,7 @@ def _senders(
     if target.startswith("store:"):
         writers = having("db-write")
         if writers:
-            return [
-                (p, "écrit" + (f" ({p.part.detail})" if p.part.kind == "data" and p.part.detail else ""), c)
-                for p, c in writers
-            ]
+            return _writes(facts, writers)
         return [(p, "lit", c) for p, c in having("db-driver:")]
     if target == "sqlite-file":
         return [(p, verb, c) for p, c in having("sqlite")]
@@ -184,6 +183,30 @@ def _senders(
         return [(p, verb, c) for p, c in calls]
     entry = placed[0]
     return [(entry, verb, [])]
+
+
+def _writes(
+    facts: Facts, writers: list[tuple[Placed, list[StoredClaim]]]
+) -> list[tuple[Placed, str, list[StoredClaim]]]:
+    """« écrit (comptes) » for a data part, by its function names; for any other part, the tables its
+    writing files are named after, less those a data part already names: Routes « écrit (items) »."""
+    words = table_words(facts)
+    named = {w for p, _ in writers if p.part.kind == "data" for w in p.part.detail.split(" · ") if w}
+    found: list[tuple[Placed, str, list[StoredClaim]]] = []
+    for part, claims in writers:
+        if part.part.kind == "data":
+            found.append((part, "écrit" + (f" ({part.part.detail})" if part.part.detail else ""), claims))
+            continue
+        word_of = {c.file: words.get(_stem(c.file).rstrip("s")) for c in claims}
+        tables = list(dict.fromkeys(w for w in word_of.values() if w))
+        own = [w for w in tables if w not in named] or tables
+        ordered = sorted(claims, key=lambda c: word_of[c.file] not in own)  # its own tables' lines first
+        found.append((part, "écrit" + (f" ({' · '.join(own[:SHOWN])})" if own else ""), ordered))
+    return found
+
+
+def _stem(path: str) -> str:
+    return posixpath.splitext(posixpath.basename(path))[0].lower()
 
 
 def distinct(claims: list[StoredClaim]) -> list[Proof]:

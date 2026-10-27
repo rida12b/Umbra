@@ -62,8 +62,8 @@ export function chipLabel(file: string): string {
 }
 
 function chipRows(part: InsidePart): string[][] {
-  // Shortest names first: the long one goes to the second row, which keeps the box narrow (mock: private.py).
-  const labels = part.chips.map((c) => chipLabel(c.file)).sort((a, b) => a.length - b.length || a.localeCompare(b));
+  // In the engine's order: sign-in first, then the files with the most routes (mock: login, users, items).
+  const labels = part.chips.map((c) => chipLabel(c.file));
   const rows: string[][] = [];
   for (let i = 0; i < labels.length; i += CHIPS_PER_ROW) rows.push(labels.slice(i, i + CHIPS_PER_ROW));
   return rows;
@@ -170,7 +170,8 @@ export function insideGeometry(inside: InsideMap): InsideGeometry {
     arrows,
     outputs,
     entry: firstIn ? { x: 20, y: firstIn.y - 14 } : null,
-    sorties: outs.some((s) => s.detail.startsWith("◉")) || outputs.length ? { x: outX, y: highest - 18 } : null,
+    // Over an output line alone, SORTIES keeps the mock's wider gap (p-web: about 40 px above the line).
+    sorties: outs.some((s) => s.detail.startsWith("◉")) || outputs.length ? { x: outX, y: stubAbove || !outputs.length ? highest - 18 : Math.min(highest - 18, 70 - 40) } : null,
     around: inside.around.length ? { x: 20, y: AROUND_Y, w: Math.max(240, insideAroundText(inside).length * 7.6 + 40) } : null,
   };
 }

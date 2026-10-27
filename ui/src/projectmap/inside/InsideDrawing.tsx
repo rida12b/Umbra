@@ -16,7 +16,7 @@ interface Props {
 /** Level 1 as SVG, drawn as the mock: ENTRÉE over the stub on the left, parts left → right, SORTIES over the stubs on the right. */
 export function InsideDrawing({ inside, drawn, selected, onSelect, onStub, onHint, onAround, onAroundLeave }: Props) {
   const names = Object.fromEntries(inside.parts.map((p) => [p.id, p.kind === "stub" ? stubName(p.title, p.detail) : p.title]));
-  const hover = (hint: Hint) => ({
+  const hover = (hint: Hint): HoverHandlers => ({
     onMouseEnter: (e: Pointer) => onHint(hint, e),
     onMouseMove: (e: Pointer) => onHint(hint, e),
     onMouseLeave: () => onHint(null),
@@ -90,7 +90,15 @@ interface PartProps {
   selected: boolean;
   onSelect: (id: string) => void;
   onStub: (neighbour: string) => void;
-  hover: (hint: Hint) => object;
+  hover: (hint: Hint) => HoverHandlers;
+}
+
+interface HoverHandlers {
+  onMouseEnter: (e: Pointer) => void;
+  onMouseMove: (e: Pointer) => void;
+  onMouseLeave: () => void;
+  onFocus: (e: Pointer) => void;
+  onBlur: () => void;
 }
 
 function Part({ drawn: { part, rect, chips }, selected, onSelect, onStub, hover }: PartProps) {
@@ -155,7 +163,7 @@ function Part({ drawn: { part, rect, chips }, selected, onSelect, onStub, hover 
           className="pm-chip"
           tabIndex={0}
           aria-label={chip.label}
-          {...hover({ title: chip.label, text: "", proofs: [{ file: chip.file, start: 0, end: 0 }], guess: false })}
+          {...chipHover(hover({ title: chip.label, text: "", proofs: [{ file: chip.file, start: 0, end: 0 }], guess: false }))}
         >
           <rect x={chip.rect.x} y={chip.rect.y} width={chip.rect.w} height={chip.rect.h} rx={6} />
           <text x={chip.rect.x + chip.rect.w / 2} y={chip.rect.y + 18.5} textAnchor="middle">
@@ -165,4 +173,18 @@ function Part({ drawn: { part, rect, chips }, selected, onSelect, onStub, hover 
       ))}
     </g>
   );
+}
+
+/** A chip under the mouse only lights its border (mock), and keeps the box's card from opening over the
+ * chips next to it; its file still shows on keyboard focus. */
+function chipHover(handlers: HoverHandlers) {
+  const quiet = (e: Pointer & { stopPropagation: () => void }) => {
+    e.stopPropagation();
+    handlers.onMouseLeave();
+  };
+  const focus = (e: Pointer) => {
+    e.stopPropagation(); // the box around it would open its own card over this one
+    handlers.onFocus(e);
+  };
+  return { onMouseEnter: quiet, onMouseMove: quiet, onFocus: focus, onBlur: handlers.onBlur };
 }
