@@ -126,8 +126,7 @@ def _print_indexed(project: Project, summary: "IndexSummary") -> None:
 
 def _start(settings: Settings, path: str, open_browser: bool) -> int:
     """A first run in one command: register (idempotent), index (only changed files are read again), serve,
-    and open the login link straight on this Project. The study itself starts when the page opens it."""
-    from umbra_engine.gateways.claude import readiness_problem
+    and open the login link straight on this Project. Nothing runs a model (ADR-0007)."""
     from umbra_engine.indexer import index_project
 
     try:
@@ -140,9 +139,6 @@ def _start(settings: Settings, path: str, open_browser: bool) -> int:
         print(f"umbra-engine: {error}", file=sys.stderr)
         return 2
     _print_indexed(project, summary)
-    problem = readiness_problem()
-    if problem:
-        print(f"\nWarning: {problem}\nUmbra needs it to study and explain the project.\n")
     return _serve(settings, open_browser, project.id)
 
 

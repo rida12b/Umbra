@@ -39,8 +39,9 @@ def add_live_routes(
     async def project_events(
         project_id: str, request: Request, since: int | None = None
     ) -> StreamingResponse:
-        """Server-sent events: `indexed` (files changed), `studying`, `rewriting`, `card` (written),
-        `failed`. A page that reconnects passes the last id it saw (`since`) and gets what it missed."""
+        """Server-sent events: `indexed` (files changed), `activity` (Claude Code's hooks),
+        `show` and `cleared` (#104). A page that reconnects passes the last id it saw (`since`) and gets
+        what it missed."""
         known_project(project_id)
 
         async def stream() -> AsyncIterator[str]:

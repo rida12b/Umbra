@@ -31,10 +31,6 @@ PRICE = "où j'ajoute un champ prix à Item ?"
 PUSH_S = 2.0  # acceptance: the open tab lights up within 2 s
 
 
-def no_claude(*_: object) -> str:
-    raise AssertionError("show must never call Claude")
-
-
 def free_port() -> int:
     with socket.socket() as probe:
         probe.bind(("127.0.0.1", 0))
@@ -47,7 +43,7 @@ def engine(tmp_path: Path, make_repo) -> Iterator[tuple[Settings, str, Path]]:
     settings = Settings(home=tmp_path / "home", port=free_port())
     server = uvicorn.Server(
         uvicorn.Config(
-            create_app(settings, ask=no_claude, study=no_claude), port=settings.port, log_level="error"
+            create_app(settings), port=settings.port, log_level="error"
         )
     )
     thread = threading.Thread(target=server.run, daemon=True)

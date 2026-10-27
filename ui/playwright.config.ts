@@ -2,7 +2,7 @@ import { defineConfig, devices } from "@playwright/test";
 
 const PORT = 7899;
 
-// The real engine on a fixture Project (ui/e2e/server.py), Claude Code replaced by a fixed model.
+// The real engine on a fixture Project (ui/e2e/server.py); it never runs a model (#114).
 export default defineConfig({
   testDir: "e2e",
   timeout: 30_000,

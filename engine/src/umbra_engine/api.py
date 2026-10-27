@@ -13,19 +13,14 @@ from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from pydantic import BaseModel
 
 from umbra_engine import __version__
-from umbra_engine.analysis.runner import MODEL_KEY, Study
-from umbra_engine.api_explain import add_explain_routes
 from umbra_engine.api_live import add_live_routes
 from umbra_engine.api_map import add_map_routes
-from umbra_engine.api_model import add_model_routes
 from umbra_engine.api_show import add_show_routes
 from umbra_engine.api_system import add_system_routes
 from umbra_engine.claims import Relation, Status, StoredClaim
 from umbra_engine.coverage import CoverageReport, coverage_report
 from umbra_engine.coverage import State as CoverageState
 from umbra_engine.events import EventHub
-from umbra_engine.explain.worker import Explainer
-from umbra_engine.gateways import claude
 from umbra_engine.indexer import IndexSummary, index_project
 from umbra_engine.journal import ingest
 from umbra_engine.live import LiveProjects
@@ -36,7 +31,6 @@ from umbra_engine.ui_session import SESSION_HEADER, UiSessions
 from umbra_engine.web import add_web_routes
 
 MAX_PAGE = 1000
-MODEL_FOLLOW_UP_S = 60.0
 JOURNAL_POLL_S = 0.5
 READ_JOIN_S = 10.0  # at shutdown, how long to wait for a project being read
 READ_RETRY_S = 30.0  # a read that failed is tried again by itself at most this often
@@ -57,14 +51,9 @@ class ProjectOut(BaseModel):
         return cls(id=project.id, name=project.name, root=str(project.root), created_at=project.created_at)
 
 
-def create_app(
-    settings: Settings,
-    ask: Callable[[str], str] = claude.ask,
-    study: Study = claude.study,
-    live: bool = False,
-) -> FastAPI:
-    """`ask` and `study` run the user's Claude Code (tests pass fakes). With `live`, every indexed
-    Project is watched: a change re-indexes it and updates the model and cards it made out of date."""
+def create_app(settings: Settings, live: bool = False) -> FastAPI:
+    """The engine never runs a model (ADR-0007): the map is built from hard signals, and Claude Code
+    talks to it through `show`. With `live`, every indexed Project is watched: a change re-indexes it."""
     registry = Registry(settings)
     token = load_or_create_token(settings).encode()
     sessions = UiSessions()
@@ -88,8 +77,6 @@ def create_app(
         deadline = time.monotonic() + READ_JOIN_S
         for reader in list(readers):
             reader.join(timeout=max(0.0, deadline - time.monotonic()))
-        for timer in follow_ups:
-            timer.cancel()
         if live_projects is not None:
             live_projects.stop_all()
         registry.close()
@@ -132,7 +119,7 @@ def create_app(
                     indexing.discard(project.id)
             if journal_stop.is_set():  # the engine stopped while it was reading: nothing to follow any more
                 return
-            # The page asks for its model again.
+            # The page asks for its map again.
             events.publish(project.id, {"type": "indexed", "changed": [], "count": 0})
             if live_projects is not None:
                 live_projects.follow(project)
@@ -273,40 +260,11 @@ def create_app(
             live_projects.follow(project)
         return summary
 
-    graph_of = add_map_routes(app, authorized, known_project, indexed_store)
-
-    follow_ups: list[threading.Timer] = []  # cancelled when the engine stops
-
-    def follow_up(project_id: str) -> None:
-        try:
-            refresh_model(project_id)
-        except Exception:  # noqa: BLE001 — a late follow-up must never take the engine down
-            return
-
-    def saved(project_id: str, key: str) -> None:
-        events.publish(project_id, {"type": "card", "key": key})
-        if key == MODEL_KEY:  # changes that landed during the session: one follow-up, a bit later
-            timer = threading.Timer(MODEL_FOLLOW_UP_S, follow_up, args=(project_id,))
-            timer.daemon = True
-            follow_ups.append(timer)
-            timer.start()
-
-    app.state.explainer = Explainer(
-        on_saved=saved,
-        on_failed=lambda project_id, key: events.publish(project_id, {"type": "failed", "key": key}),
-    )
-    refresh_cards = add_explain_routes(
-        app, authorized, known_project, indexed_store, graph_of, app.state.explainer, ask
-    )
+    add_map_routes(app, authorized, known_project, indexed_store)
     system_of = add_system_routes(app, authorized, known_project, indexed_store, ensure_indexed)
     add_show_routes(app, authorized, known_project, system_of, events)
-    refresh_model = add_model_routes(
-        app, authorized, known_project, indexed_store, graph_of, app.state.explainer, study, ensure_indexed
-    )
     add_live_routes(app, authorized, known_project, events, registry.open_store)
-    live_projects = (
-        LiveProjects(registry.open_store, events, refresh_cards, refresh_model, lock_of) if live else None
-    )
+    live_projects = LiveProjects(registry.open_store, events, lock_of) if live else None
     app.state.live = live_projects
     add_web_routes(app, authorized, sessions)  # last: the web app is mounted at `/`
     return app

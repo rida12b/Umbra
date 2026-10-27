@@ -1,7 +1,6 @@
 """The real engine and web app on a small fixture Project, for browser tests.
 
-Claude Code is replaced by fakes that fail (no network, no subscription): the map is built from hard
-signals only, and nothing the page does may call Claude. Writes e2e/.state.json (Project id, token file).
+The engine never runs a model (ADR-0007, #114): the map is built from hard signals only. Writes e2e/.state.json (Project id, token file).
 Usage: python ui/e2e/server.py PORT
 """
 
@@ -41,10 +40,6 @@ FILES = {
 }
 
 
-def no_claude(*_: object) -> str:
-    raise RuntimeError("the browser tests must never call Claude")
-
-
 def write(root: Path) -> None:
     for rel, text in FILES.items():
         (root / rel).parent.mkdir(parents=True, exist_ok=True)
@@ -65,7 +60,7 @@ def main() -> None:
         project, _ = registry.add(root)
         with registry.open_store(project) as store:
             index_project(project, store)
-    app = create_app(settings, ask=no_claude, study=no_claude)
+    app = create_app(settings)
     state = {"project": project.id, "token": str(settings.home / "token"), "spare": str(spare)}
     (Path(__file__).parent / ".state.json").write_text(json.dumps(state), encoding="utf-8")
     uvicorn.run(app, host="127.0.0.1", port=port, log_level="warning")

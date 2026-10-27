@@ -4,16 +4,16 @@ Local daemon that registers Projects, keeps one isolated store per Project and e
 
 ## Try it on your project (Windows, macOS, Linux)
 
-You need Python 3.11–3.13, [pipx](https://pipx.pypa.io) and [Claude Code](https://claude.com/claude-code) signed in
-with a claude.ai subscription (run `claude` once). Umbra asks your own Claude Code to study the project.
+You need Python 3.11–3.13 and [pipx](https://pipx.pypa.io). Umbra draws the map from the files alone: it never
+runs a model. Ask your questions in [Claude Code](https://claude.com/claude-code); with the Umbra plugin it lights
+the answer on the open map.
 
 ```bash
 pipx install https://github.com/rida12b/Umbra/releases/download/engine-v0.1.0/umbra_engine-0.1.0-py3-none-any.whl
 umbra-engine start path/to/your/project
 ```
 
-`start` registers the folder, indexes it, runs the engine and opens your browser on the project. The first study
-takes a few minutes. Next time, run the same command: only changed files are read again.
+`start` registers the folder, indexes it, runs the engine and opens your browser on the project's map. Next time, run the same command: only changed files are read again.
 
 **On a server or a VM without a screen**, the engine only answers on `127.0.0.1`, on purpose: it shows your code.
 Run `umbra-engine start <folder> --no-browser` there, open a tunnel from your own computer with

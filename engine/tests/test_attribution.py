@@ -36,9 +36,7 @@ def wait_for(condition, timeout: float = 15.0):
 
 def test_a_claude_turn_appears_with_its_prompt_files_and_final_message(settings, auth, make_repo):
     root = write_repo(make_repo("shop"), {"app/a.py": "x = 1\n"}, git=False)
-    app = create_app(
-        settings, ask=lambda prompt: "{}", study=lambda prompt, folder: '{"resume": "r"}', live=True
-    )
+    app = create_app(settings, live=True)
     with TestClient(app, base_url="http://127.0.0.1") as client:
         project = client.post("/v1/projects", json={"path": str(root)}, headers=auth).json()["id"]
         client.post(f"/v1/projects/{project}/index", headers=auth)

@@ -1,4 +1,4 @@
-"""Live events of each Project (re-indexed, card rewritten), for pages that follow them.
+"""Live events of each Project (re-indexed, Claude Code's activity, a path shown), for pages that follow them.
 
 Published from background threads, read by the streaming route: a short, numbered history per
 Project, so a page that reconnects with the last number it saw gets what it missed.

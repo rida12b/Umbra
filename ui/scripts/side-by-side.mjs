@@ -28,10 +28,7 @@ await page.evaluate(() => localStorage.setItem("umbra-theme", "dark")); // the m
 
 for (const pair of pairs) {
   await page.goto(`${base}/?shot=${pair.name}${pair.path}`);
-  await page.waitForTimeout(1500); // layout, fonts, the room's opening animation
-  // The mockup has no « Nouvelle méthode d'étude » banner: hide it so both images show the same frame.
-  await page.addStyleTag({ content: '[aria-label="Nouvelle méthode d\'étude"]{display:none!important}' });
-  await page.waitForTimeout(200);
+  await page.waitForTimeout(1500); // layout and fonts
   const screen = resolve(outDir, `${pair.name}.png`);
   await page.screenshot({ path: screen });
   // A page set from memory may not read local files: the two images go in as data.

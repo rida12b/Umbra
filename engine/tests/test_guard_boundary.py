@@ -2,7 +2,7 @@
 
 Parses every engine module outside `umbra_engine/guard/` and fails on a fixed list of ways to read
 files, list directories, use introspection or dynamic code, reach guard internals or copy a
-GuardedFile. External programs (git, `claude -p`, a Project's test run) are legitimate but may only be
+GuardedFile. External programs (git, a Project's test run) are legitimate but may only be
 started from `umbra_engine/gateways/`, whose outputs must pass through the guard before use.
 It catches mistakes, not deliberate obfuscation; review covers intent.
 """
