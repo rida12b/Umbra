@@ -250,6 +250,59 @@ a.pm-link { display: inline-block; text-decoration: none; font-size: 13px; font-
 .pm-zoomin > svg { animation: pm-zoom 280ms ease-out; transform-origin: inherit; }
 @keyframes pm-zoom { from { transform: scale(0.4); opacity: 0.15; } to { transform: none; opacity: 1; } }
 @media (prefers-reduced-motion: reduce) { .pm-zoomin > svg { animation: none; } }
+/* #107: the map and « Ce qu'on peut faire » side by side (prototype state p-actions) */
+.pm-stage { flex: 1; min-height: 0; display: flex; position: relative; }
+.pm-stage > .pm-mapwrap, .pm-mapcol { flex: 1; min-width: 0; }
+.pm-mapcol { display: flex; flex-direction: column; min-height: 0; }
+.pm-panel { width: 460px; flex: none; border-left: 1px solid var(--u-line); background: var(--u-panel); overflow-y: auto; overflow-x: hidden; }
+.pm-panel .hd { padding: 18px 22px 12px; border-bottom: 1px solid var(--u-line); position: sticky; top: 0; background: var(--u-panel); z-index: 1; }
+.pm-panel h3 { margin: 0; font-size: 18px; font-weight: 700; display: flex; align-items: center; }
+.pm-panel h3 .n { color: var(--u-faint); font-weight: 500; margin-left: 8px; }
+.pm-panel h3 .pm-btn { margin-left: auto; font-weight: 600; }
+.pm-panel .sub { font-size: 13px; color: var(--u-faint); margin-top: 6px; line-height: 1.45; }
+.pm-panel .sub .mono { font-family: var(--font-mono); font-size: 12.5px; }
+.pm-panel .err { margin: 8px 0 0; font-size: 13px; color: var(--u-danger); }
+.pm-panel .wait { padding: 14px 22px; font-size: 13.5px; color: var(--u-muted); }
+.pm-panel .grp { padding: 10px 14px 2px; }
+.pm-panel .gh { font-size: 12.5px; color: var(--u-faint); padding: 4px 8px 6px; display: flex; gap: 8px; }
+.pm-panel .gh b { color: var(--u-ink); font-family: var(--font-mono); font-weight: 600; }
+.pm-panel .act { display: flex; max-width: 100%; align-items: center; gap: 10px; padding: 5px 8px; border-radius: 8px; border: 0; background: none; text-align: left; font-size: 14px; color: var(--u-ink); min-width: 0; }
+.pm-panel .act:hover, .pm-panel .act:focus-visible { background: var(--u-raised); }
+.pm-panel .m { font-family: var(--font-mono); font-size: 11px; font-weight: 700; width: 54px; flex: none; color: var(--u-muted); border: 1px solid var(--u-line); border-radius: 5px; text-align: center; padding: 2px 0; }
+.pm-panel .act .lab { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.pm-panel .act .lab.mono { font-family: var(--font-mono); font-size: 13px; }
+.pm-panel .act .rt { margin-left: auto; font-family: var(--font-mono); font-size: 12px; color: var(--u-faint); display: none; white-space: nowrap; }
+.pm-panel .act .go { margin-left: auto; color: var(--u-accent); font-size: 12.5px; font-weight: 600; white-space: nowrap; visibility: hidden; }
+.pm-panel .act .rt + .go { margin-left: 0; }
+.pm-panel .act:hover .rt, .pm-panel .act:focus-visible .rt { display: inline; }
+.pm-panel .act:hover .go, .pm-panel .act:focus-visible .go { visibility: visible; }
+.pm-panel .cmds { display: flex; flex-wrap: wrap; gap: 6px; padding: 4px 8px 16px; }
+.pm-panel .cmds button { font-family: var(--font-mono); font-size: 12.5px; border: 1px solid var(--u-line); border-radius: 6px; padding: 3px 8px; background: var(--u-raised); color: var(--u-ink); }
+.pm-panel .cmds button:hover, .pm-panel .cmds button:focus-visible { border-color: var(--u-accent); color: var(--u-accent); }
+/* #107: an action's path, lit inside a box (mock p-chemin.png) */
+.pm-caption .step { font-size: 13.5px; color: var(--u-muted); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; border-left: 1px solid var(--u-line); padding-left: 14px; }
+.pm-caption .step b { color: var(--u-accent); }
+.pm-caption .step .mono { font-family: var(--font-mono); font-size: 12.5px; color: var(--u-faint); }
+.pm-caption .step .guess { color: var(--u-warn-ink); }
+.pm-btn.icon { padding: 6px 9px; font-family: var(--font-mono); }
+.pm-inside.pathmode .pm-dimmable.lit.on, .pm-inside.pathmode .pm-dimmable.lit.pass { opacity: 0.62; }
+.pm-inside.pathmode .pm-arrow.lit.on { opacity: 0.55; }
+.pm-inside .pm-box.lit rect.b { stroke-width: 1.8; }
+.pm-inside .pm-box.lit.cur rect.b { stroke-width: 3.5; }
+.pm-inside .pm-box.lit.pass rect.b { fill: var(--u-panel); }
+.pm-inside .pm-box.lit.guess rect.b { stroke-dasharray: 7 5; }
+.pm-map .pm-stub.lit .tt, .pm-map .pm-stub.lit .st { fill: var(--u-accent); font-weight: 700; }
+.pm-arrow.lit path.l { stroke: var(--u-accent); stroke-width: 2; }
+.pm-arrow.lit.cur path.l { stroke-width: 3.4; }
+.pm-map .pm-arrow.lit .pm-lbl { fill: var(--u-accent); font-weight: 600; }
+#pm-ahl path { fill: var(--u-accent); }
+/* #107: « chemin → » on a route of the card (mock p-items.png) */
+.pm-card-fns .row { display: flex; align-items: center; border-radius: 8px; min-width: 0; }
+.pm-card-fns .row:hover, .pm-card-fns .row:focus-within { background: var(--u-raised); }
+.pm-card-fns .row .act { flex: 1; }
+.pm-card-fns .row .act:hover, .pm-card-fns .row .act:focus-visible { background: none; }
+.pm-card-fns .go { flex: none; border: 0; background: none; color: var(--u-accent); font-size: 12.5px; font-weight: 600; padding: 4px 10px; white-space: nowrap; visibility: hidden; }
+.pm-card-fns .row:hover .go, .pm-card-fns .row:focus-within .go { visibility: visible; }
 .pm-toast { position: fixed; left: 50%; bottom: 58px; transform: translateX(-50%); background: var(--u-ink); color: var(--u-bg); padding: 9px 16px; border-radius: 9px; font-size: 14px; z-index: 50; box-shadow: var(--u-shadow); }
 
 @media (max-width: 860px) {
@@ -263,6 +316,13 @@ a.pm-link { display: inline-block; text-decoration: none; font-size: 13px; font-
   .pm-caption .what { flex-basis: 100%; }
   .pm-caption .q { white-space: normal; }
   .pm-caption .tag { display: none; }
+  .pm-caption .what { flex-wrap: wrap; }
+  .pm-caption .step { flex-basis: 100%; white-space: normal; border-left: 0; padding-left: 0; }
+  .pm-panel { position: absolute; inset: 0; width: auto; z-index: 5; border-left: 0; }
+  .pm-panel .hd { padding: 14px 16px 10px; }
+  .pm-panel .grp { padding: 8px 8px 2px; }
+  .pm-panel .act .go { visibility: visible; } /* no hover on a phone */
+  .pm-card-fns .go { visibility: visible; }
   .pm-card { display: flex; flex-direction: column; gap: 12px; margin: 0 8px 8px; padding: 12px; max-height: 52vh; overflow-y: auto; }
   .pm-card > * { flex: none; }
   .pm-card-fns .acts { max-height: none; }

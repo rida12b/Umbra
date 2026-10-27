@@ -9,9 +9,10 @@ from collections.abc import Callable
 
 from umbra_engine.claims import StoredClaim
 from umbra_engine.projection import card_routes
-from umbra_engine.projection.card_code import RouteDef, imported_names, return_types, routes
+from umbra_engine.projection.card_code import imported_names, return_types
 from umbra_engine.projection.card_links import called_by, calls, files_hint, http_callers
 from umbra_engine.projection.card_model import RECEIVES, RETURNS, CardFunction, CardLine, CardWord, PartCard
+from umbra_engine.projection.card_routes import Route, action_id
 from umbra_engine.projection.inside import InsideRead
 from umbra_engine.projection.inside_links import Placed
 from umbra_engine.projection.system_facts import Facts
@@ -25,7 +26,6 @@ ROUTES_SECTION = "Ce qu'on peut faire ici"
 FUNCTIONS_SECTION = "Ses fonctions"
 TextOf = Callable[[str], str | None]
 DefinitionsOf = Callable[[str], list[StoredClaim]]
-Route = tuple[str, RouteDef, str, str]  # file, route, full address, plain words
 
 
 def part_card(
@@ -53,7 +53,8 @@ def part_card(
         ]
     lines.append(calls(read, placed, set(files), units, shown))
     functions = [
-        CardFunction(r.name or r.path, f, r.line, r.verb, full, words) for f, r, full, words in found
+        CardFunction(r.name or r.path, f, r.line, r.verb, full, words, action_id(f, r.line) if r.name else "")
+        for f, r, full, words in found
     ]
     functions += _functions(files, definitions_of, {(f.file, f.name) for f in functions})
     section = ROUTES_SECTION if found else FUNCTIONS_SECTION
@@ -74,18 +75,7 @@ def _names(read: InsideRead, placed: Placed, file: str) -> tuple[str, str, str]:
 
 
 def _routes(read: InsideRead, facts: Facts, files: list[str], text_of: TextOf) -> list[Route]:
-    mount_files = sorted({c.file for c in facts.signal("mount", read.unit.files)})
-    settings = sorted({c.file for c in facts.signal("settings")})
-    found: list[Route] = []
-    for file in files:
-        python = file.endswith(".py")
-        for route in routes(text_of(file) or "", python):
-            prefix = (
-                card_routes.full_prefix(file, route.router, text_of, mount_files, settings) if python else ""
-            )
-            full = card_routes.address(prefix, route.path)
-            found.append((file, route, full, card_routes.label(route.verb, full, route.owned)))
-    return found
+    return card_routes.read_routes(facts, read.unit.files, files, text_of)
 
 
 def _route_receives(read: InsideRead, found: list[Route], known: set[str], files: list[str]) -> CardLine:

@@ -35,14 +35,21 @@ class StepRequest:
     why: str = ""  # one sentence on hover: « pourquoi ici »
 
 
+QUESTION = "question"  # asked in Claude Code (`show`, #104)
+PATH = "path"  # an action of « Ce qu'on peut faire », traced in the code without any model (#107)
+
+
 @dataclass
 class LitStep:
     n: int
     box: str  # the box it sits in
-    label: str  # short, in the box's own terms: « models.py », « components/Items/ »
+    label: str  # short, in the box's own terms: « models.py », « deps.py:30 get_current_user »
     path: str  # repo path (a folder ends with "/"); empty for a box without a folder
     note: str
     why: str
+    part: str = ""  # drawn inside `Highlight.inside` (Level 1): the part or stub it numbers
+    guess: bool = False  # deduced, not read (a method found by its name alone): drawn dashed, « supposé »
+    chip: str = ""  # the file chip of the part that lights with it (« items.py » in Routes)
 
 
 @dataclass
@@ -52,6 +59,11 @@ class Highlight:
     steps: list[LitStep] = field(default_factory=list)
     files: list[str] = field(default_factory=list)  # what « copier pour Claude » copies, in step order
     serial: int = 0  # set by the engine: tells one `show` from the next
+    kind: str = QUESTION
+    detail: str = ""  # said after the caption when copied: « POST /api/v1/items/ »
+    inside: str = ""  # the box whose inside (Level 1) shows it; empty: the whole map (Level 0)
+    parts: list[str] = field(default_factory=list)  # Level 1: lit parts and stubs, in map order
+    passed: list[str] = field(default_factory=list)  # Level 1: parts the path goes through, unnumbered
 
 
 def resolve(
@@ -105,7 +117,7 @@ def _fail(shown: SystemMap, part: str, owners: dict[str, str]) -> NoReturn:
 
 
 def _step(shown: SystemMap, owners: dict[str, str], request: StepRequest, number: int) -> LitStep:
-    note, why = _short(request.note, MAX_NOTE, "note"), _short(request.why, MAX_WHY, "why")
+    note, why = short_text(request.note, MAX_NOTE, "note"), short_text(request.why, MAX_WHY, "why")
     box_id = _box(shown, request.part)
     if box_id is not None:
         box = next(b for b in shown.boxes if b.id == box_id)
@@ -127,7 +139,7 @@ def _step(shown: SystemMap, owners: dict[str, str], request: StepRequest, number
     _fail(shown, request.part, owners)
 
 
-def _short(text: str, limit: int, name: str) -> str:
+def short_text(text: str, limit: int, name: str) -> str:
     text = " ".join(text.split())
     if len(text) > limit:
         raise NotOnMapError(f"{name} is {len(text)} characters: {limit} at most")

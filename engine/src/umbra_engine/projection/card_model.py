@@ -36,6 +36,7 @@ class CardFunction:
     verb: str = ""  # a route: « GET »
     path: str = ""  # a route: « /api/v1/items/{id} »
     label: str = ""  # a route of a plain shape: « Voir un item »; empty otherwise
+    action: str = ""  # a route: its id in « Ce qu'on peut faire », whose path « chemin → » lights (#107)
 
 
 @dataclass

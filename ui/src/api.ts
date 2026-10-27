@@ -133,6 +133,25 @@ export interface CardFunction {
   verb: string;
   path: string;
   label: string; // « Voir un item » for a plain shape; empty otherwise
+  action: string; // a route: its id in « Ce qu'on peut faire », whose path « chemin → » lights (#107)
+}
+
+/** One thing the project can be asked to do (#107): an address the server answers, or a CLI command. */
+export interface Action {
+  id: string; // the function's file and line: « backend/app/api/routes/items.py:62 »
+  kind: "routes" | "commands";
+  verb: string; // « POST »; empty for a command
+  label: string; // « Créer un item » for a plain shape; empty otherwise
+  address: string; // « /api/v1/items/ », or the command as typed: « insert »
+  name: string;
+  file: string;
+  line: number;
+}
+
+/** « Ce qu'on peut faire », grouped by the file that holds them. */
+export interface ActionList {
+  total: number;
+  groups: { file: string; kind: "routes" | "commands"; actions: Action[] }[];
 }
 
 /** Level 2 (ADR-0007, #106): one part of a box, or one file of it, in four lines and its functions. */
@@ -159,15 +178,24 @@ export interface LitStep {
   path: string; // repo path, a folder ends with "/"; empty for a box without a folder
   note: string;
   why: string; // « pourquoi ici », on hover; empty when Claude gave none
+  part: string; // drawn inside `Highlight.inside` (Level 1): the part or stub it numbers
+  guess: boolean; // deduced, not read: drawn dashed, « supposé »
+  chip: string; // the file chip that lights with it (« items.py » in Routes)
 }
 
-/** What Claude Code lit on the map with `show` (#104): boxes lit, ≤ 6 numbered steps, the rest dimmed. */
+/** What is lit on the map (#104, #107): a question Claude Code answered with `show`, or the path of an
+ * action traced in the code. Boxes or parts lit, ≤ 6 numbered steps, the rest dimmed. */
 export interface Highlight {
   caption: string;
   boxes: string[];
   steps: LitStep[];
   files: string[]; // what « copier pour Claude » copies
   serial: number;
+  kind: "question" | "path";
+  detail: string; // said after the caption when copied: « POST /api/v1/items/ »
+  inside: string; // the box whose inside (Level 1) shows it; empty: the whole map
+  parts: string[]; // Level 1: lit parts and stubs
+  passed: string[]; // Level 1: parts the path goes through without a number
 }
 
 /** Why a request failed, in the terms the page shows. */
@@ -268,6 +296,10 @@ export const api = {
   activity: (id: string) => call<Turn[]>(`${project(id)}/activity`),
   /** What is lit now (a tab opened after Claude's `show` call); null when nothing. */
   shownNow: (id: string) => call<Highlight | null>(`${project(id)}/show`),
+  /** « Ce qu'on peut faire »: the addresses and commands, grouped by file. */
+  actions: (id: string) => call<ActionList>(`${project(id)}/system/actions`),
+  /** Lights an action's traced path on every open tab (the same highlight as a `show`). */
+  showAction: (id: string, action: string) => call<Highlight>(`${project(id)}/show/action`, { method: "POST", body: JSON.stringify({ action }) }),
   /** « effacer »: every open tab goes back to the plain map. */
   clearShown: (id: string) => call<{ cleared: boolean }>(`${project(id)}/show`, { method: "DELETE" }),
 };

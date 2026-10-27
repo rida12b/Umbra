@@ -1,8 +1,16 @@
 import { useEffect, useState } from "react";
 import { HelpCard } from "./MapCards";
 
+interface Props {
+  actions: number;
+  open: boolean; // the « Ce qu'on peut faire » panel is open: its button hides, as in the mock
+  onActions: () => void;
+  toast: string | null;
+  onToast: (text: string | null) => void;
+}
+
 /** The band under the map on every level: « Ce qu'on peut faire (N) », « ? » with how to read it, and one toast. */
-export function MapFooter({ actions, toast, onToast }: { actions: number; toast: string | null; onToast: (text: string | null) => void }) {
+export function MapFooter({ actions, open, onActions, toast, onToast }: Props) {
   const [help, setHelp] = useState(false);
 
   useEffect(() => {
@@ -25,12 +33,12 @@ export function MapFooter({ actions, toast, onToast }: { actions: number; toast:
   return (
     <>
       <footer className="pm-bottom">
-        {actions > 0 && (
-          <button type="button" className="pm-btn" onClick={() => onToast("La liste arrive dans la prochaine version d'Umbra.")}>
+        {actions > 0 && !open && (
+          <button type="button" className="pm-btn" aria-expanded={false} onClick={onActions}>
             Ce qu'on peut faire <b>({actions})</b>
           </button>
         )}
-        <button type="button" className="pm-btn round" aria-label="Aide : comment lire la carte" aria-expanded={help} onClick={() => setHelp((open) => !open)}>
+        <button type="button" className="pm-btn round" aria-label="Aide : comment lire la carte" aria-expanded={help} onClick={() => setHelp((shown) => !shown)}>
           ?
         </button>
       </footer>

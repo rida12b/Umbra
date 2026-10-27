@@ -2,6 +2,7 @@
 
 import threading
 from collections.abc import Callable
+from dataclasses import dataclass
 
 from fastapi import FastAPI, HTTPException, params, status
 
@@ -12,7 +13,7 @@ from umbra_engine.indexer import ANALYZERS, GIT_BRANCH, GIT_DATE
 from umbra_engine.project_store import ProjectStore
 from umbra_engine.projection.card import part_card
 from umbra_engine.projection.card_model import PartCard
-from umbra_engine.projection.inside import has_inside, read_inside
+from umbra_engine.projection.inside import InsideRead, has_inside, read_inside
 from umbra_engine.projection.inside_model import InsideMap
 from umbra_engine.projection.system import system_map
 from umbra_engine.projection.system_facts import SYSTEM_RELATIONS, Facts, facts_of
@@ -28,6 +29,30 @@ INDEXING = "indexing: Umbra is reading this project"
 CACHE_SIZE = 4
 Owners = dict[str, str]  # repo file -> the box that holds it
 SystemOf = Callable[..., tuple[SystemMap, Owners]]
+Read = tuple[SystemMap, Owners, Facts, list[Unit]]
+TextOf = Callable[[str], str | None]
+
+
+@dataclass
+class MapReader:
+    """What the routes of the map share with `show` and the actions (#104, #107)."""
+
+    system_of: SystemOf  # the placed map, and which box holds each indexed file
+    read: Callable[[str], Read]  # the same, with the facts and units it is built from
+    inside: Callable[[str, str], InsideRead | None]  # Level 1 of a box, as drawn; None without one
+
+
+def released_text(guard: SecretGuard) -> TextOf:
+    """A file's text as the Secret Guard releases it (None when it does not), each read once."""
+    texts: dict[str, str | None] = {}
+
+    def text_of(path: str) -> str | None:
+        if path not in texts:
+            released = guard.read(path)
+            texts[path] = released.text if isinstance(released, GuardedFile) else None
+        return texts[path]
+
+    return text_of
 
 
 def _signals_outdated(store: ProjectStore) -> bool:
@@ -41,8 +66,8 @@ def add_system_routes(
     known_project: Callable[[str], Project],
     indexed_store: Callable[[str], ProjectStore],
     ensure_indexed: Callable[..., bool],
-) -> SystemOf:
-    maps: dict[tuple[str, str], tuple[SystemMap, Owners, Facts, list[Unit]]] = {}
+) -> MapReader:
+    maps: dict[tuple[str, str], Read] = {}
     lock = threading.Lock()
 
     def system_of(project_id: str, retry: bool = False) -> tuple[SystemMap, Owners]:
@@ -50,7 +75,7 @@ def add_system_routes(
         found, owners, _, _ = read(project_id, retry)
         return found, owners
 
-    def read(project_id: str, retry: bool = False) -> tuple[SystemMap, Owners, Facts, list[Unit]]:
+    def read(project_id: str, retry: bool = False) -> Read:
         project = known_project(project_id)
         if not ensure_indexed(project_id, retry=retry, outdated=_signals_outdated):
             raise HTTPException(status.HTTP_409_CONFLICT, INDEXING)
@@ -106,15 +131,7 @@ def add_system_routes(
         """Level 2: one part of a box, or one file of it (a chip), in four lines and its functions, read
         in the code through the Secret Guard. 404 when the part is not drawn inside the box."""
         found, _, facts, units = read(project_id)
-        guard = SecretGuard(known_project(project_id).root)
-        texts: dict[str, str | None] = {}
-
-        def text_of(path: str) -> str | None:
-            if path not in texts:
-                released = guard.read(path)
-                texts[path] = released.text if isinstance(released, GuardedFile) else None
-            return texts[path]
-
+        text_of = released_text(SecretGuard(known_project(project_id).root))
         with indexed_store(project_id) as store, lock:
             read_box = read_inside(facts, units, found, box, store.layout(LEVEL_1 + box))
             if read_box is None:
@@ -128,4 +145,9 @@ def add_system_routes(
             raise HTTPException(status.HTTP_404_NOT_FOUND, f"no part {part!r} {file!r} in box {box!r}")
         return card
 
-    return system_of
+    def inside_of(project_id: str, box: str) -> InsideRead | None:
+        found, _, facts, units = read(project_id)
+        with indexed_store(project_id) as store, lock:
+            return read_inside(facts, units, found, box, store.layout(LEVEL_1 + box))
+
+    return MapReader(system_of, read, inside_of)

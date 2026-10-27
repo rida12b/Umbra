@@ -7,9 +7,11 @@ import posixpath
 import re
 from collections.abc import Callable
 
-from umbra_engine.projection.card_code import RouteDef, constant, mounts, router_prefixes
+from umbra_engine.projection.card_code import RouteDef, constant, mounts, router_prefixes, routes
+from umbra_engine.projection.system_facts import Facts
 
 TextOf = Callable[[str], str | None]
+Route = tuple[str, RouteDef, str, str]  # file, route, full address, plain words
 MAX_HOPS = 4
 SUFFIXES = ("Public", "Out", "Response", "Read", "Schema")
 ORDER = ("GET", "POST", "PUT", "PATCH", "DELETE")
@@ -20,6 +22,25 @@ DOES = {
     "Modifier": "modifier",
     "Supprimer": "supprimer",
 }
+
+
+def action_id(file: str, line: int) -> str:
+    """An action of « Ce qu'on peut faire » (#107): the file and line of the function that does it."""
+    return f"{file}:{line}"
+
+
+def read_routes(facts: Facts, unit_files: set[str], files: list[str], text_of: TextOf) -> list[Route]:
+    """The routes of `files`, each with its full address and plain words (card, « Ce qu'on peut faire »)."""
+    mount_files = sorted({c.file for c in facts.signal("mount", unit_files)})
+    settings = sorted({c.file for c in facts.signal("settings")})
+    found: list[Route] = []
+    for file in files:
+        python = file.endswith(".py")
+        for route in routes(text_of(file) or "", python):
+            prefix = full_prefix(file, route.router, text_of, mount_files, settings) if python else ""
+            full = address(prefix, route.path)
+            found.append((file, route, full, label(route.verb, full, route.owned)))
+    return found
 
 
 def full_prefix(file: str, router: str, text_of: TextOf, mount_files: list[str], settings: list[str]) -> str:

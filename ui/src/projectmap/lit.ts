@@ -1,4 +1,4 @@
-import type { Highlight, LitStep } from "../api.ts";
+import type { Highlight, LitStep, SystemLink } from "../api.ts";
 import type { Geometry, Rect } from "./geometry.ts";
 
 // A path lit by Claude Code (`show`, #104; mock p-question.png): the lit boxes stay, the rest is dimmed, and
@@ -128,10 +128,54 @@ function widthOf(step: LitStep): number {
   return Math.ceil(44 + step.label.length * MONO_CHAR + (step.note ? 18 + step.note.length * SANS_CHAR : 0) + 14);
 }
 
-/** « copier pour Claude »: the question and the files, ready to paste for an agent (mock copyFiles). */
+/** « copier pour Claude »: the question (or the action) and the files, ready to paste for an agent (mock copyFiles). */
 export function copyText(highlight: Highlight): string {
   const files = highlight.files.map((f) => `- ${f}`).join("\n");
-  return `Tâche : ${highlight.caption}\nFichiers (${highlight.files.length}) :\n${files}`;
+  const title = highlight.kind === "path" ? `Chemin : ${highlight.caption}${highlight.detail ? ` (${highlight.detail})` : ""}` : `Tâche : ${highlight.caption}`;
+  return `${title}\nFichiers (${highlight.files.length}) :\n${files}`;
+}
+
+export type LitState = "cur" | "on" | "pass";
+
+/** A path drawn inside a box (#107, mock p-chemin.png): each numbered part with its badge, the parts it
+ * goes through unnumbered, and the arrows between two steps in a row (through a passed part when they have
+ * no arrow of their own). The current step is strong, the others half lit; with no current step (a
+ * question from Claude Code) every step is strong. */
+export interface InsideLit {
+  parts: Map<string, LitState>;
+  badges: Map<string, { n: number; cur: boolean }>;
+  guesses: Set<string>; // parts whose step is only supposed: drawn dashed
+  arrows: Map<string, LitState>; // by link id
+  chips: Set<string>; // files whose chip lights
+}
+
+export function insideLit(highlight: Highlight, links: SystemLink[], step: number | null): InsideLit {
+  const state = (n: number): LitState => (step === null || n === step ? "cur" : "on");
+  const lit: InsideLit = { parts: new Map(), badges: new Map(), guesses: new Set(), arrows: new Map(), chips: new Set() };
+  for (const passed of highlight.passed) lit.parts.set(passed, "pass");
+  const between = (source: string, target: string) => links.filter((x) => x.source === source && x.target === target);
+  highlight.steps.forEach((s, i) => {
+    lit.parts.set(s.part, state(s.n));
+    lit.badges.set(s.part, { n: s.n, cur: step === s.n });
+    if (s.guess) lit.guesses.add(s.part);
+    if (s.chip) lit.chips.add(s.chip);
+    // The arrow in comes from the latest step before it that has one (Routes → Modèles after Contrôle
+    // d'accès), else through a passed part (Application web → Porte d'entrée → Routes).
+    const earlier = highlight.steps.slice(0, i).reverse();
+    const direct = earlier.map((e) => between(e.part, s.part)).find((found) => found.length) ?? [];
+    const before = highlight.steps[i - 1];
+    const through =
+      direct.length || !before ? [] : highlight.passed.flatMap((p) => (between(before.part, p).length && between(p, s.part).length ? [...between(before.part, p), ...between(p, s.part)] : []));
+    for (const link of [...direct, ...through]) lit.arrows.set(link.id, state(s.n));
+  });
+  return lit;
+}
+
+/** ← and → along the numbered steps: from nothing chosen, → starts at 1 and ← at the last. */
+export function nextStep(current: number | null, count: number, forward: boolean): number | null {
+  if (!count) return null;
+  if (current === null) return forward ? 1 : count;
+  return Math.min(count, Math.max(1, current + (forward ? 1 : -1)));
 }
 
 /** The view box grown downwards when a callout would leave it; the same box otherwise (the map never moves). */

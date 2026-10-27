@@ -1,15 +1,17 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { api, type Project, type SystemMap } from "../api";
+import type { Project, SystemMap } from "../api";
 import { useLive } from "../live";
 import { MAP_VIEW, navigate } from "../route";
 import { Button, StateMessage } from "../ui";
+import { ActionsPanel } from "./actions/ActionsPanel";
 import { CaptionBar } from "./CaptionBar";
 import { frenchDate, geometry } from "./geometry";
 import { InsideView } from "./inside/InsideView";
-import { callouts, copyText } from "./lit";
+import { callouts } from "./lit";
 import { MapDrawing, type Hint, type Pointer } from "./MapDrawing";
 import { AroundList, HintCard, type Place } from "./MapCards";
 import { MapFooter } from "./MapFooter";
+import { useLit, type Lit } from "./useLit";
 import { useSystem } from "./useSystem";
 
 export interface Crumbs {
@@ -24,12 +26,21 @@ interface Props {
   onCrumb: (crumbs: Crumbs) => void; // what the top bar names after « Vue d'ensemble »
 }
 
+/** « Ce qu'on peut faire » (#107): open or not, on every level. */
+export interface Panel {
+  open: boolean;
+  onOpen: () => void;
+  onClose: () => void;
+}
+
 /** A Project's map (ADR-0007): Level 0, what it is, who comes in, its parts, what leaves; Level 1, inside one box. */
 export function ProjectMap({ project, box, card, onCrumb }: Props) {
   const [state, retry] = useSystem(project.id);
   const [selected, setSelected] = useState<string | null>(null); // kept while zooming in and out
   const origin = useRef<string | null>(null);
-  const highlight = useLive().highlight;
+  const lit = useLit(project.id);
+  const [open, setOpen] = useState(false);
+  const panel = useMemo(() => ({ open, onOpen: () => setOpen(true), onClose: () => setOpen(false) }), [open]);
   const map = state.kind === "ready" ? state.map : null;
   const inside = box ? map?.boxes.find((b) => b.id === box) : undefined;
 
@@ -43,13 +54,16 @@ export function ProjectMap({ project, box, card, onCrumb }: Props) {
   const crumb = inside?.opens ? inside.title : null; // a box with no inside stays on the whole map
   const shownCard = crumb && card ? cardTitle : null;
   useEffect(() => onCrumb({ inside: crumb, card: shownCard }), [crumb, shownCard, onCrumb]);
-  // Claude lights its answer on Level 0 (#104): a `show` brings the map back to it.
-  const serial = highlight?.serial;
+  // Something newly lit (Claude's `show`, #104, or an action, #107) brings the map where it is drawn: the
+  // box whose inside shows it, or the whole map; an open card closes.
+  const live = useLive().highlight;
+  const serial = live?.serial;
+  const target = live?.inside || null;
   const seen = useRef(serial);
   useEffect(() => {
-    if (serial !== undefined && serial !== seen.current && box) up();
+    if (serial !== undefined && serial !== seen.current && (target !== box || card)) go(target);
     seen.current = serial;
-  }, [serial, box, up]);
+  }, [serial, target, box, card, go]);
 
   if (state.kind === "loading") return <StateMessage>Lecture de la carte…</StateMessage>;
   if (state.kind === "reading")
@@ -78,12 +92,15 @@ export function ProjectMap({ project, box, card, onCrumb }: Props) {
       <InsideView
         key={box}
         projectId={project.id}
+        name={state.map.name}
         root={project.root}
         box={box}
         card={card}
         onCard={openCard}
         onCardTitle={setCardTitle}
         actions={state.map.actions}
+        panel={panel}
+        lit={lit}
         origin={origin.current}
         onUp={() => {
           setSelected(box);
@@ -103,6 +120,8 @@ export function ProjectMap({ project, box, card, onCrumb }: Props) {
       projectId={project.id}
       selected={selected}
       onSelect={setSelected}
+      panel={panel}
+      lit={lit}
       onOpen={(id, at) => {
         origin.current = at;
         go(id);
@@ -116,36 +135,24 @@ interface LoadedProps {
   projectId: string;
   selected: string | null;
   onSelect: (id: string | null) => void;
+  panel: Panel;
+  lit: Lit;
   onOpen: (id: string, origin: string | null) => void; // zoom into a box that has an inside
 }
 
-function Loaded({ map, projectId, selected, onSelect, onOpen }: LoadedProps) {
+function Loaded({ map, projectId, selected, onSelect, panel, lit, onOpen }: LoadedProps) {
   const stage = useRef<HTMLDivElement>(null);
   const drawn = useMemo(() => geometry(map), [map]);
   const [hint, setHint] = useState<{ hint: Hint; at: Place } | null>(null);
   const [around, setAround] = useState<Place | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const overList = useRef(false);
-  // A path Claude Code lit from the terminal (`show`, #104); « effacer » hides it here at once.
-  const shown = useLive().highlight;
-  const [hidden, setHidden] = useState<number | null>(null);
-  const highlight = shown && shown.serial !== hidden ? shown : null;
-  const [step, setStep] = useState<number | null>(null);
-  useEffect(() => setStep(null), [highlight?.serial]);
-  const lit = useMemo(
-    () => (highlight ? { boxes: new Set(highlight.boxes), callouts: callouts(drawn, highlight), current: step } : null),
-    [highlight, drawn, step],
+  // A path lit on the whole map (a question, or an action of a project with no inside): callouts under boxes.
+  const highlight = lit.highlight && !lit.highlight.inside ? lit.highlight : null;
+  const drawnLit = useMemo(
+    () => (highlight ? { boxes: new Set(highlight.boxes), callouts: callouts(drawn, highlight), current: lit.step } : null),
+    [highlight, drawn, lit.step],
   );
-  const clear = () => {
-    if (!highlight) return;
-    setHidden(highlight.serial);
-    api.clearShown(projectId).catch(() => undefined); // the other tabs go back to the plain map too
-  };
-  const copy = () => {
-    if (!highlight) return;
-    copyToClipboard(copyText(highlight));
-    setToast("Copié");
-  };
 
   const place = (at: Pointer): Place => {
     const box = stage.current?.getBoundingClientRect();
@@ -165,15 +172,9 @@ function Loaded({ map, projectId, selected, onSelect, onOpen }: LoadedProps) {
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
-      const count = highlight?.steps.length ?? 0;
-      if (count && (event.key === "ArrowRight" || event.key === "ArrowLeft")) {
-        const forward = event.key === "ArrowRight";
-        setStep((n) => (n === null ? (forward ? 1 : count) : Math.min(count, Math.max(1, n + (forward ? 1 : -1)))));
-        return;
-      }
       if (event.key !== "Escape") return;
       if (around) setAround(null);
-      else if (highlight) clear();
+      else if (highlight) lit.clear();
       else onSelect(null);
     };
     window.addEventListener("keydown", onKey);
@@ -193,62 +194,62 @@ function Loaded({ map, projectId, selected, onSelect, onOpen }: LoadedProps) {
           <p>{where || "pas d'historique git"}</p>
         </section>
       </header>
-      {highlight && <CaptionBar caption={highlight.caption} onCopy={copy} onClear={clear} />}
+      {highlight && (
+        <CaptionBar
+          highlight={highlight}
+          step={lit.step}
+          onMove={lit.move}
+          onCopy={() => {
+            lit.copy();
+            setToast("Copié");
+          }}
+          onClear={lit.clear}
+        />
+      )}
       <p className="pm-slide" aria-hidden="true">
         La carte glisse sur le côté : la suite est à droite →
       </p>
-      <div ref={stage} className="pm-mapwrap" onClick={(e) => e.target === e.currentTarget && onSelect(null)}>
-        {map.boxes.length === 0 ? (
-          <StateMessage title="Rien qui tourne n'a été trouvé">
-            <p>Ni service, ni manifeste, ni dossier de code : la carte reste vide.</p>
-          </StateMessage>
-        ) : (
-          <MapDrawing
-            map={map}
-            drawn={drawn}
-            selected={selected}
-            onSelect={(id) => {
-              // A box with an inside zooms into it; any other box is selected (a second click lets go).
-              if (map.boxes.find((b) => b.id === id)?.opens) onOpen(id, originOf(id));
-              else onSelect(selected === id ? null : id);
-            }}
-            onHint={(next, at) => setHint(next && at ? { hint: next, at: place(at) } : null)}
-            onAround={(at) => {
-              setHint(null);
-              setAround(place(at));
-            }}
-            onAroundLeave={() => window.setTimeout(() => !overList.current && setAround(null), 150)}
-            lit={lit}
-          />
-        )}
-        {hint && <HintCard hint={hint.hint} at={hint.at} />}
-        {around && (
-          <AroundList
-            items={map.around}
-            at={around}
-            onEnter={() => (overList.current = true)}
-            onLeave={() => {
-              overList.current = false;
-              setAround(null);
-            }}
-          />
-        )}
+      <div className="pm-stage">
+        <div ref={stage} className="pm-mapwrap" onClick={(e) => e.target === e.currentTarget && onSelect(null)}>
+          {map.boxes.length === 0 ? (
+            <StateMessage title="Rien qui tourne n'a été trouvé">
+              <p>Ni service, ni manifeste, ni dossier de code : la carte reste vide.</p>
+            </StateMessage>
+          ) : (
+            <MapDrawing
+              map={map}
+              drawn={drawn}
+              selected={selected}
+              onSelect={(id) => {
+                // A box with an inside zooms into it; any other box is selected (a second click lets go).
+                if (map.boxes.find((b) => b.id === id)?.opens) onOpen(id, originOf(id));
+                else onSelect(selected === id ? null : id);
+              }}
+              onHint={(next, at) => setHint(next && at ? { hint: next, at: place(at) } : null)}
+              onAround={(at) => {
+                setHint(null);
+                setAround(place(at));
+              }}
+              onAroundLeave={() => window.setTimeout(() => !overList.current && setAround(null), 150)}
+              lit={drawnLit}
+            />
+          )}
+          {hint && <HintCard hint={hint.hint} at={hint.at} />}
+          {around && (
+            <AroundList
+              items={map.around}
+              at={around}
+              onEnter={() => (overList.current = true)}
+              onLeave={() => {
+                overList.current = false;
+                setAround(null);
+              }}
+            />
+          )}
+        </div>
+        {panel.open && <ActionsPanel projectId={projectId} name={map.name} onClose={panel.onClose} />}
       </div>
-      <MapFooter actions={map.actions} toast={toast} onToast={setToast} />
+      <MapFooter actions={map.actions} open={panel.open} onActions={panel.onOpen} toast={toast} onToast={setToast} />
     </div>
   );
-}
-
-/** The clipboard API, or the old way when the page is not allowed to use it. */
-function copyToClipboard(text: string): void {
-  const fallback = () => {
-    const area = document.createElement("textarea");
-    area.value = text;
-    document.body.appendChild(area);
-    area.select();
-    document.execCommand("copy");
-    area.remove();
-  };
-  if (navigator.clipboard) navigator.clipboard.writeText(text).catch(fallback);
-  else fallback();
 }
