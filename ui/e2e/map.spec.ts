@@ -175,3 +175,25 @@ test("a question answered from Claude Code while a box is open lights it on the 
   await expect(page.getByLabel("1 orders.py")).toBeVisible();
   await page.request.delete(`/v1/projects/${project}/show`, { headers });
 });
+
+test("a click on a part opens its card under the map: four lines, its functions open VS Code at their line; Esc goes up one level (#106)", async ({ page }) => {
+  const project = await signIn(page);
+  await page.goto(`/#/p/${project}?box=server%3Aapi`);
+  await page.getByRole("button", { name: /^Modèles/ }).click();
+  await expect(page).toHaveURL(/part=server%3Aapi%2Fmodels/);
+  const card = page.getByRole("region", { name: "Carte de Modèles" });
+  await expect(card).toBeVisible();
+  for (const label of ["Reçoit", "Renvoie", "Appelé par", "Appelle"]) await expect(card.getByText(label, { exact: true })).toBeVisible();
+  const fn = card.getByRole("link", { name: /create_order/ });
+  await expect(fn).toHaveAttribute("href", /^vscode:\/\/file\/.+\/api\/app\/orders\.py:4$/);
+  await expect(card.getByRole("link", { name: "ouvrir le code" })).toHaveAttribute("href", /orders\.py:1$/);
+  await expect(page.getByRole("button", { name: /^Porte d'entrée/ })).toBeVisible(); // the map stays on the same screen
+  const crumbs = page.getByRole("navigation", { name: "Où vous êtes" });
+  await expect(crumbs.locator("[aria-current=page]")).toHaveText("Modèles");
+  await page.keyboard.press("Escape"); // the card first
+  await expect(page).not.toHaveURL(/part=/);
+  await expect(page).toHaveURL(/box=server/);
+  await expect(card).toHaveCount(0);
+  await page.keyboard.press("Escape"); // then the box
+  await expect(page).not.toHaveURL(/box=/);
+});

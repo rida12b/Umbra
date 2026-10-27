@@ -215,10 +215,38 @@
 .pm-map .pm-stub .tt { font-size: 14px; font-weight: 600; fill: var(--u-stub-ink); }
 .pm-map .pm-stub .st { font-size: 12.5px; fill: var(--u-stub-ink); }
 .pm-stub:hover rect.b, .pm-stub:focus-visible rect.b { stroke: var(--u-muted); }
-.pm-chip { cursor: help; outline: none; }
+.pm-chip { cursor: pointer; outline: none; }
 .pm-chip rect { fill: var(--u-raised); stroke: var(--u-line); }
 .pm-map .pm-chip text { font-family: var(--font-mono); font-size: 12.5px; fill: var(--u-ink); }
 .pm-chip:hover rect, .pm-chip:focus-visible rect { stroke: var(--u-accent); }
+.pm-chip.lit rect { fill: var(--u-accent); stroke: var(--u-accent); }
+.pm-map .pm-chip.lit text { fill: var(--u-accent-ink); font-weight: 700; }
+/* Level 2 (#106, mock p-items.png): the card of a part or a file, under the map, on the same screen */
+.pm-card { flex: none; display: grid; grid-template-columns: 230px 1fr 1fr; gap: 22px; margin: 0 20px 10px; padding: 14px 18px; background: var(--u-panel); border: 1px solid var(--u-accent); border-radius: 12px; box-shadow: var(--u-shadow); min-width: 0; }
+.pm-card.pm-card-wait { display: block; color: var(--u-muted); font-size: 13.5px; }
+.pm-card > * { min-width: 0; }
+.pm-card-id h2 { margin: 0; font-size: 20px; font-weight: 700; overflow-wrap: anywhere; line-height: 1.3; }
+.pm-card-id h2.mono { font-family: var(--font-mono); }
+.pm-card-id .path { font-family: var(--font-mono); font-size: 12px; color: var(--u-faint); margin: 4px 0 12px; overflow-wrap: anywhere; line-height: normal; }
+a.pm-link { display: inline-block; text-decoration: none; font-size: 13px; font-weight: 500; line-height: normal; }
+.pm-four { margin: 0; border: 1px solid var(--u-line); border-radius: 10px; overflow: hidden; }
+.pm-four > div { display: grid; grid-template-columns: 92px 1fr; gap: 10px; padding: 7px 12px; border-top: 1px solid var(--u-line); font-size: 13.5px; line-height: 1.4; }
+.pm-four > div:first-child { border-top: 0; }
+.pm-four dt { color: var(--u-faint); font-size: 12.5px; padding-top: 1px; }
+.pm-four dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
+.pm-four .mono { font-family: var(--font-mono); font-size: 12px; color: var(--u-muted); }
+.pm-four .guess { border-bottom: 1.5px dashed var(--u-faint); cursor: help; }
+.pm-card .none { color: var(--u-faint); font-size: 13px; }
+.pm-card-fns .sec { margin: 0 0 4px; font-size: 12px; font-weight: 700; color: var(--u-faint); text-transform: uppercase; letter-spacing: 0.7px; }
+.pm-card-fns .sec .count { font-weight: 600; }
+.pm-card-fns .acts { list-style: none; margin: 0; padding: 0; max-height: 162px; overflow-y: auto; } /* 5½ rows: the map keeps its room */
+.pm-card-fns .act { display: flex; align-items: center; gap: 10px; padding: 5px 8px; border-radius: 8px; font-size: 14px; line-height: 1.35; color: var(--u-ink); text-decoration: none; min-width: 0; }
+.pm-card-fns .act:hover, .pm-card-fns .act:focus-visible { background: var(--u-raised); }
+.pm-card-fns .m { font-family: var(--font-mono); font-size: 11px; font-weight: 700; width: 54px; flex: none; color: var(--u-muted); border: 1px solid var(--u-line); border-radius: 5px; text-align: center; padding: 2px 0; line-height: normal; }
+.pm-card-fns .lab { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.pm-card-fns .lab.mono { font-family: var(--font-mono); font-size: 13px; }
+.pm-card-fns .fn { font-family: var(--font-mono); font-size: 12px; color: var(--u-faint); white-space: nowrap; flex: none; }
+.pm-card-fns .more { padding: 5px 8px; font-size: 13px; color: var(--u-faint); }
 .pm-zoomin > svg { animation: pm-zoom 280ms ease-out; transform-origin: inherit; }
 @keyframes pm-zoom { from { transform: scale(0.4); opacity: 0.15; } to { transform: none; opacity: 1; } }
 @media (prefers-reduced-motion: reduce) { .pm-zoomin > svg { animation: none; } }
@@ -235,6 +263,9 @@
   .pm-caption .what { flex-basis: 100%; }
   .pm-caption .q { white-space: normal; }
   .pm-caption .tag { display: none; }
+  .pm-card { display: flex; flex-direction: column; gap: 12px; margin: 0 8px 8px; padding: 12px; max-height: 52vh; overflow-y: auto; }
+  .pm-card > * { flex: none; }
+  .pm-card-fns .acts { max-height: none; }
 }
 
 /* Code is shown as it is written: the monospace font draws no ligature (« >= » stays « >= », never « ≥ »). */

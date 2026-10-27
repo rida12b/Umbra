@@ -110,6 +110,47 @@ export interface InsideMap {
   around: AroundItem[];
 }
 
+/** One word of a card line: plain, a repo name in monospace, or deduced (dashed, « supposé »). */
+export interface CardWord {
+  text: string;
+  mono: boolean;
+  inferred: boolean;
+  hint: string; // on hover: the files behind it; empty when none
+}
+
+/** « Reçoit », « Renvoie », « Appelé par » or « Appelle »; no word when nothing was read. */
+export interface CardLine {
+  label: string;
+  words: CardWord[];
+  proofs: Proof[];
+}
+
+/** A function of the card, opened in VS Code at its line; a route also has its verb and address. */
+export interface CardFunction {
+  name: string;
+  file: string;
+  line: number;
+  verb: string;
+  path: string;
+  label: string; // « Voir un item » for a plain shape; empty otherwise
+}
+
+/** Level 2 (ADR-0007, #106): one part of a box, or one file of it, in four lines and its functions. */
+export interface PartCard {
+  box: string;
+  part: string;
+  file: string; // empty for the whole part
+  title: string;
+  folder: string;
+  path: string;
+  sentence: string;
+  open_file: string;
+  lines: CardLine[];
+  section: string;
+  functions: CardFunction[];
+  more: number;
+}
+
 /** One numbered place of a lit path, under its box: « 3 models.py — ajouter le champ ». */
 export interface LitStep {
   n: number;
@@ -221,6 +262,9 @@ export const api = {
   system: (id: string, retry = false) => call<SystemMap>(`${project(id)}/system${retry ? "?relire=true" : ""}`),
   /** Level 1: the inside of one box of the map; 404 when it has none. */
   inside: (id: string, box: string) => call<InsideMap>(`${project(id)}/system/inside?box=${encodeURIComponent(box)}`),
+  /** Level 2: the card of one part of a box, or of one file of it; 404 when it is not drawn there. */
+  card: (id: string, box: string, part: string, file: string | null) =>
+    call<PartCard>(`${project(id)}/system/card?${new URLSearchParams({ box, part, file: file ?? "" })}`),
   activity: (id: string) => call<Turn[]>(`${project(id)}/activity`),
   /** What is lit now (a tab opened after Claude's `show` call); null when nothing. */
   shownNow: (id: string) => call<Highlight | null>(`${project(id)}/show`),

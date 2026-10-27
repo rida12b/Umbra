@@ -8,6 +8,8 @@ export interface Route {
   projectId: string | null;
   node: string;
   box?: string | null; // Level 1: the box whose inside is shown (`?box=server:backend`)
+  part?: string | null; // Level 2: the part of that box whose card is open (`&part=server:backend/routes`)
+  file?: string | null; // Level 2: one file of the part (a chip, `&file=backend/app/api/routes/items.py`)
 }
 
 export const MAP_VIEW = "arch:"; // a Project opens on its map; links made for older views open it too
@@ -35,10 +37,14 @@ export function parseRoute(hash: string): Route {
   const params = new URLSearchParams(query);
   const node = params.get("node");
   const view = node === ACTIVITY_VIEW ? ACTIVITY_VIEW : MAP_VIEW;
+  const box = view === MAP_VIEW ? params.get("box") || null : null;
+  const part = box ? params.get("part") || null : null;
   return {
     projectId: match?.[1] ? safeDecode(match[1]) : null,
     node: view,
-    box: view === MAP_VIEW ? params.get("box") || null : null,
+    box,
+    part,
+    file: part ? params.get("file") || null : null,
   };
 }
 
@@ -53,9 +59,16 @@ function safeDecode(text: string): string | null {
 
 export function routeHash(route: Route): string {
   if (!route.projectId) return "#/";
-  const params: Record<string, string> | null = route.node === MAP_VIEW ? (route.box ? { box: route.box } : null) : { node: route.node };
+  const params: Record<string, string> | null = route.node === MAP_VIEW ? mapParams(route) : { node: route.node };
   const query = params ? `?${new URLSearchParams(params)}` : "";
   return `#/p/${encodeURIComponent(route.projectId)}${query}`;
+}
+
+/** `box`, then `part` and `file` only under it: a card never opens without its box. */
+function mapParams({ box, part, file }: Route): Record<string, string> | null {
+  if (!box) return null;
+  if (!part) return { box };
+  return file ? { box, part, file } : { box, part };
 }
 
 export function navigate(route: Route): void {

@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { ApiError, api, whenSignedOut, type Project } from "./api";
 import { LiveContext, useLiveEvents } from "./live";
 import { useNewVersion } from "./newVersion";
+import type { Crumbs } from "./projectmap/ProjectMap";
 import { ProjectPage } from "./ProjectPage";
 import { ACTIVITY_VIEW, takeLoginCode, useRoute } from "./route";
 import { TopBar } from "./shell/TopBar";
@@ -21,7 +22,7 @@ export function App() {
   const route = useRoute();
   const [projects, setProjects] = useState<Projects>(null);
   const outdated = useNewVersion();
-  const [crumb, setCrumb] = useState<string | null>(null); // the box whose inside is open (Level 1)
+  const [crumbs, setCrumbs] = useState<Crumbs>({ inside: null, card: null }); // Level 1 and Level 2 open
 
   useEffect(() => {
     whenSignedOut(() => setProjects({ error: new ApiError(401, "signed out") }));
@@ -62,7 +63,9 @@ export function App() {
         <TopBar
           project={project}
           activity={route.node === ACTIVITY_VIEW}
-          inside={route.node === ACTIVITY_VIEW || !route.box ? null : crumb}
+          inside={route.node === ACTIVITY_VIEW || !route.box ? null : crumbs.inside}
+          card={route.node === ACTIVITY_VIEW || !route.box || !route.part ? null : crumbs.card}
+          box={route.box ?? null}
           theme={theme}
           onToggleTheme={toggleTheme}
         />
@@ -79,7 +82,7 @@ export function App() {
           </StateMessage>
         )}
         {project && (
-          <ProjectPage key={project.id} project={project} route={route} onCrumb={setCrumb} />
+          <ProjectPage key={project.id} project={project} route={route} onCrumb={setCrumbs} />
         )}
       </div>
     </LiveContext.Provider>

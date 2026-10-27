@@ -12,14 +12,20 @@ import { AroundList, HintCard, type Place } from "./MapCards";
 import { MapFooter } from "./MapFooter";
 import { useSystem } from "./useSystem";
 
+export interface Crumbs {
+  inside: string | null; // the box whose inside is open (Level 1): « Serveur »
+  card: string | null; // the part or file whose card is open (Level 2): « items.py »
+}
+
 interface Props {
   project: Project;
   box: string | null; // Level 1: the box whose inside is shown; null on Level 0
-  onCrumb: (title: string | null) => void; // what the top bar names after « Vue d'ensemble »
+  card: { part: string; file: string | null } | null; // Level 2: the card open inside that box
+  onCrumb: (crumbs: Crumbs) => void; // what the top bar names after « Vue d'ensemble »
 }
 
 /** A Project's map (ADR-0007): Level 0, what it is, who comes in, its parts, what leaves; Level 1, inside one box. */
-export function ProjectMap({ project, box, onCrumb }: Props) {
+export function ProjectMap({ project, box, card, onCrumb }: Props) {
   const [state, retry] = useSystem(project.id);
   const [selected, setSelected] = useState<string | null>(null); // kept while zooming in and out
   const origin = useRef<string | null>(null);
@@ -29,8 +35,14 @@ export function ProjectMap({ project, box, onCrumb }: Props) {
 
   const go = useCallback((next: string | null) => navigate({ projectId: project.id, node: MAP_VIEW, box: next }), [project.id]);
   const up = useCallback(() => go(null), [go]);
+  const openCard = useCallback(
+    (next: { part: string; file: string | null } | null) => navigate({ projectId: project.id, node: MAP_VIEW, box, part: next?.part, file: next?.file }),
+    [project.id, box],
+  );
+  const [cardTitle, setCardTitle] = useState<string | null>(null);
   const crumb = inside?.opens ? inside.title : null; // a box with no inside stays on the whole map
-  useEffect(() => onCrumb(crumb), [crumb, onCrumb]);
+  const shownCard = crumb && card ? cardTitle : null;
+  useEffect(() => onCrumb({ inside: crumb, card: shownCard }), [crumb, shownCard, onCrumb]);
   // Claude lights its answer on Level 0 (#104): a `show` brings the map back to it.
   const serial = highlight?.serial;
   const seen = useRef(serial);
@@ -66,7 +78,11 @@ export function ProjectMap({ project, box, onCrumb }: Props) {
       <InsideView
         key={box}
         projectId={project.id}
+        root={project.root}
         box={box}
+        card={card}
+        onCard={openCard}
+        onCardTitle={setCardTitle}
         actions={state.map.actions}
         origin={origin.current}
         onUp={() => {
