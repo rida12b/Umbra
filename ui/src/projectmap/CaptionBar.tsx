@@ -5,7 +5,7 @@ export function CaptionBar({ caption, onCopy, onClear }: { caption: string; onCo
     <section className="pm-caption" aria-label="Question posée dans Claude Code">
       <div className="what">
         <span className="kind">Question</span>
-        <span className="q">« {caption} »</span>
+        <span className="q">{quoted(caption)}</span>
         <span className="tag">posée dans Claude Code</span>
       </div>
       <button type="button" className="pm-btn primary" onClick={onCopy}>
@@ -16,4 +16,11 @@ export function CaptionBar({ caption, onCopy, onClear }: { caption: string; onCo
       </button>
     </section>
   );
+}
+
+const NBSP = " ";
+
+/** French quotes with no-break spaces: « ? » never ends alone on the next line (narrow screens). */
+export function quoted(caption: string): string {
+  return `«${NBSP}${caption.trim().replace(/ (?=[?!:;])/g, NBSP)}${NBSP}»`;
 }

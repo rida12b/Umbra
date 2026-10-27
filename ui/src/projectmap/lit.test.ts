@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { test } from "node:test";
 import type { Highlight, LitStep, SystemMap } from "../api.ts";
 import { geometry, type Rect } from "./geometry.ts";
-import { applyEvent, callouts, copyText, newer, viewBoxWith } from "./lit.ts";
+import { applyEvent, callouts, copyText, gapsUnder, labelY, newer, viewBoxWith } from "./lit.ts";
 
 const template = JSON.parse(readFileSync(new URL("../../test-fixtures/system-fastapi-template.json", import.meta.url), "utf-8")) as SystemMap;
 const step = (n: number, box: string, label: string, path: string, note: string): LitStep => ({ n, box, label, path, note, why: "" });
@@ -95,4 +95,25 @@ test("a box with another box right under it gets its callout on its right, clear
   for (const callout of placed) for (const box of drawn.boxes) assert.ok(!overlap(callout, box.rect), `${callout.box} callout covers ${box.box.id}`);
   const [x1, y1, x2, y2] = onRight.connector;
   assert.deepEqual([x1, x2, y1 === y2], [commandBox.x + commandBox.w, onRight.x, true]);
+  const midLine = commandBox.y + commandBox.h / 2; // where the command's output line leaves it
+  assert.ok(onRight.y > midLine, "the command's callout sits on its output line");
+  const chip = drawn.around as NonNullable<typeof drawn.around>;
+  for (const callout of placed) assert.ok(!overlap(callout, { ...chip, w: chip.w + 16, h: 36 }), `${callout.box} callout touches the pill`);
+  assert.deepEqual(gapsUnder(placed).length, 1); // only the callout under its box has a gap to cover
+});
+
+test("between a lit box and its callout only the blue connector shows; a covered arrow label moves under the callout", () => {
+  const drawn = geometry(template);
+  const placed = callouts(drawn, price);
+  const gaps = gapsUnder(placed);
+  assert.equal(gaps.length, 2);
+  for (const [i, gap] of gaps.entries()) {
+    const callout = placed[i] as (typeof placed)[0];
+    assert.deepEqual([gap.x, gap.w, gap.y + gap.h], [callout.x, callout.w, callout.y]);
+    assert.ok(gap.y > callout.connector[1], "the gap covers the box's border");
+  }
+  const server = placed[1] as (typeof placed)[0];
+  const inside = labelY(server.x + 30, server.y + 20, placed);
+  assert.equal(inside, server.y + server.h + 13);
+  assert.equal(labelY(server.x + 30, server.y - 30, placed), server.y - 30); // a free label stays
 });

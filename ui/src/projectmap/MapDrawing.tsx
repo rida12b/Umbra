@@ -1,7 +1,7 @@
 import type { FocusEvent, MouseEvent } from "react";
 import type { Proof, SystemMap } from "../api";
 import { aroundText, type DrawnBox, type Geometry } from "./geometry";
-import { viewBoxWith, type Callout } from "./lit";
+import { gapsUnder, labelY, viewBoxWith, type Callout } from "./lit";
 import { CalloutRows } from "./MapCallout";
 
 /** What a hover or a keyboard focus shows: what it is, in a sentence, and the lines that prove it. */
@@ -72,7 +72,7 @@ export function MapDrawing({ map, drawn, selected, onSelect, onHint, onAround, o
           <g key={key} className={`pm-arrow pm-dimmable${link.inferred ? " dash" : ""}`} tabIndex={0} aria-label={`${titles[from]} ${label.text} ${titles[to]}`} {...hover(hint)}>
             <path className="hitp" d={path} />
             <path className="l" d={path} markerEnd="url(#pm-ah)" />
-            <text className="pm-lbl" x={label.x} y={label.y} textAnchor={label.anchor}>
+            <text className="pm-lbl" x={label.x} y={lit ? labelY(label.x, label.y, lit.callouts) : label.y} textAnchor={label.anchor}>
               {label.text}
             </text>
           </g>
@@ -116,6 +116,7 @@ export function MapDrawing({ map, drawn, selected, onSelect, onHint, onAround, o
           </text>
         </g>
       )}
+      {lit && gapsUnder(lit.callouts).map((gap) => <rect key={`${gap.x},${gap.y}`} className="pm-gap" x={gap.x} y={gap.y} width={gap.w} height={gap.h} aria-hidden="true" />)}
       {lit?.callouts.map((callout) => <CalloutRows key={callout.box} callout={callout} current={lit.current} hover={hover} />)}
     </svg>
   );
