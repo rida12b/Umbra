@@ -1,15 +1,17 @@
 """The routes of a file on its card (#106): each one's full address (router prefixes and the prefixes it
-is mounted under, read in the code), and plain French words only where the shape says it all: a GET on
-a collection lists, a GET on `{id}` shows, a POST creates, a PUT or PATCH changes, a DELETE removes."""
+is mounted under, read in the code), and its plain French words (`route_words`)."""
 
 import ast
 import posixpath
 import re
 from collections.abc import Callable
 
-from umbra_engine.projection.card_code import RouteDef, constant, mounts, router_prefixes
+from umbra_engine.projection import route_words
+from umbra_engine.projection.card_code import RouteDef, constant, mounts, router_prefixes, routes
+from umbra_engine.projection.system_facts import Facts
 
 TextOf = Callable[[str], str | None]
+Route = tuple[str, RouteDef, str, str]  # file, route, full address, plain words
 MAX_HOPS = 4
 SUFFIXES = ("Public", "Out", "Response", "Read", "Schema")
 ORDER = ("GET", "POST", "PUT", "PATCH", "DELETE")
@@ -20,6 +22,27 @@ DOES = {
     "Modifier": "modifier",
     "Supprimer": "supprimer",
 }
+
+
+def action_id(file: str, line: int) -> str:
+    """An action of « Ce qu'on peut faire » (#107): the file and line of the function that does it."""
+    return f"{file}:{line}"
+
+
+def read_routes(facts: Facts, unit_files: set[str], files: list[str], text_of: TextOf) -> list[Route]:
+    """The routes of `files`, each with its full address and plain words (card, « Ce qu'on peut faire »)."""
+    mount_files = sorted({c.file for c in facts.signal("mount", unit_files)})
+    settings = sorted({c.file for c in facts.signal("settings")})
+    found: list[Route] = []
+    for file in files:
+        python = file.endswith(".py")
+        for route in routes(text_of(file) or "", python):
+            prefix = full_prefix(file, route.router, text_of, mount_files, settings) if python else ""
+            full = address(prefix, route.path)
+            found.append(
+                (file, route, full, label(route.verb, full, route.owned, route.admin, route.signed_in))
+            )
+    return found
 
 
 def full_prefix(file: str, router: str, text_of: TextOf, mount_files: list[str], settings: list[str]) -> str:
@@ -66,24 +89,9 @@ def common_address(addresses: list[str]) -> str:
     return common if common.endswith("/") else common.rsplit("/", 1)[0] + "/"
 
 
-def label(verb: str, full: str, owned: bool = False) -> str:
-    """French words for a plain shape only; « » for anything else (Claude names those, #108). A list
-    kept to the caller's own rows (`owned`) is « ses » items, else « les »."""
-    segments = [s for s in full.split("/") if s]
-    one = bool(segments) and segments[-1].startswith("{")
-    statics = [s for s in segments if not s.startswith("{")]
-    if not statics or (one and len(segments) < 2) or (one and segments[-2].startswith("{")):
-        return ""
-    many = statics[-1]
-    if one and segments[-2] != many or not re.fullmatch(r"[a-z]+s", many):
-        return ""
-    single = many[:-1]
-    shapes = {
-        ("GET", False): f"Lister {'ses' if owned else 'les'} {many}", ("GET", True): f"Voir {_a(single)}",
-        ("POST", False): f"Créer {_a(single)}", ("PUT", True): f"Modifier {_a(single)}",
-        ("PATCH", True): f"Modifier {_a(single)}", ("DELETE", True): f"Supprimer {_a(single)}",
-    }  # fmt: skip
-    return shapes.get((verb, one), "")
+def label(verb: str, full: str, owned: bool = False, admin: bool = False, signed_in: bool = True) -> str:
+    """French words for a route (`route_words`); « » when no rule names it (Claude names those, #108)."""
+    return route_words.label(verb, full, owned, admin, signed_in)
 
 
 def sentence(rows: list[tuple[RouteDef, str, str]]) -> str:
@@ -92,8 +100,8 @@ def sentence(rows: list[tuple[RouteDef, str, str]]) -> str:
     and under which one."""
     things = {full.strip("/").split("/")[-1] if not full.endswith("}") else full.split("/")[-2]
               for _, full, _ in rows}  # fmt: skip
-    words = list(dict.fromkeys(DOES[w.split(" ")[0]] for _, _, w in rows if w))
-    if rows and all(w for _, _, w in rows) and len(things) == 1:
+    words = list(dict.fromkeys(DOES.get(w.split(" ")[0], "") for _, _, w in rows if w))
+    if rows and all(w for _, _, w in rows) and len(things) == 1 and all(words):
         listed = ", ".join(words[:-1]) + f" et {words[-1]}" if len(words) > 1 else words[0]
         whose = "ses" if any(w.startswith("Lister ses ") for _, _, w in rows) else "les"
         return f"Les adresses pour {listed} {whose} {things.pop()}."

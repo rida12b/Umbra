@@ -38,6 +38,8 @@ For every question about where, how or what in this repo:
      path (file, or folder ending with `/`) or a box of the map; `note` is 2-4 French words
      (« ajouter le champ », « nouvelle migration », « vérifier »); `why` is one French sentence shown on hover.
    - `parts`: boxes the answer reaches without a step of its own (e.g. `Base`).
+   - When the whole answer sits inside one box, name its parts as « Box/Part » (« Serveur/Contrôle d'accès »,
+     « Serveur/Base »): the map opens that box and numbers its parts. Every step must then be in that box.
 4. If `show` refuses a name, it lists the valid boxes: correct the call and send it again.
 5. End with « → regarde la carte. »
 

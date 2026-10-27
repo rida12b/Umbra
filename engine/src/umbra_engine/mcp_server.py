@@ -26,12 +26,15 @@ DESCRIPTION = """Light the answer to a repo question on the Umbra map open in th
   French `why` shown on hover.
 - parts: boxes to light without a number (e.g. the database the change reaches). Boxes holding a path step
   light up by themselves.
-A box is named by its id, its title (« Serveur ») or its folder. An unknown name is refused with the list of
-valid boxes: correct it and call again. The user's « copier pour Claude » button copies the path's files."""
+A box is named by its id, its title (« Serveur ») or its folder. To answer inside one box, name its parts as
+« Box/Part » (« Serveur/Contrôle d'accès », « Serveur/Base » for a neighbour): the box then opens and the
+steps are numbered on its parts; every step must then sit in that box (a file it holds is fine).
+An unknown name is refused with the list of valid boxes: correct it and call again. The user's « copier
+pour Claude » button copies the path's files."""
 
 
 class Step(BaseModel):
-    part: str = Field(description="repo path (file, or folder ending with /) or a box of the map")
+    part: str = Field(description="repo path (file, or folder ending with /), a box, or « Box/Part »")
     note: str = Field("", description="2-4 French words beside it: « ajouter le champ »")
     why: str = Field("", description="one French sentence on hover: why this place")
 

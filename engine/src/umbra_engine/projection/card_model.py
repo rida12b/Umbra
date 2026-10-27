@@ -35,7 +35,8 @@ class CardFunction:
     line: int  # where it starts: VS Code opens there
     verb: str = ""  # a route: « GET »
     path: str = ""  # a route: « /api/v1/items/{id} »
-    label: str = ""  # a route of a plain shape: « Voir un item »; empty otherwise
+    label: str = ""  # a route's French words: « Voir un item » (`route_words`); empty when no rule names it
+    action: str = ""  # a route: its id in « Ce qu'on peut faire », whose path « chemin → » lights (#107)
 
 
 @dataclass

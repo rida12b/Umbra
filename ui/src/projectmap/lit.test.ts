@@ -3,10 +3,10 @@ import { readFileSync } from "node:fs";
 import { test } from "node:test";
 import type { Highlight, LitStep, SystemMap } from "../api.ts";
 import { geometry, type Rect } from "./geometry.ts";
-import { applyEvent, callouts, copyText, gapsUnder, labelY, newer, viewBoxWith } from "./lit.ts";
+import { applyEvent, callouts, copyText, gapsUnder, insideLit, labelY, newer, nextStep, viewBoxWith } from "./lit.ts";
 
 const template = JSON.parse(readFileSync(new URL("../../test-fixtures/system-fastapi-template.json", import.meta.url), "utf-8")) as SystemMap;
-const step = (n: number, box: string, label: string, path: string, note: string): LitStep => ({ n, box, label, path, note, why: "" });
+const step = (n: number, box: string, label: string, path: string, note: string): LitStep => ({ n, box, label, path, note, why: "", part: "", guess: false, chip: "" });
 
 // The question of the mock (p-question.png): « où j'ajoute un champ prix à Item ? ».
 const price: Highlight = {
@@ -21,6 +21,11 @@ const price: Highlight = {
   ],
   files: ["frontend/src/components/Items/", "frontend/src/client/", "backend/app/models.py", "backend/app/alembic/versions/", "backend/app/api/routes/items.py"],
   serial: 3,
+  kind: "question",
+  detail: "",
+  inside: "",
+  parts: [],
+  passed: [],
 };
 
 const overlap = (a: Rect, b: Rect) => a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
@@ -116,4 +121,61 @@ test("between a lit box and its callout only the blue connector shows; a covered
   const inside = labelY(server.x + 30, server.y + 20, placed);
   assert.equal(inside, server.y + server.h + 13);
   assert.equal(labelY(server.x + 30, server.y - 30, placed), server.y - 30); // a free label stays
+});
+
+// The path of the mock (p-chemin.png): « Créer un item », traced in the code, drawn inside Serveur.
+const S = "server:backend";
+const inServer = (n: number, part: string, label: string, path: string, note: string, extra: Partial<LitStep> = {}): LitStep => ({ ...step(n, S, label, path, note), part, ...extra });
+const createItem: Highlight = {
+  caption: "Créer un item",
+  boxes: [S],
+  steps: [
+    inServer(1, "stub:web:frontend", "AddItem.tsx:57 → sdk.gen.ts:40", "frontend/src/client/sdk.gen.ts", "le formulaire envoie POST /api/v1/items/"),
+    inServer(2, `${S}/routes`, "routes/items.py:62", "backend/app/api/routes/items.py", "create_item reçoit la demande", { chip: "backend/app/api/routes/items.py" }),
+    inServer(3, `${S}/access`, "deps.py:30 get_current_user", "backend/app/api/deps.py", "vérifie la connexion, retrouve le compte"),
+    inServer(4, `${S}/models`, "models.py:87 Item", "backend/app/models.py", "Item vérifie les champs", { guess: true }),
+    inServer(5, "stub:store:db", "routes/items.py:70", "backend/app/api/routes/items.py", "session.commit écrit la ligne"),
+  ],
+  files: ["frontend/src/components/Items/AddItem.tsx", "frontend/src/client/sdk.gen.ts", "backend/app/main.py", "backend/app/api/routes/items.py"],
+  serial: 4,
+  kind: "path",
+  detail: "POST /api/v1/items/",
+  inside: S,
+  parts: [],
+  passed: [`${S}/entry`],
+};
+const link = (id: string, source: string, target: string) => ({ id, source, target, verb: "", back: "", detail: "", proofs: [], inferred: false });
+const serverLinks = [
+  link("w-p", "stub:web:frontend", `${S}/entry`),
+  link("p-r", `${S}/entry`, `${S}/routes`),
+  link("r-c", `${S}/routes`, `${S}/access`),
+  link("r-m", `${S}/routes`, `${S}/models`),
+  link("r-d", `${S}/routes`, "stub:store:db"),
+  link("r-a", `${S}/routes`, `${S}/data`),
+];
+
+test("a path inside a box: step 3 strong, the others half lit, the door passed, arrows through it lit (p-chemin)", () => {
+  const lit = insideLit(createItem, serverLinks, 3);
+  assert.equal(lit.parts.get(`${S}/access`), "cur");
+  assert.equal(lit.parts.get(`${S}/routes`), "on");
+  assert.equal(lit.parts.get(`${S}/entry`), "pass");
+  assert.equal(lit.parts.get(`${S}/data`), undefined); // not on the path: dimmed
+  assert.deepEqual(lit.badges.get(`${S}/access`), { n: 3, cur: true });
+  assert.deepEqual([...lit.arrows.entries()], [["w-p", "on"], ["p-r", "on"], ["r-c", "cur"], ["r-m", "on"], ["r-d", "on"]]);
+  assert.ok(lit.chips.has("backend/app/api/routes/items.py"));
+  assert.ok(lit.guesses.has(`${S}/models`) && !lit.guesses.has(`${S}/access`));
+  assert.equal(insideLit(createItem, serverLinks, null).parts.get(`${S}/routes`), "cur"); // a question: all strong
+});
+
+test("← → move along the steps and stop at both ends", () => {
+  assert.equal(nextStep(null, 5, true), 1);
+  assert.equal(nextStep(null, 5, false), 5);
+  assert.equal(nextStep(3, 5, true), 4);
+  assert.equal(nextStep(5, 5, true), 5);
+  assert.equal(nextStep(1, 5, false), 1);
+  assert.equal(nextStep(2, 0, true), null);
+});
+
+test("« copier pour Claude » on an action's path names the action and its address", () => {
+  assert.ok(copyText(createItem).startsWith("Chemin : Créer un item (POST /api/v1/items/)\nFichiers (4) :\n- frontend/src/components/Items/AddItem.tsx"));
 });

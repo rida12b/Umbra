@@ -13,6 +13,7 @@ from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from pydantic import BaseModel
 
 from umbra_engine import __version__
+from umbra_engine.api_actions import add_action_routes
 from umbra_engine.api_live import add_live_routes
 from umbra_engine.api_map import add_map_routes
 from umbra_engine.api_show import add_show_routes
@@ -261,8 +262,9 @@ def create_app(settings: Settings, live: bool = False) -> FastAPI:
         return summary
 
     add_map_routes(app, authorized, known_project, indexed_store)
-    system_of = add_system_routes(app, authorized, known_project, indexed_store, ensure_indexed)
-    add_show_routes(app, authorized, known_project, system_of, events)
+    reader = add_system_routes(app, authorized, known_project, indexed_store, ensure_indexed)
+    publish = add_show_routes(app, authorized, known_project, reader, events)
+    add_action_routes(app, authorized, known_project, indexed_store, reader, publish)
     add_live_routes(app, authorized, known_project, events, registry.open_store)
     live_projects = LiveProjects(registry.open_store, events, lock_of) if live else None
     app.state.live = live_projects

@@ -9,6 +9,9 @@ from dataclasses import dataclass, field
 
 VERBS = ("get", "post", "put", "patch", "delete")
 JS_ROUTE = re.compile(r"\b(?:app|router)\.(get|post|put|patch|delete)\(\s*['\"`]([^'\"`]+)")
+ADMIN = re.compile(r"superuser|admin", re.IGNORECASE)
+SIGNED_IN = re.compile(r"current_?user|superuser|admin|auth", re.IGNORECASE)
+LOCAL = {"local", "dev", "development"}
 NOT_A_MODEL = {"Any", "None", "dict", "list", "str", "int", "bool", "float", "bytes", "object"}
 
 
@@ -23,6 +26,8 @@ class RouteDef:
     takes: list[str] = field(default_factory=list)  # annotated parameters: « ItemCreate »
     raises: bool = False
     owned: bool = False  # keeps the caller's rows: `Item.owner_id == current_user.id`
+    admin: bool = False  # behind a superuser or admin dependency: `Depends(get_current_active_superuser)`
+    signed_in: bool = True  # takes the signed-in caller (`CurrentUser`), or an admin
 
 
 @dataclass
@@ -30,6 +35,7 @@ class Mount:
     holder: str  # « api_router » in `api_router.include_router(items.router)`
     target: str  # « items.router »
     prefix: str  # the prefix as written: « "/x" » or « settings.API_V1_STR »; empty when none
+    local: bool = False  # mounted only under `if settings.ENVIRONMENT == "local":`
 
 
 def parse(text: str) -> ast.Module | None:
@@ -74,10 +80,22 @@ def _route_of(decorator: ast.expr, node: ast.FunctionDef | ast.AsyncFunctionDef)
         answers = [_name(node.returns)]
     takes = [_name(a.annotation) for a in node.args.args + node.args.kwonlyargs if a.annotation is not None]
     raises = any(isinstance(n, ast.Raise) for n in ast.walk(node))
+    gates = _gates(decorator, node)
     return RouteDef(
         verb.upper(), path, decorator.func.value.id, node.name, node.lineno,
         [a for a in answers if a], [t for t in takes if t], raises, _owned(node),
+        bool(ADMIN.search(gates)), bool(SIGNED_IN.search(gates)),
     )  # fmt: skip
+
+
+def _gates(decorator: ast.Call, node: ast.FunctionDef | ast.AsyncFunctionDef) -> str:
+    """What a route asks of its caller, as written: its `dependencies=` and its parameters' types and
+    defaults (`current_user: CurrentUser`, `Depends(get_current_active_superuser)`)."""
+    written = [ast.unparse(k.value) for k in decorator.keywords if k.arg == "dependencies"]
+    params = node.args.args + node.args.kwonlyargs
+    written += [ast.unparse(a.annotation) for a in params if a.annotation is not None]
+    written += [ast.unparse(d) for d in node.args.defaults + node.args.kw_defaults if d is not None]
+    return " ".join(written)
 
 
 def _owned(node: ast.FunctionDef | ast.AsyncFunctionDef) -> bool:
@@ -126,6 +144,13 @@ def mounts(text: str) -> list[Mount]:
     """`app.include_router(api_router, prefix=settings.API_V1_STR)`, as written."""
     tree = parse(text)
     found: list[Mount] = []
+    local = {
+        id(inner)
+        for node in (ast.walk(tree) if tree else [])
+        if isinstance(node, ast.If) and _local_only(node.test)
+        for statement in node.body
+        for inner in ast.walk(statement)
+    }
     for node in ast.walk(tree) if tree else []:
         if (
             isinstance(node, ast.Call)
@@ -136,8 +161,15 @@ def mounts(text: str) -> list[Mount]:
         ):
             prefix = _keyword(node, "prefix")
             written = "" if prefix is None else ast.unparse(prefix)
-            found.append(Mount(node.func.value.id, ast.unparse(node.args[0]), written))
+            found.append(Mount(node.func.value.id, ast.unparse(node.args[0]), written, id(node) in local))
     return found
+
+
+def _local_only(test: ast.expr) -> bool:
+    return any(
+        isinstance(n, ast.Constant) and isinstance(n.value, str) and n.value.lower() in LOCAL
+        for n in ast.walk(test)
+    )
 
 
 def constant(text: str, name: str) -> str | None:

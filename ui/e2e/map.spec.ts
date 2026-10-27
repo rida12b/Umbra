@@ -197,3 +197,25 @@ test("a click on a part opens its card under the map: four lines, its functions 
   await page.keyboard.press("Escape"); // then the box
   await expect(page).not.toHaveURL(/box=/);
 });
+
+test("« Ce qu'on peut faire » lists the addresses; one lights its path traced in the code inside its box, ← → move, « effacer » goes back (#107)", async ({ page }) => {
+  const project = await signIn(page);
+  await page.goto(`/#/p/${project}`);
+  await page.getByRole("button", { name: "Ce qu'on peut faire (1)" }).click();
+  const panel = page.getByRole("complementary", { name: "Ce qu'on peut faire" });
+  await expect(panel).toContainText("main.py");
+  await expect(page.getByRole("button", { name: "Ce qu'on peut faire (1)" })).toHaveCount(0); // its button hides, as the mock
+  await panel.getByRole("button", { name: /POST/ }).click();
+  const caption = page.getByRole("region", { name: "Chemin tracé dans le code" });
+  await expect(caption).toContainText("tracé automatiquement", { timeout: 2_000 });
+  await expect(page).toHaveURL(/box=server%3Aapi/); // drawn inside the box that answers
+  await expect(panel).toHaveCount(0);
+  await expect(caption).toContainText("Étape 1 sur");
+  await expect(caption).toContainText("envoie POST /orders");
+  await caption.getByRole("button", { name: "Étape suivante" }).click();
+  await expect(caption).toContainText("Étape 2 sur");
+  await expect(caption).toContainText("main.py");
+  await caption.getByRole("button", { name: "effacer" }).click();
+  await expect(caption).toHaveCount(0);
+  await expect(page).toHaveURL(/box=server%3Aapi/); // « effacer » keeps the place
+});

@@ -5,7 +5,7 @@ import { vscodeLink } from "./vscode";
 
 /** Level 2 (ADR-0007, #106, mock p-items.png): the card under the map, on the same screen. Its name and
  * « ouvrir le code », the four lines, then the functions, each opening VS Code at its line. Nothing below. */
-export function CardStrip({ state, root }: { state: CardState; root: string }) {
+export function CardStrip({ state, root, onPath }: { state: CardState; root: string; onPath: (action: string) => void }) {
   if (state.kind === "closed" || state.kind === "none") return null;
   if (state.kind === "loading")
     return (
@@ -48,8 +48,13 @@ export function CardStrip({ state, root }: { state: CardState; root: string }) {
         {card.functions.length ? (
           <ul className="acts">
             {card.functions.map((fn) => (
-              <li key={`${fn.file}:${fn.line}:${fn.name}`}>
+              <li key={`${fn.file}:${fn.line}:${fn.name}`} className="row">
                 <FunctionRow fn={fn} root={root} many={files.size > 1} under={under} />
+                {fn.action && (
+                  <button type="button" className="go" title="Allume sur la carte le chemin de cette action, suivi dans le code" onClick={() => onPath(fn.action)}>
+                    chemin →
+                  </button>
+                )}
               </li>
             ))}
             {card.more > 0 && <li className="more">+ {card.more} autres, dans le code</li>}
