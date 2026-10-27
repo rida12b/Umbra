@@ -1,29 +1,6 @@
 import type { ButtonHTMLAttributes, ReactNode } from "react";
 
-/** « 1 étape », « 8 étapes ». */
-export function steps(count: number): string {
-  return `${count} étape${count === 1 ? "" : "s"}`;
-}
-
 // The few building blocks every view shares, so a heading or a button looks the same everywhere.
-
-export function SectionTitle({ children }: { children: ReactNode }) {
-  return <h3 className="mt-6 mb-2 text-[13px] font-semibold text-ink">{children}</h3>;
-}
-
-export function Tag({ children, tone = "plain" }: { children: ReactNode; tone?: "plain" | "condition" | "manual" }) {
-  const tones = {
-    plain: "border-line text-muted",
-    condition: "border-lamp-ink/60 text-ink",
-    manual: "border-dashed border-line text-muted",
-  };
-  return (
-    <span className={`inline-block rounded border px-2 py-px text-[12px] leading-5 ${tones[tone]}`}>
-      {tone === "condition" && <span className="text-lamp-ink">Seulement si </span>}
-      {children}
-    </span>
-  );
-}
 
 type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & { variant?: "primary" | "quiet" | "link" };
 
@@ -53,15 +30,5 @@ export function Command({ children }: { children: ReactNode }) {
     <pre className="my-3 overflow-x-auto rounded-md border border-line bg-code px-3 py-2 text-left font-mono text-[12.5px] text-ink">
       {children}
     </pre>
-  );
-}
-
-/** "Hypothèse": what Claude wrote is a reading of the code, never proof. */
-export function HypothesisNote({ children }: { children: ReactNode }) {
-  return (
-    <p className="mt-6 border-t border-line-soft pt-3 text-[12px] text-faint">
-      <span className="mr-1.5 rounded border border-line px-1.5 py-px text-muted">Hypothèse</span>
-      {children}
-    </p>
   );
 }

@@ -5,11 +5,13 @@ import pytest
 from secret_fixtures import GH, store_bytes, write_repo
 
 from umbra_engine.analyzers.code import CodeAnalyzer
+from umbra_engine.analyzers.signals import SignalsAnalyzer
 from umbra_engine.claims import CALLS, DEFINES, IMPORTS
 from umbra_engine.fact_check import check_facts
 from umbra_engine.guard import GuardedFile, SecretGuard
 from umbra_engine.indexer import index_project
 from umbra_engine.registry import Registry
+from umbra_engine.store_schema import LIST_SEPARATOR
 
 PYTHON = (
     '''import os
@@ -124,7 +126,10 @@ def test_index_stores_claims_with_evidence_commit_and_no_secret(settings, repo):
         c.evidence_version == summary.git_commit and c.producer == CodeAnalyzer.producer for c in stored
     )
     assert checks and all(check.correct for check in checks)
-    assert inventory["app/service.py"].analyzers == CodeAnalyzer.producer
+    assert inventory["app/service.py"].analyzers.split(LIST_SEPARATOR) == [
+        CodeAnalyzer.producer,
+        SignalsAnalyzer.producer,
+    ]
     assert inventory["config.yaml"].analyzers == ""
     assert GH.encode() not in store_bytes(settings.projects_dir / project.id)
 

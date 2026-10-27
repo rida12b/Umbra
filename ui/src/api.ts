@@ -2,81 +2,11 @@
 // kept in this page's storage (per origin, so per port) and sent in a header. Never a cookie:
 // browsers would send it to every server on 127.0.0.1.
 
-export type NodeKind =
-  | "application" | "service" | "component" | "module"
-  | "function" | "class" | "method" | "type" | "group";
-export type MapStatus = "fact" | "hypothesis" | "declaration";
-
 export interface Project {
   id: string;
   name: string;
   root: string;
   created_at: string;
-}
-
-export interface MapNode {
-  key: string;
-  kind: NodeKind;
-  label: string;
-  status: MapStatus;
-  children: number;
-  path: string | null;
-  lines: [number, number] | null;
-  details: Record<string, string[]>;
-  hidden: string[];
-  evidence: string[];
-}
-
-export interface MapEdge {
-  source: string;
-  target: string;
-  relation: string;
-  status: MapStatus;
-  count: number;
-  evidence: string[];
-}
-
-export interface Crumb {
-  key: string;
-  kind: NodeKind;
-  label: string;
-}
-
-export interface MapView {
-  parent: MapNode;
-  breadcrumbs: Crumb[];
-  nodes: MapNode[];
-  edges: MapEdge[];
-  total_children: number;
-}
-
-export interface Claim {
-  key: string;
-  file: string;
-  subject: string;
-  relation: string;
-  object: string;
-  status: "fact" | "hypothesis" | "observation";
-  line_start: number;
-  line_end: number;
-  producer: string;
-  evidence_version: string;
-}
-
-export interface Excerpt {
-  file: string;
-  version: string;
-  start: number;
-  end: number;
-  first_line: number;
-  lines: string[];
-  current: boolean;
-}
-
-export interface IndexSummary {
-  files: number;
-  readable: number;
-  claims: Record<string, number>;
 }
 
 export interface Turn {
@@ -88,176 +18,66 @@ export interface Turn {
   ended: string | null;
 }
 
-export interface SearchHit {
-  key: string;
-  kind: NodeKind;
+/** A file and its lines; `start` 0 means the whole file. */
+export interface Proof {
+  file: string;
+  start: number;
+  end: number;
+}
+
+/** One box of the project map: a person who comes in (actor), a part that runs, or an outside service. */
+export interface SystemBox {
+  id: string;
+  kind: "actor" | "box" | "external";
+  title: string;
+  detail: string;
+  folder: string;
+  role: string;
+  proofs: Proof[];
+  inferred: boolean; // deduced, not read: drawn dashed, « supposé »
+  opens: boolean; // has an inside (Level 1): drawn with the « voir dedans » mark
+  col: number; // placed once by the engine and stored: the map never moves
+  row: number;
+}
+
+export interface SystemLink {
+  id: string;
+  source: string;
+  target: string;
+  verb: string;
+  back: string; // the way back (« répond »), drawn as a second arrow; empty when none
+  detail: string;
+  proofs: Proof[];
+  inferred: boolean;
+}
+
+export interface SystemOutput {
+  id: string;
+  box: string;
   label: string;
-  path: string | null;
-  level: string;
+  detail: string;
+  proofs: Proof[];
 }
 
-export interface Located {
-  texte: string;
-  fichier: string | null;
-  lignes: [number, number] | null;
-}
-
-/** What Claude Code wrote about one element: an LLM's reading of the code, so a Hypothesis. */
-export interface Card {
-  role: string;
-  entrees: string[];
-  sorties: string[];
-  etapes: Located[];
-  points_entree: Located[];
-  depend_de: string[];
-  enfants: Record<string, string>;
-  incertitudes: string[];
-}
-
-export type BlockType =
-  | "user" | "frontend" | "backend" | "worker" | "database" | "storage" | "queue" | "external"
-  | "ml_model" | "device" | "cli" | "library" | "docs" | "tests" | "infra";
-
-export interface ArchBlock {
+export interface AroundItem {
   id: string;
-  nom: string;
-  type: BlockType;
-  role: string;
-  en_bref?: string; // a few plain words for the diagram (models studied before v1.4 have none)
-  importance?: "coeur" | "secondaire" | "ancien"; // v1.5: the home shows the core only
-  zone?: "utilise" | "recoit" | "traite" | "range" | "exterieur" | "atelier" | ""; // v1.6, no longer drawn: the factory floor places parts by the data (ADR-0006)
-  interieur?: "" | "personne" | "externe" | "fichiers"; // v1.7: what « Entrer » shows in a part without components
-  entre?: string[]; // v1.6: what comes in, in plain words
-  sort?: string[]; // v1.6: what goes out
-  techno: string;
-  code: { chemin: string; element: string }[];
-  indices: string;
+  title: string;
+  short: string;
+  detail: string;
+  proofs: Proof[];
 }
 
-export interface ArchFlow {
-  de: string;
-  vers: string;
-  quoi: string;
-  verbe?: string; // v1.5: read as « de VERBE vers »
-  nature?: "donnee" | "controle"; // v1.7: does data move, or does one part start or check another
-}
-
-/** v1.7: a setting a person would change, checked word for word in the lines it cites. */
-export interface Setting extends Cited {
-  nom: string;
-  code: string; // the exact text in the file
-  sorte: "env" | "entete" | "constante" | "champ" | "limite" | "branchement" | "";
-  valeur: string;
-  effet: string;
-  valeur_vue: boolean; // the value itself is in the cited lines too
-}
-
-export interface ProjectSetting extends Cited {
-  nom: string;
-  code: string;
-  valeur: string;
-  valeur_vue: boolean;
-  lu_par_le_code: "oui" | "non";
-}
-
-export interface Lever extends Cited {
-  intention: string; // « Je veux changer … »
-  composant: string;
-  reglage: string;
-  motif?: string; // why it is not shown as verified (« non lu par le code »)
-}
-
-/** A place in the code the model cites; `verifie` = Umbra found the file and those lines. */
-export interface Cited {
-  fichier: string | null;
-  lignes: [number, number] | null;
-  verifie: boolean;
-}
-
-export interface Component {
-  id: string;
-  nom: string;
-  en_bref?: string; // v1.6: a few plain words
-  bloc: string;
-  role: string;
-  responsabilites: string[];
-  expose: (Cited & { quoi: string })[];
-  utilise: string[];
-  fichiers: string[];
-  entre?: string[]; // v1.7
-  sort?: string[];
-  reglages?: Setting[];
-  termes?: { simple: string; code: string }[];
-}
-
-export interface JourneyStep extends Cited {
-  texte: string;
-  action?: string; // 2-5 words for the diagram (models studied before v1.3 have none)
-  simple?: string; // the step in one plain sentence, for a reader who does not code (v1.4)
-  composant: string | null; // null only on a step done by hand (v1.7)
-  touche: string[]; // blocks this step reaches: the user, a database, a model, an outside service
-  conditions?: string[]; // what must hold for the step to happen at all
-  manuel?: boolean; // done by a person (a command, a click), not by the code
-}
-
-export interface Branch extends Cited {
-  quand: string;
-  alors: string;
-  quand_simple?: string; // v1.7: in everyday words
-  alors_simple?: string;
-  etape?: number | null; // v1.7: the step that handles it (1-based)
-}
-
-export interface Journey {
-  id: string;
-  nom: string;
-  declencheur: string;
-  depart?: string; // v1.5: the trigger in plain words
-  fin?: string; // v1.5: the result in plain words
-  etapes: JourneyStep[];
-  resultat: string;
-  branches?: Branch[];
-  principal?: boolean; // v1.7: the journey the belt follows
-  principal_deduit?: boolean;
-  entree?: string | null;
-  sortie?: string[];
-  phases?: { nom: string; de: number; a: number }[];
-}
-
-/** What Claude Code understood of the whole Project in one study (a Hypothesis, citations checked). */
-export interface ProjectModel {
-  pitch?: string; // one plain sentence: what the product does, for whom (v1.4)
-  resume: string;
-  blocs: ArchBlock[];
-  flux: ArchFlow[];
-  composants: Component[];
-  parcours: Journey[];
-  modules: Record<string, string>;
-  dossiers: Record<string, string>;
-  incertitudes: string[];
-  donnee?: { nom: string; dans_le_code: string; entre_par: string | null; finit_dans: string | null }[]; // v1.7
-  reglages_projet?: ProjectSetting[];
-  pour_changer?: Lever[];
-}
-
-export interface ModelState {
-  // indexing: Umbra is still reading the project (just added, never read); the study comes next (#85).
-  state: "ready" | "stale" | "methode" | "missing" | "queued" | "working" | "error" | "indexing";
-  model: ProjectModel | null;
-  created_at: string | null;
-  changed: string[];
-  message: string | null;
-  producer?: string | null; // the method version that wrote the model
-  methode_ancienne?: boolean; // written by an older method: only « Relancer l'étude » studies it again
-}
-
-export interface Explanation<T = Card> {
-  state: "ready" | "stale" | "missing" | "queued" | "working" | "error";
-  card: T | null;
-  producer: string | null;
-  created_at: string | null;
-  message: string | null;
-  level?: string | null;
+/** The Level 0 project map (ADR-0007), built from hard signals without any LLM. */
+export interface SystemMap {
+  name: string;
+  sentence: string;
+  branch: string;
+  last_change: string; // YYYY-MM-DD
+  boxes: SystemBox[];
+  links: SystemLink[];
+  outputs: SystemOutput[];
+  around: AroundItem[];
+  actions: number;
 }
 
 /** Why a request failed, in the terms the page shows. */
@@ -271,10 +91,6 @@ export class ApiError extends Error {
 
   get needsLogin(): boolean {
     return this.status === 401;
-  }
-
-  get staleIndex(): boolean {
-    return this.status === 409;
   }
 }
 
@@ -352,25 +168,7 @@ export const api = {
     keepSession(session);
   },
   projects: () => call<Project[]>("/v1/projects"),
-  index: (id: string) => call<IndexSummary>(`${project(id)}/index`, { method: "POST" }),
-  map: (id: string, node: string, expand: boolean) =>
-    call<MapView>(`${project(id)}/map?${new URLSearchParams({ node, expand: String(expand) })}`),
-  model: (id: string) => call<ModelState>(`${project(id)}/model`),
-  study: (id: string) => call<ModelState>(`${project(id)}/model`, { method: "POST" }),
-  /** The user's « Relancer l'étude »: the only call that studies a model written by an older method. */
-  // « Réessayer » after a failed read: the engine reads the project again at once (#85).
-  retryRead: (id: string) => call<ModelState>(`${project(id)}/model`, { method: "POST", body: JSON.stringify({ relire: true }) }),
-  relaunchStudy: (id: string) =>
-    call<ModelState>(`${project(id)}/model`, { method: "POST", body: JSON.stringify({ relancer: true }) }),
-  explanation: (id: string, node: string) =>
-    call<Explanation>(`${project(id)}/explain?${new URLSearchParams({ node })}`),
-  explain: (id: string, node: string) =>
-    call<Explanation>(`${project(id)}/explain?${new URLSearchParams({ node })}`, { method: "POST" }),
+  /** `retry`: after a failed read, read the project again at once (« Réessayer »). */
+  system: (id: string, retry = false) => call<SystemMap>(`${project(id)}/system${retry ? "?relire=true" : ""}`),
   activity: (id: string) => call<Turn[]>(`${project(id)}/activity`),
-  search: (id: string, q: string) => call<SearchHit[]>(`${project(id)}/search?${new URLSearchParams({ q })}`),
-  claim: (id: string, key: string) => call<Claim>(`${project(id)}/claims/${encodeURIComponent(key)}`),
-  evidence: (id: string, file: string, start: number, end: number) =>
-    call<Excerpt>(
-      `${project(id)}/evidence?${new URLSearchParams({ file, start: String(start), end: String(end) })}`,
-    ),
 };

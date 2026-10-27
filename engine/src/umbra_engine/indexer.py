@@ -10,7 +10,7 @@ from datetime import UTC, datetime
 from umbra_engine.analyzers import Analyzer, default_analyzers
 from umbra_engine.claim_keys import WORKTREE, content_digest, evidence_version, keyed
 from umbra_engine.claims import StoredClaim
-from umbra_engine.gateways.git import changed_files, head_commit
+from umbra_engine.gateways.git import changed_files, head_commit, head_info
 from umbra_engine.guard import BINARY, TOO_LARGE, GuardedFile, SecretGuard
 from umbra_engine.linkers import PRODUCER as LINKER
 from umbra_engine.linkers import link
@@ -20,6 +20,8 @@ from umbra_engine.store_schema import INDEX_ID
 
 RACY_WINDOW_NS = 3_000_000_000
 LASTING_SKIPS = {BINARY, TOO_LARGE}  # decided by the content itself: unchanged content, same verdict
+GIT_BRANCH = "git_branch"  # meta: the branch checked out when indexed
+GIT_DATE = "git_date"  # meta: day of the last commit (YYYY-MM-DD)
 ANALYZERS = "analyzers"  # meta: which Analyzers (and versions) produced the stored Claims
 
 
@@ -43,6 +45,7 @@ def index_project(
     started = time.time_ns()
     commit = head_commit(project.root)
     changed = changed_files(project.root) if commit else None
+    branch, day = head_info(project.root) if commit else ("", "")
     guard = SecretGuard(project.root)
     analyzers = default_analyzers() if analyzers is None else analyzers
     signature = LIST_SEPARATOR.join(sorted(a.producer for a in analyzers))
@@ -117,6 +120,8 @@ def index_project(
         "guard_rules": guard.rules_version,
         ANALYZERS: signature,
         "git_commit": commit or "",
+        GIT_BRANCH: branch,
+        GIT_DATE: day,
         "uncommitted_changes": str(bool(changed) if changed is not None else None),
         INDEXED_SCHEMA: str(SCHEMA_VERSION),
     }

@@ -18,6 +18,7 @@ from umbra_engine.api_explain import add_explain_routes
 from umbra_engine.api_live import add_live_routes
 from umbra_engine.api_map import add_map_routes
 from umbra_engine.api_model import add_model_routes
+from umbra_engine.api_system import add_system_routes
 from umbra_engine.claims import Relation, Status, StoredClaim
 from umbra_engine.coverage import CoverageReport, coverage_report
 from umbra_engine.coverage import State as CoverageState
@@ -149,10 +150,13 @@ def create_app(
         readers.append(reader)
         reader.start()
 
-    def ensure_indexed(project_id: str, retry: bool = False) -> bool:
+    def ensure_indexed(
+        project_id: str, retry: bool = False, outdated: Callable[[ProjectStore], bool] | None = None
+    ) -> bool:
         """True when the index is current; otherwise start reading the Project and say False. A failed read
         stays said (500) to every ask: the page asks on each live event. It is tried again by itself after
-        READ_RETRY_S, or at once on `retry` (« Réessayer », adding the folder again)."""
+        READ_RETRY_S, or at once on `retry` (« Réessayer », adding the folder again). `outdated`: the
+        caller's own reason to read again (its Analyzer changed since the last run)."""
         project = known_project(project_id)
         with index_guard:
             if project_id in indexing:
@@ -166,7 +170,7 @@ def create_app(
             detail = f"reading the project failed: {failed}"
             raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, detail)
         with registry.open_store(project) as store:
-            if store.index_is_current():
+            if store.index_is_current() and not (outdated and outdated(store)):
                 return True
         start_indexing(project)
         return False
@@ -293,6 +297,7 @@ def create_app(
     refresh_cards = add_explain_routes(
         app, authorized, known_project, indexed_store, graph_of, app.state.explainer, ask
     )
+    add_system_routes(app, authorized, known_project, indexed_store, ensure_indexed)
     refresh_model = add_model_routes(
         app, authorized, known_project, indexed_store, graph_of, app.state.explainer, study, ensure_indexed
     )

@@ -9,7 +9,6 @@ import { useTheme } from "./theme";
 import { Command, StateMessage } from "./ui";
 
 type Projects = { list: Project[] } | { error: ApiError } | null;
-const NARROW = "(max-width: 860px)";
 
 // Done once per page load, before any API call: a login code works only once.
 const sessionReady: Promise<void> = (() => {
@@ -17,23 +16,10 @@ const sessionReady: Promise<void> = (() => {
   return code ? api.openSession(code).catch(() => undefined) : Promise.resolve();
 })();
 
-function useNarrow(): boolean {
-  const [narrow, setNarrow] = useState(() => window.matchMedia(NARROW).matches);
-  useEffect(() => {
-    const media = window.matchMedia(NARROW);
-    const update = () => setNarrow(media.matches);
-    media.addEventListener("change", update);
-    return () => media.removeEventListener("change", update);
-  }, []);
-  return narrow;
-}
-
 export function App() {
   const [theme, toggleTheme] = useTheme();
   const route = useRoute();
-  const narrow = useNarrow();
   const [projects, setProjects] = useState<Projects>(null);
-  const [searching, setSearching] = useState(false);
   const outdated = useNewVersion();
 
   useEffect(() => {
@@ -77,7 +63,6 @@ export function App() {
           activity={route.node === ACTIVITY_VIEW}
           theme={theme}
           onToggleTheme={toggleTheme}
-          onSearch={() => setSearching(true)}
         />
         {projects === null && <StateMessage>Connexion au moteur local…</StateMessage>}
         {projects && "error" in projects && <ConnectionProblem error={projects.error} />}
@@ -92,15 +77,7 @@ export function App() {
           </StateMessage>
         )}
         {project && (
-          <ProjectPage
-            key={project.id}
-            project={project}
-            route={route}
-            theme={theme}
-            narrow={narrow}
-            searching={searching}
-            onSearching={setSearching}
-          />
+          <ProjectPage key={project.id} project={project} route={route} />
         )}
       </div>
     </LiveContext.Provider>

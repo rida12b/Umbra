@@ -1,0 +1,434 @@
+{
+ "name": "full-stack-fastapi-template",
+ "sentence": "Une appli web avec comptes : on se connecte, on gère ses « items ».",
+ "branch": "master",
+ "last_change": "2026-04-16",
+ "boxes": [
+  {
+   "id": "actor:user",
+   "kind": "actor",
+   "title": "Utilisateur",
+   "detail": "navigateur",
+   "folder": "",
+   "role": "Une personne dans un navigateur. Supposé : déduit de l'application web.",
+   "proofs": [
+    {
+     "file": "frontend/package.json",
+     "start": 41,
+     "end": 41
+    },
+    {
+     "file": "frontend/src/main.tsx",
+     "start": 43,
+     "end": 43
+    }
+   ],
+   "inferred": true,
+   "opens": false,
+   "col": 0,
+   "row": 0
+  },
+  {
+   "id": "web:frontend",
+   "kind": "box",
+   "title": "Application web",
+   "detail": "React",
+   "folder": "frontend/",
+   "role": "Les écrans dans le navigateur.",
+   "proofs": [
+    {
+     "file": "frontend/package.json",
+     "start": 41,
+     "end": 41
+    },
+    {
+     "file": "frontend/src/main.tsx",
+     "start": 43,
+     "end": 43
+    },
+    {
+     "file": "compose.override.yml",
+     "start": 96,
+     "end": 105
+    }
+   ],
+   "inferred": false,
+   "opens": true,
+   "col": 1,
+   "row": 0
+  },
+  {
+   "id": "server:backend",
+   "kind": "box",
+   "title": "Serveur",
+   "detail": "FastAPI · Python",
+   "folder": "backend/app/",
+   "role": "Reçoit les appels, vérifie qui appelle, lit et écrit la base.",
+   "proofs": [
+    {
+     "file": "backend/app/main.py",
+     "start": 17,
+     "end": 17
+    },
+    {
+     "file": "compose.override.yml",
+     "start": 58,
+     "end": 88
+    }
+   ],
+   "inferred": false,
+   "opens": true,
+   "col": 2,
+   "row": 0
+  },
+  {
+   "id": "mail",
+   "kind": "external",
+   "title": "Courriel",
+   "detail": "service externe",
+   "folder": "",
+   "role": "Envoie les courriels. En local, mailcatcher les attrape.",
+   "proofs": [
+    {
+     "file": "backend/app/utils.py",
+     "start": 7,
+     "end": 7
+    },
+    {
+     "file": "compose.override.yml",
+     "start": 90,
+     "end": 94
+    }
+   ],
+   "inferred": false,
+   "opens": false,
+   "col": 2,
+   "row": 1
+  },
+  {
+   "id": "store:db",
+   "kind": "box",
+   "title": "Base",
+   "detail": "PostgreSQL",
+   "folder": "",
+   "role": "Garde les données du projet.",
+   "proofs": [
+    {
+     "file": "compose.override.yml",
+     "start": 48,
+     "end": 51
+    },
+    {
+     "file": "compose.yml",
+     "start": 3,
+     "end": 20
+    }
+   ],
+   "inferred": false,
+   "opens": false,
+   "col": 3,
+   "row": 0
+  }
+ ],
+ "links": [
+  {
+   "id": "actor:user>web:frontend",
+   "source": "actor:user",
+   "target": "web:frontend",
+   "verb": "clique",
+   "back": "affiche",
+   "detail": "clavier et souris",
+   "proofs": [
+    {
+     "file": "frontend/package.json",
+     "start": 41,
+     "end": 41
+    },
+    {
+     "file": "frontend/src/main.tsx",
+     "start": 43,
+     "end": 43
+    }
+   ],
+   "inferred": false
+  },
+  {
+   "id": "web:frontend>server:backend",
+   "source": "web:frontend",
+   "target": "server:backend",
+   "verb": "appelle",
+   "back": "répond",
+   "detail": "HTTP + JSON",
+   "proofs": [
+    {
+     "file": "frontend/src/main.tsx",
+     "start": 16,
+     "end": 16
+    },
+    {
+     "file": "frontend/playwright.config.ts",
+     "start": 27,
+     "end": 27
+    },
+    {
+     "file": "frontend/tests/utils/privateApi.ts",
+     "start": 5,
+     "end": 5
+    }
+   ],
+   "inferred": false
+  },
+  {
+   "id": "server:backend>store:db",
+   "source": "server:backend",
+   "target": "store:db",
+   "verb": "écrit",
+   "back": "",
+   "detail": "SQL via SQLAlchemy, SQLModel",
+   "proofs": [
+    {
+     "file": "backend/app/api/routes/items.py",
+     "start": 69,
+     "end": 69
+    },
+    {
+     "file": "backend/app/api/routes/items.py",
+     "start": 70,
+     "end": 70
+    },
+    {
+     "file": "backend/app/alembic/env.py",
+     "start": 5,
+     "end": 5
+    }
+   ],
+   "inferred": false
+  },
+  {
+   "id": "server:backend>mail",
+   "source": "server:backend",
+   "target": "mail",
+   "verb": "envoie",
+   "back": "",
+   "detail": "SMTP, attrapé en local",
+   "proofs": [
+    {
+     "file": "backend/app/utils.py",
+     "start": 7,
+     "end": 7
+    }
+   ],
+   "inferred": false
+  }
+ ],
+ "outputs": [
+  {
+   "id": "out:web:frontend",
+   "box": "web:frontend",
+   "label": "écran mis à jour",
+   "detail": "",
+   "proofs": [
+    {
+     "file": "frontend/src/main.tsx",
+     "start": 43,
+     "end": 43
+    }
+   ]
+  },
+  {
+   "id": "out:store:db",
+   "box": "store:db",
+   "label": "ligne enregistrée",
+   "detail": "",
+   "proofs": [
+    {
+     "file": "backend/app/api/routes/items.py",
+     "start": 69,
+     "end": 69
+    },
+    {
+     "file": "backend/app/api/routes/items.py",
+     "start": 70,
+     "end": 70
+    },
+    {
+     "file": "backend/app/alembic/env.py",
+     "start": 5,
+     "end": 5
+    }
+   ]
+  },
+  {
+   "id": "out:mail",
+   "box": "mail",
+   "label": "courriel envoyé",
+   "detail": "",
+   "proofs": [
+    {
+     "file": "backend/app/utils.py",
+     "start": 7,
+     "end": 7
+    }
+   ]
+  }
+ ],
+ "around": [
+  {
+   "id": "sentry",
+   "title": "Suivi des erreurs",
+   "short": "",
+   "detail": "Sentry, seulement si une clé est réglée",
+   "proofs": [
+    {
+     "file": "backend/app/main.py",
+     "start": 14,
+     "end": 14
+    },
+    {
+     "file": "backend/app/main.py",
+     "start": 1,
+     "end": 1
+    },
+    {
+     "file": "backend/app/main.py",
+     "start": 15,
+     "end": 15
+    }
+   ]
+  },
+  {
+   "id": "prestart",
+   "title": "Préparation au démarrage",
+   "short": "",
+   "detail": "crée les tables et le premier compte",
+   "proofs": [
+    {
+     "file": "compose.yml",
+     "start": 45,
+     "end": 77
+    }
+   ]
+  },
+  {
+   "id": "tests",
+   "title": "Tests",
+   "short": "tests",
+   "detail": "serveur (pytest) et écrans (Playwright)",
+   "proofs": [
+    {
+     "file": "backend/tests/__init__.py",
+     "start": 0,
+     "end": 0
+    },
+    {
+     "file": "backend/tests/api/__init__.py",
+     "start": 0,
+     "end": 0
+    },
+    {
+     "file": "backend/tests/api/routes/__init__.py",
+     "start": 0,
+     "end": 0
+    },
+    {
+     "file": "backend/tests/api/routes/test_items.py",
+     "start": 0,
+     "end": 0
+    },
+    {
+     "file": "backend/tests/api/routes/test_login.py",
+     "start": 0,
+     "end": 0
+    }
+   ]
+  },
+  {
+   "id": "ci",
+   "title": "Vérifications automatiques",
+   "short": "CI",
+   "detail": "12 fichiers : tests, mise en ligne",
+   "proofs": [
+    {
+     "file": ".github/workflows/add-to-project.yml",
+     "start": 0,
+     "end": 0
+    },
+    {
+     "file": ".github/workflows/deploy-production.yml",
+     "start": 0,
+     "end": 0
+    },
+    {
+     "file": ".github/workflows/deploy-staging.yml",
+     "start": 0,
+     "end": 0
+    },
+    {
+     "file": ".github/workflows/detect-conflicts.yml",
+     "start": 0,
+     "end": 0
+    },
+    {
+     "file": ".github/workflows/issue-manager.yml",
+     "start": 0,
+     "end": 0
+    }
+   ]
+  },
+  {
+   "id": "db-admin",
+   "title": "Voir la base (Adminer)",
+   "short": "",
+   "detail": "la base dans le navigateur, en local",
+   "proofs": [
+    {
+     "file": "compose.override.yml",
+     "start": 53,
+     "end": 56
+    }
+   ]
+  },
+  {
+   "id": "generator",
+   "title": "Créer un projet depuis ce modèle",
+   "short": "",
+   "detail": "questions posées à la création",
+   "proofs": [
+    {
+     "file": "copier.yml",
+     "start": 0,
+     "end": 0
+    }
+   ]
+  },
+  {
+   "id": "docs",
+   "title": "Documentation",
+   "short": "docs",
+   "detail": "installer, développer, mettre en ligne",
+   "proofs": [
+    {
+     "file": "CONTRIBUTING.md",
+     "start": 0,
+     "end": 0
+    },
+    {
+     "file": "README.md",
+     "start": 0,
+     "end": 0
+    },
+    {
+     "file": "deployment.md",
+     "start": 0,
+     "end": 0
+    },
+    {
+     "file": "development.md",
+     "start": 0,
+     "end": 0
+    }
+   ]
+  }
+ ],
+ "actions": 23
+}

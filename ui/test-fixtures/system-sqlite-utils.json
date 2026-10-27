@@ -1,0 +1,342 @@
+{
+ "name": "sqlite-utils",
+ "sentence": "Un outil en ligne de commande et une bibliothèque Python pour remplir et modifier des fichiers SQLite.",
+ "branch": "main",
+ "last_change": "2026-10-10",
+ "boxes": [
+  {
+   "id": "actor:terminal",
+   "kind": "actor",
+   "title": "Personne",
+   "detail": "dans un terminal",
+   "folder": "",
+   "role": "Tape la commande. Supposé : déduit de la commande déclarée.",
+   "proofs": [
+    {
+     "file": "pyproject.toml",
+     "start": 72,
+     "end": 72
+    }
+   ],
+   "inferred": true,
+   "opens": false,
+   "col": 0,
+   "row": 0
+  },
+  {
+   "id": "actor:program",
+   "kind": "actor",
+   "title": "Programme Python",
+   "detail": "import sqlite_utils",
+   "folder": "",
+   "role": "Un autre programme qui utilise la bibliothèque. Supposé : déduit de ce qu'elle exporte.",
+   "proofs": [
+    {
+     "file": "sqlite_utils/__init__.py",
+     "start": 1,
+     "end": 1
+    }
+   ],
+   "inferred": true,
+   "opens": false,
+   "col": 0,
+   "row": 1
+  },
+  {
+   "id": "cli:sqlite-utils",
+   "kind": "box",
+   "title": "Commande",
+   "detail": "47 commandes",
+   "folder": "cli.py",
+   "role": "Lit ce qui est tapé dans le terminal et fait le travail demandé.",
+   "proofs": [
+    {
+     "file": "pyproject.toml",
+     "start": 72,
+     "end": 72
+    }
+   ],
+   "inferred": false,
+   "opens": true,
+   "col": 1,
+   "row": 0
+  },
+  {
+   "id": "library:sqlite_utils",
+   "kind": "box",
+   "title": "Bibliothèque",
+   "detail": "Database · Table",
+   "folder": "db.py",
+   "role": "Le code que d'autres programmes importent.",
+   "proofs": [
+    {
+     "file": "sqlite_utils/__init__.py",
+     "start": 1,
+     "end": 1
+    }
+   ],
+   "inferred": false,
+   "opens": true,
+   "col": 1,
+   "row": 1
+  },
+  {
+   "id": "sqlite-file",
+   "kind": "box",
+   "title": "Fichier SQLite",
+   "detail": "un .db sur le disque",
+   "folder": "",
+   "role": "La base est un simple fichier, ouvert avec sqlite3.",
+   "proofs": [
+    {
+     "file": "sqlite_utils/db.py",
+     "start": 592,
+     "end": 592
+    },
+    {
+     "file": "sqlite_utils/db.py",
+     "start": 611,
+     "end": 611
+    }
+   ],
+   "inferred": false,
+   "opens": false,
+   "col": 2,
+   "row": 1
+  }
+ ],
+ "links": [
+  {
+   "id": "actor:terminal>cli:sqlite-utils",
+   "source": "actor:terminal",
+   "target": "cli:sqlite-utils",
+   "verb": "tape",
+   "back": "",
+   "detail": "47 commandes",
+   "proofs": [
+    {
+     "file": "pyproject.toml",
+     "start": 72,
+     "end": 72
+    }
+   ],
+   "inferred": false
+  },
+  {
+   "id": "actor:program>library:sqlite_utils",
+   "source": "actor:program",
+   "target": "library:sqlite_utils",
+   "verb": "importe",
+   "back": "",
+   "detail": "import",
+   "proofs": [
+    {
+     "file": "sqlite_utils/__init__.py",
+     "start": 1,
+     "end": 1
+    }
+   ],
+   "inferred": false
+  },
+  {
+   "id": "cli:sqlite-utils>library:sqlite_utils",
+   "source": "cli:sqlite-utils",
+   "target": "library:sqlite_utils",
+   "verb": "appelle",
+   "back": "",
+   "detail": "7 imports",
+   "proofs": [
+    {
+     "file": "sqlite_utils/cli.py",
+     "start": 22,
+     "end": 22
+    },
+    {
+     "file": "sqlite_utils/cli.py",
+     "start": 23,
+     "end": 23
+    },
+    {
+     "file": "sqlite_utils/cli.py",
+     "start": 24,
+     "end": 34
+    }
+   ],
+   "inferred": false
+  },
+  {
+   "id": "library:sqlite_utils>sqlite-file",
+   "source": "library:sqlite_utils",
+   "target": "sqlite-file",
+   "verb": "lit et écrit",
+   "back": "",
+   "detail": "sqlite3.connect(fichier)",
+   "proofs": [
+    {
+     "file": "sqlite_utils/db.py",
+     "start": 592,
+     "end": 592
+    },
+    {
+     "file": "sqlite_utils/db.py",
+     "start": 611,
+     "end": 611
+    },
+    {
+     "file": "sqlite_utils/db.py",
+     "start": 3123,
+     "end": 3123
+    }
+   ],
+   "inferred": false
+  }
+ ],
+ "outputs": [
+  {
+   "id": "out:cli:sqlite-utils",
+   "box": "cli:sqlite-utils",
+   "label": "résultat affiché",
+   "detail": "JSON, CSV, tableau",
+   "proofs": [
+    {
+     "file": "sqlite_utils/cli.py",
+     "start": 272,
+     "end": 272
+    },
+    {
+     "file": "sqlite_utils/cli.py",
+     "start": 287,
+     "end": 287
+    },
+    {
+     "file": "sqlite_utils/cli.py",
+     "start": 478,
+     "end": 478
+    }
+   ]
+  },
+  {
+   "id": "out:sqlite-file",
+   "box": "sqlite-file",
+   "label": "fichier .db modifié",
+   "detail": "",
+   "proofs": [
+    {
+     "file": "sqlite_utils/db.py",
+     "start": 592,
+     "end": 592
+    },
+    {
+     "file": "sqlite_utils/db.py",
+     "start": 611,
+     "end": 611
+    },
+    {
+     "file": "sqlite_utils/db.py",
+     "start": 3123,
+     "end": 3123
+    }
+   ]
+  }
+ ],
+ "around": [
+  {
+   "id": "tests",
+   "title": "Tests",
+   "short": "tests",
+   "detail": "pytest, un fichier par commande ou presque",
+   "proofs": [
+    {
+     "file": "tests/__init__.py",
+     "start": 0,
+     "end": 0
+    },
+    {
+     "file": "tests/conftest.py",
+     "start": 0,
+     "end": 0
+    },
+    {
+     "file": "tests/ext.c",
+     "start": 0,
+     "end": 0
+    },
+    {
+     "file": "tests/sniff/example1.csv",
+     "start": 0,
+     "end": 0
+    },
+    {
+     "file": "tests/sniff/example2.csv",
+     "start": 0,
+     "end": 0
+    }
+   ]
+  },
+  {
+   "id": "docs",
+   "title": "Documentation",
+   "short": "docs",
+   "detail": "site de documentation",
+   "proofs": [
+    {
+     "file": "docs/",
+     "start": 0,
+     "end": 0
+    }
+   ]
+  },
+  {
+   "id": "ci",
+   "title": "Vérifications automatiques",
+   "short": "CI",
+   "detail": "7 fichiers : tests, publication",
+   "proofs": [
+    {
+     "file": ".github/workflows/codeql-analysis.yml",
+     "start": 0,
+     "end": 0
+    },
+    {
+     "file": ".github/workflows/documentation-links.yml",
+     "start": 0,
+     "end": 0
+    },
+    {
+     "file": ".github/workflows/publish.yml",
+     "start": 0,
+     "end": 0
+    },
+    {
+     "file": ".github/workflows/spellcheck.yml",
+     "start": 0,
+     "end": 0
+    },
+    {
+     "file": ".github/workflows/test-coverage.yml",
+     "start": 0,
+     "end": 0
+    }
+   ]
+  },
+  {
+   "id": "plugins",
+   "title": "Extensions",
+   "short": "",
+   "detail": "d'autres paquets ajoutent des commandes",
+   "proofs": [
+    {
+     "file": "sqlite_utils/hookspecs.py",
+     "start": 4,
+     "end": 4
+    },
+    {
+     "file": "sqlite_utils/plugins.py",
+     "start": 3,
+     "end": 3
+    }
+   ]
+  }
+ ],
+ "actions": 47
+}

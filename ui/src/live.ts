@@ -1,29 +1,18 @@
 import { createContext, useContext, useEffect, useState } from "react";
 import { readSessionHeader, signedOut } from "./api";
 
-// What the engine reports while it watches the Project: files that just changed, cards rewritten.
+// What the engine reports while it watches the Project: every event (a re-read, Claude's activity) bumps
+// `revision`, and views read their data again.
 export interface Live {
   connected: boolean;
-  revision: number; // bumps on every event: views read their data again
-  changed: Map<string, number>; // path -> when it changed (ms), kept a few minutes
-  rewriting: number;
-  lastEvent: number | null;
+  revision: number;
 }
 
-const KEEP_MS = 5 * 60_000;
 const RETRY_MS = 3000;
-const IDLE: Live = { connected: false, revision: 0, changed: new Map(), rewriting: 0, lastEvent: null };
+const IDLE: Live = { connected: false, revision: 0 };
 
 export const LiveContext = createContext<Live>(IDLE);
 export const useLive = () => useContext(LiveContext);
-
-type Event =
-  | { type: "indexed"; changed: string[]; count: number }
-  | { type: "rewriting"; count: number }
-  | { type: "studying" }
-  | { type: "card"; key: string }
-  | { type: "failed"; key: string };
-const MODEL_KEY = "model:";
 
 /** Follows `/events` with fetch (an EventSource could not send the session header). */
 export function useLiveEvents(projectId: string | null): Live {
@@ -36,19 +25,7 @@ export function useLiveEvents(projectId: string | null): Live {
     let lastId: string | null = null; // sent back on reconnect: the engine replays what was missed
     setLive(IDLE);
 
-    const apply = (event: Event) =>
-      setLive((previous) => {
-        const now = Date.now();
-        const changed = new Map([...previous.changed].filter(([, at]) => now - at < KEEP_MS));
-        let rewriting = previous.rewriting;
-        if (event.type === "indexed") event.changed.forEach((path) => changed.set(path, now));
-        if (event.type === "rewriting") rewriting += event.count;
-        // Element cards count down; the model has its own status line.
-        if ((event.type === "card" || event.type === "failed") && event.key !== MODEL_KEY) {
-          rewriting = Math.max(0, rewriting - 1);
-        }
-        return { connected: true, revision: previous.revision + 1, changed, rewriting, lastEvent: now };
-      });
+    const apply = () => setLive((previous) => ({ connected: true, revision: previous.revision + 1 }));
 
     const connect = async () => {
       while (!stopped) {
@@ -79,7 +56,7 @@ export function useLiveEvents(projectId: string | null): Live {
               const id = lines.find((line) => line.startsWith("id: "));
               const data = lines.find((line) => line.startsWith("data: "));
               if (id) lastId = id.slice(4);
-              if (data) apply(JSON.parse(data.slice(6)) as Event);
+              if (data) apply();
             }
           }
         } catch {
@@ -99,13 +76,4 @@ export function useLiveEvents(projectId: string | null): Live {
   }, [projectId]);
 
   return live;
-}
-
-/** Was this path (or anything under it, for a folder) changed in the last minutes? */
-export function changedUnder(live: Live, path: string | null | undefined): boolean {
-  if (path === null || path === undefined) return false;
-  for (const changed of live.changed.keys()) {
-    if (path === "" || changed === path || changed.startsWith(`${path}/`)) return true;
-  }
-  return false;
 }

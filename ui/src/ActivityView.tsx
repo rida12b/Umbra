@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import { api, type Project, type Turn } from "./api";
 import { useLive } from "./live";
-import { navigate } from "./route";
 import { Command, StateMessage } from "./ui";
 
 /** What Claude Code did in this Project, turn by turn: the prompt, the files it changed, its answer. */
@@ -46,13 +45,7 @@ export function ActivityView({ project }: { project: Project }) {
               <ul className="mt-2.5 flex flex-wrap gap-1.5" aria-label="Fichiers modifiés">
                 {turn.files.map((file) => (
                   <li key={file}>
-                    <button
-                      type="button"
-                      className="rounded border border-line bg-panel px-2 py-0.5 font-mono text-[12px] text-ink hover:border-ink/40"
-                      onClick={() => navigate({ projectId: project.id, node: file, expand: false })}
-                    >
-                      {file}
-                    </button>
+                    <span className="rounded border border-line bg-panel px-2 py-0.5 font-mono text-[12px] text-ink">{file}</span>
                   </li>
                 ))}
               </ul>

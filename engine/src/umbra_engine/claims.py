@@ -7,13 +7,13 @@ Status = Literal["fact", "hypothesis", "observation"]
 Kind = Literal[
     "module", "function", "class", "method", "type", "namespace", "symbol", "import",
     "service", "image", "port", "directory", "workload", "k8s-service", "ingress", "labels", "resource",
-    "package",
+    "package", "signal",
 ]  # fmt: skip
 Relation = Literal[
     "defines", "imports", "calls",
     "declares", "uses_image", "built_from", "depends_on", "exposes", "based_on",
     "has_labels", "selects", "routes_to", "mounts", "build_context", "imports_module", "targets", "code_root",
-    "requires", "references", "sources",
+    "requires", "references", "sources", "signals",
 ]  # fmt: skip
 
 DEFINES = "defines"
@@ -34,6 +34,7 @@ BUILD_CONTEXT = "build_context"  # the directory a build sends to the image buil
 REQUIRES = "requires"  # a manifest asks for a package
 REFERENCES = "references"  # a Terraform block refers to another block's address
 SOURCES = "sources"  # a Terraform module comes from this source
+SIGNALS = "signals"  # a file shows a hard sign of what the code does: sends mail, writes rows, starts a CLI
 # Links computed across files once every file is analyzed:
 IMPORTS_MODULE = "imports_module"  # a Module's import resolved to another Module (or package directory)
 TARGETS = "targets"  # a Kubernetes Service reaches a workload (its selector is a subset of the labels)
