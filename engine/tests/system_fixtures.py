@@ -68,7 +68,8 @@ TEMPLATE = {
         "\n"
         "from app.api.main import api_router\n"
         "\n"
-        "sentry_sdk.init(dsn=None, enable_tracing=True)\n"
+        'if settings.SENTRY_DSN and settings.ENVIRONMENT != "local":\n'
+        "    sentry_sdk.init(dsn=str(settings.SENTRY_DSN), enable_tracing=True)\n"
         "\n"
         "app = FastAPI(title='app')\n"
         "\n"
@@ -84,7 +85,30 @@ TEMPLATE = {
         "\n"
         "def get_db() -> Generator[Session, None, None]:\n"
         "    yield Session()\n"
+        "\n"
+        "\n"
+        "reusable_oauth2 = OAuth2PasswordBearer(\n"
+        '    tokenUrl=f"{settings.API_V1_STR}/login/access-token"\n'
+        ")\n"
     ),
+    "backend/app/models.py": (
+        "from sqlmodel import Field, SQLModel\n"
+        "\n"
+        "\n"
+        "class User(UserBase, table=True):\n"
+        "    hashed_password: str\n"
+        "\n"
+        "\n"
+        "class Item(ItemBase, table=True):\n"
+        '    owner_id: uuid.UUID = Field(foreign_key="user.id", nullable=False)\n'
+    ),
+    "backend/app/core/db.py": (
+        "def init_db(session: Session) -> None:\n"
+        "    user = session.exec(\n"
+        "        select(User).where(User.email == settings.FIRST_SUPERUSER)\n"
+        "    ).first()\n"
+    ),
+    "backend/app/alembic/env.py": "from alembic import context\n",
     "backend/app/api/routes/__init__.py": "",
     "backend/app/api/routes/items.py": (
         "from fastapi import APIRouter\n"

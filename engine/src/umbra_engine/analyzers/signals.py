@@ -40,6 +40,14 @@ PY_SIGNALS: dict[str, re.Pattern[str]] = {
     "sqlite": re.compile(r"\bsqlite3\.connect\((?!\s*[\"']:memory:)"),  # a file, not a database in memory
     "smtp": re.compile(r"^\s*(?:import|from)\s+(?:smtplib|emails)\b|\bsmtplib\.SMTP|\bsend_mail\("),
     "sentry": re.compile(r"^\s*import\s+sentry_sdk\b|\bsentry_sdk\.init\("),
+    "sentry-if-key": re.compile(r"^\s*if\b.*\b(?:SENTRY_DSN|sentry_dsn)\b"),  # on only when a key is set
+    "auth": re.compile(
+        r"\bOAuth2PasswordBearer\(|\bOAuth2PasswordRequestForm\b|\bLoginManager\(|^\s*@login_required\b"
+        r"|\bjwt\.encode\("
+    ),
+    "first-account": re.compile(r"\bFIRST_SUPERUSER\b|\bcreate_?superuser\b|\bcreatesuperuser\b"),
+    "table": re.compile(r"^\s*class\s+(?P<name>\w+)\((?=[^)]*\btable\s*=\s*True|\s*models\.Model\s*\))"),
+    "tablename": re.compile(r"^\s*__tablename__\s*=\s*[\"'](?P<name>\w+)[\"']"),
     "plugins": re.compile(r"^\s*import\s+pluggy\b|^\s*from\s+pluggy\s+import\b"),
     "format:json": re.compile(r"^\s*import\s+json\b"),
     "format:csv": re.compile(r"^\s*import\s+csv\b"),
@@ -56,12 +64,13 @@ JS_SIGNALS: dict[str, re.Pattern[str]] = {
     "db-driver": re.compile(rf"""(?:from\s+|require\()\s*['"](?P<name>{_DRIVER_JS})['"]"""),
     "smtp": re.compile(r"""(?:from\s+|require\()\s*['"]nodemailer['"]"""),
     "sentry": re.compile(r"""(?:from\s+|require\()\s*['"]@sentry/"""),
+    "auth": re.compile(r"""(?:from\s+|require\()\s*['"](?:next-auth|passport|jsonwebtoken)['"]"""),
 }
 _EXPORTS = re.compile(r"^__all__\s*=|^from\s+\.\w*\s+import\s+[A-Z_]")
 
 
 class SignalsAnalyzer:
-    producer = "signals@1.0"
+    producer = "signals@1.1"
 
     def accepts(self, file: GuardedFile) -> bool:
         name = posixpath.basename(file.rel_path).lower()

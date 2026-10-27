@@ -2,6 +2,7 @@
 
 import os
 import subprocess
+import time
 from pathlib import Path
 
 import pytest
@@ -9,9 +10,12 @@ from fastapi.testclient import TestClient
 from secret_fixtures import write_repo
 from system_fixtures import SQLITE_UTILS, TEMPLATE
 
+from umbra_engine.analyzers import default_analyzers
 from umbra_engine.analyzers.signals import SignalsAnalyzer
 from umbra_engine.api import create_app
 from umbra_engine.guard import GuardedFile, SecretGuard
+from umbra_engine.indexer import index_project
+from umbra_engine.registry import Registry
 
 
 def commit(root: Path, day: str) -> None:
@@ -91,15 +95,27 @@ def test_web_app_server_database_and_mail_from_compose_and_code(client, auth, ma
     }
     around = [a["title"] for a in system["around"]]
     assert around == [
-        "Suivi des erreurs", "Préparation au démarrage", "Tests", "Vérifications automatiques",
-        "Voir la base (Adminer)", "Proxy (Traefik)", "Créer un projet depuis ce modèle", "Documentation",
-    ]  # fmt: skip
+        "Suivi des erreurs",
+        "Préparation au démarrage",
+        "Tests",
+        "Vérifications automatiques",
+        "Voir la base (Adminer)",
+        "Créer un projet depuis ce modèle",
+        "Documentation",
+    ]  # fmt: skip  (the proxy only routes: neither a box nor a tool)
+    details = {a["title"]: a["detail"] for a in system["around"]}
+    assert details["Suivi des erreurs"] == "Sentry, seulement si une clé est réglée"
+    assert details["Préparation au démarrage"] == "crée les tables et le premier compte"
+    assert details["Tests"] == "serveur (pytest) et écrans (Playwright)"
+    assert details["Vérifications automatiques"] == "2 fichiers : tests"
+    assert details["Documentation"] == "installer, développer"
+    assert [a["short"] for a in system["around"] if a["short"]][:2] == ["tests", "CI"]
+    assert {b["title"] for b in system["boxes"] if b["opens"]} == {"Application web", "Serveur"}
     assert "compose.override.yml:4" in where(boxes["Courriel"]["proofs"])  # mailcatcher: mail caught locally
     assert (system["branch"], system["last_change"], system["actions"]) == ("main", "2026-04-16", 2)
     assert (
-        system["sentence"]
-        == "Une application web et son serveur, qui écrit dans une base et envoie des courriels."
-    )
+        system["sentence"] == "Une appli web avec comptes : on se connecte, on gère ses « items »."
+    )  # what it is for, not the boxes again
 
 
 def test_command_and_library_over_an_sqlite_file_without_compose(client, auth, make_repo):
@@ -124,14 +140,16 @@ def test_command_and_library_over_an_sqlite_file_without_compose(client, auth, m
     assert "sqlite_utils/cli.py:29" not in where(shown["proofs"])  # a commented print is no signal
     assert [a["title"] for a in system["around"]] == [
         "Tests",
+        "Documentation",
         "Vérifications automatiques",
         "Extensions",
-        "Documentation",
     ]
     assert system["actions"] == 3  # the commands of the group, not a lone @click.command
-    assert (
-        system["sentence"] == "Une commande et une bibliothèque Python, qui lit et écrit un fichier SQLite."
+    assert system["sentence"] == (
+        "Un outil en ligne de commande et une bibliothèque Python"
+        " pour remplir et modifier des fichiers SQLite."
     )
+    assert {b["title"] for b in system["boxes"] if b["opens"]} == {"Commande", "Bibliothèque"}
 
 
 def test_every_box_and_arrow_has_its_proof(client, auth, make_repo):
@@ -193,4 +211,21 @@ def test_a_server_alone_is_called_by_a_client_and_its_database_is_deduced(client
     assert links(system) == {("Client", "appelle", "répond", "Serveur"), ("Serveur", "lit", "", "Base")}
     assert outputs(system) == {"réponse envoyée": "Serveur"}  # nothing written: no « ligne enregistrée »
     assert system["actions"] == 2
-    assert system["sentence"] == "Un serveur, qui lit une base."
+    assert system["sentence"] == "Un serveur."  # no account, no table class: nothing more is read
+
+
+def test_an_index_made_by_an_older_signals_analyzer_is_read_again(client, auth, make_repo, settings):
+    project, first = system_of(client, auth, make_repo, "tpl", TEMPLATE, "2026-04-16")
+    with Registry(settings) as registry:
+        found = registry.get(project)
+        assert found is not None
+        with registry.open_store(found) as store:  # as an Umbra without today's signals left it
+            older = [a for a in default_analyzers() if not isinstance(a, SignalsAnalyzer)]
+            index_project(found, store, older)
+    url = f"/v1/projects/{project}/system"
+    assert client.get(url, headers=auth).status_code == 409  # read again, not shown with old signals
+    deadline = time.monotonic() + 60
+    while (response := client.get(url, headers=auth)).status_code == 409 and time.monotonic() < deadline:
+        time.sleep(0.2)
+    assert response.status_code == 200, response.text
+    assert response.json()["sentence"] == first["sentence"]

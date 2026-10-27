@@ -50,13 +50,14 @@ export interface Geometry {
 const TOP = 100;
 const ROW_Y = 150;
 const ROW_STEP = 200;
+const OUTSIDE_STEP = 270; // a row of outside services only, hung under their caller: a longer arrow (mock)
 const BOX_H = 110;
 const OUTSIDE_H = 90;
-const ACTOR_X = 70;
 const OUT_MIN_X = 1048;
 const OUT_LABEL_W = 152;
-const LANE_GAP = 44;
+const LANE_GAP = 38;
 const CHIP_H = 36;
+const MIN_VIEW_H = 480; // the mock's view: a small map sits where a big one would, not lower
 
 export function aroundText(map: SystemMap): string {
   const named = map.around.map((a) => a.short).filter(Boolean).slice(0, 2);
@@ -69,23 +70,26 @@ export function geometry(map: SystemMap): Geometry {
   const start = narrow ? 300 : 250;
   const step = narrow ? 390 : 280;
   const width = narrow ? 220 : 200;
-  const actorWidth = narrow ? 150 : 130;
+  const actorWidth = narrow ? 150 : 120;
+  const actorX = narrow ? 70 : 80;
   const rects = new Map<string, Rect>();
   const sources = new Set(map.links.map((l) => l.source));
+  const rowY = rowTops(map.boxes, narrow ? ROW_Y - 5 : ROW_Y); // mock p-sqlite: 145
   for (const box of map.boxes) {
-    const y = ROW_Y + box.row * ROW_STEP;
+    const y = rowY[box.row] ?? ROW_Y;
     const store = box.kind === "box" && !sources.has(box.id); // where data ends (a base, a file): a bit narrower, as the mock
     const rect =
       box.kind === "actor"
-        ? { x: ACTOR_X, y, w: actorWidth, h: BOX_H }
+        ? { x: actorX, y, w: actorWidth, h: BOX_H }
         : { x: start + (box.col - 1) * step, y, w: store ? width - 20 : width, h: box.kind === "external" ? OUTSIDE_H : BOX_H };
     rects.set(box.id, rect);
   }
   const lastRight = Math.max(start + width, ...[...rects.values()].map((r) => r.x + r.w));
   const outX = Math.max(OUT_MIN_X, lastRight + 38);
-  const bottom = Math.max(ROW_Y + BOX_H, ...[...rects.values()].map((r) => r.y + r.h));
+  const bottom = Math.max((rowY[0] ?? ROW_Y) + BOX_H, ...[...rects.values()].map((r) => r.y + r.h));
 
-  const arrows = map.links.flatMap((link) => arrowsOf(link, rects));
+  const outside = new Set(map.boxes.filter((b) => b.kind === "external").map((b) => b.id));
+  const arrows = map.links.flatMap((link) => arrowsOf(link, rects, outside));
   let lanes = 0;
   const outputs = map.outputs.flatMap((output): DrawnOutput[] => {
     const box = map.boxes.find((b) => b.id === output.box);
@@ -103,22 +107,34 @@ export function geometry(map: SystemMap): Geometry {
   });
 
   const firstLane = bottom + LANE_GAP;
-  const chipY = lanes > 0 ? firstLane - CHIP_H / 2 : bottom + 40;
+  const chipY = lanes > 0 ? firstLane - CHIP_H / 2 - 10 : bottom + 45;
   const around = map.around.length ? { x: 24, y: chipY, w: Math.max(220, aroundText(map).length * 7.4 + 34) } : null;
   const lowest = Math.max(around ? chipY + CHIP_H : 0, bottom + (lanes ? LANE_GAP + (lanes - 1) * 34 + 12 : 0));
   const actors = map.boxes.filter((b) => b.kind === "actor").map((b) => rects.get(b.id) as Rect);
   return {
-    viewBox: `0 ${TOP} ${outX + OUT_LABEL_W} ${lowest + 24 - TOP}`,
+    viewBox: `0 ${TOP} ${outX + OUT_LABEL_W} ${Math.max(MIN_VIEW_H, lowest + 24 - TOP)}`,
     boxes: map.boxes.map((box) => ({ box, rect: rects.get(box.id) as Rect })),
     arrows,
     outputs,
-    entries: actors.map((r) => ({ y: r.y, arrowEnd: r.x - 4 })),
+    entries: actors.map((r) => ({ y: r.y, arrowEnd: narrow ? r.x : r.x - 4 })),
     sorties: outputs.length ? { x: outX - 12, y: 128 } : null,
     around,
   };
 }
 
-function arrowsOf(link: SystemLink, rects: Map<string, Rect>): DrawnArrow[] {
+/** The top of each row: one step down, longer when the row holds only outside services (mock: Courriel). */
+function rowTops(boxes: SystemBox[], first: number): number[] {
+  const rows = Math.max(0, ...boxes.map((b) => b.row));
+  const tops = [first];
+  for (let row = 1; row <= rows; row++) {
+    const inRow = boxes.filter((b) => b.row === row);
+    const outsideOnly = inRow.length > 0 && inRow.every((b) => b.kind === "external");
+    tops.push((tops[row - 1] ?? first) + (outsideOnly ? OUTSIDE_STEP : ROW_STEP));
+  }
+  return tops;
+}
+
+function arrowsOf(link: SystemLink, rects: Map<string, Rect>, outside: Set<string>): DrawnArrow[] {
   const s = rects.get(link.source);
   const t = rects.get(link.target);
   if (!s || !t) return [];
@@ -136,7 +152,9 @@ function arrowsOf(link: SystemLink, rects: Map<string, Rect>): DrawnArrow[] {
   if (s.x === t.x && t.y > s.y) {
     const x = s.x + s.w / 2;
     const [y1, y2] = [s.y + s.h, t.y];
-    const label = (dx: number, text: string): Label => ({ x: x + dx + 10, y: (y1 + y2) / 2 + 4, anchor: "start", text });
+    // Down to an outside service: the verb sits just above it (mock « envoie »); otherwise mid-way.
+    const labelY = outside.has(link.target) ? y2 - 10 : (y1 + y2) / 2 + 4;
+    const label = (dx: number, text: string): Label => ({ x: x + dx + 10, y: labelY, anchor: "start", text });
     if (!link.back) return [drawn(`M${x},${y1} L${x},${y2}`, label(0, link.verb))];
     return [
       drawn(`M${x - 14},${y1} L${x - 14},${y2}`, { ...label(-14, link.verb), x: x - 24, anchor: "end" }),

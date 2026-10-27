@@ -17,10 +17,12 @@ test("the template map is laid out as the mock: user, web app, server, base on o
   const at = Object.fromEntries(drawn.boxes.map((b) => [b.box.title, b.rect]));
   assert.deepEqual(
     ["Utilisateur", "Application web", "Serveur", "Base"].map((t) => at[t]?.x),
-    [70, 250, 530, 810],
+    [80, 250, 530, 810],
   );
-  assert.equal(at.Courriel?.x, 530); // under the server that sends it
-  assert.ok((at.Courriel?.y ?? 0) > (at.Serveur?.y ?? 0));
+  assert.deepEqual([at.Courriel?.x, at.Courriel?.y], [530, 420]); // under the server that sends it, as the mock
+  const sends = drawn.arrows.find((a) => a.label.text === "envoie");
+  assert.equal(sends?.label.y, 410); // the verb just above the box it reaches
+  assert.deepEqual(drawn.around && [drawn.around.x, drawn.around.y], [24, 520]);
   assert.deepEqual(drawn.viewBox.split(" ").slice(0, 3), ["0", "100", "1200"]);
   assert.equal(drawn.entries.length, 1);
   assert.deepEqual(
@@ -60,7 +62,7 @@ test("no two boxes overlap, the chip « + N autour » sits left of every line, a
 });
 
 test("on 1280×720 the map is drawn at least at 85 % of its size: no scroll, text still readable", () => {
-  const area = { w: 1280 - 40, h: 720 - 48 - 92 - 54 }; // top bar, header, bottom bar (styles.css)
+  const area = { w: 1280 - 40, h: 720 - 48 - 116 - 54 }; // top bar, header, bottom bar (styles.css)
   for (const map of [template, sqlite]) {
     const [, , w, h] = viewBox(geometry(map).viewBox);
     assert.ok(Math.min(area.w / w, area.h / h) >= 0.85, `${w}×${h}`);
@@ -88,8 +90,8 @@ test("two-way links draw both arrows with their verbs; the same map always draws
 });
 
 test("words around the map", () => {
-  assert.equal(aroundText(template), "+ 8 outils autour (tests, CI…)");
-  assert.equal(aroundText(sqlite), "+ 4 outils autour (tests, CI…)");
+  assert.equal(aroundText(template), "+ 7 outils autour (tests, CI…)");
+  assert.equal(aroundText(sqlite), "+ 4 outils autour (tests, docs…)");
   assert.equal(frenchDate("2026-04-16"), "16/04/2026");
   assert.equal(where({ file: "a.py", start: 7, end: 7 }), "a.py:7");
   assert.equal(where({ file: "a.py", start: 7, end: 9 }), "a.py:7-9");

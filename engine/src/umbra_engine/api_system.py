@@ -5,19 +5,25 @@ from collections.abc import Callable
 
 from fastapi import FastAPI, HTTPException, params, status
 
+from umbra_engine.analyzers.signals import SignalsAnalyzer
 from umbra_engine.claims import DEFINES
-from umbra_engine.indexer import GIT_BRANCH, GIT_DATE
+from umbra_engine.indexer import ANALYZERS, GIT_BRANCH, GIT_DATE
 from umbra_engine.project_store import ProjectStore
 from umbra_engine.projection.system import system_map
 from umbra_engine.projection.system_facts import SYSTEM_RELATIONS, facts_of
 from umbra_engine.projection.system_layout import place
 from umbra_engine.projection.system_model import SystemMap
 from umbra_engine.registry import Project
-from umbra_engine.store_schema import INDEX_ID
+from umbra_engine.store_schema import INDEX_ID, LIST_SEPARATOR
 
 LEVEL_0 = "L0"
 INDEXING = "indexing: Umbra is reading this project"
 CACHE_SIZE = 4
+
+
+def _signals_outdated(store: ProjectStore) -> bool:
+    """The map reads the hard signals: an index made by another version of their Analyzer is read again."""
+    return SignalsAnalyzer.producer not in store.meta().get(ANALYZERS, "").split(LIST_SEPARATOR)
 
 
 def add_system_routes(
@@ -36,7 +42,7 @@ def add_system_routes(
         Cells are stored the first time a box is placed: the map does not move on reload or re-index.
         A Project never read is read first (409 meanwhile); a failed read says so (500), `relire` retries."""
         project = known_project(project_id)
-        if not ensure_indexed(project_id, retry=relire):
+        if not ensure_indexed(project_id, retry=relire, outdated=_signals_outdated):
             raise HTTPException(status.HTTP_409_CONFLICT, INDEXING)
         with indexed_store(project_id) as store, lock:
             meta = store.meta()

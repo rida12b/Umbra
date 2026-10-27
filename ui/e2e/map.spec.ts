@@ -23,12 +23,13 @@ test("a project opens on its map: who comes in, the parts, what leaves; the proo
   const project = await signIn(page);
   await page.goto(`/#/p/${project}`);
   await expect(page.getByRole("heading", { name: "shop" })).toBeVisible();
-  await expect(page.getByText("Une application web et son serveur, qui écrit dans une base.")).toBeVisible();
+  await expect(page.getByText("Une appli web : on gère des « orders ».")).toBeVisible(); // what it is for, from its tables
   for (const name of ["Utilisateur", "Application web", "Serveur", "Base"]) await expect(page.getByRole("button", { name: new RegExp(`^${name}`) })).toBeVisible();
   await expect(page.getByText("ENTRÉE")).toBeVisible();
   await expect(page.getByLabel("Sortie : ligne enregistrée")).toBeVisible();
   await expect(page.getByLabel("Sortie : écran mis à jour")).toBeVisible();
   await expect(page.getByLabel("Où on en est")).toContainText(/pas d'historique git|branche/);
+  await expect(page.getByLabel("Où on en est")).toContainText("à définir avec toi");
   await expect(page.getByRole("button", { name: "Ce qu'on peut faire (1)" })).toBeVisible();
   // The page never scrolls; on a phone only the map itself slides sideways, its words kept readable.
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true);
@@ -36,6 +37,7 @@ test("a project opens on its map: who comes in, the parts, what leaves; the proo
 
   await page.getByRole("button", { name: /^Serveur/ }).focus(); // keyboard too: the same card as the mouse
   await expect(page.getByRole("tooltip")).toContainText("api/app/main.py:5");
+  await expect(page.getByRole("tooltip")).toContainText("clic : voir dedans →"); // a part with an inside (#105)
   await page.getByLabel("Application web appelle Serveur").hover();
   await expect(page.getByRole("tooltip")).toContainText("web/src/app.ts:2");
 });

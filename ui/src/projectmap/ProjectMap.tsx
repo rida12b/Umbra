@@ -77,10 +77,16 @@ function Loaded({ map }: { map: SystemMap }) {
           {map.sentence && <p className="pm-sentence">{map.sentence}</p>}
         </div>
         <section className="pm-status" aria-label="Où on en est">
-          <h2>Où on en est</h2>
+          <h2>
+            Où on en est <span>à définir avec toi</span>
+          </h2>
           <p>{where || "pas d'historique git"}</p>
+          <p className="q">Ce qui a bougé récemment, ou ce qui est fini / pas fini ?</p>
         </section>
       </header>
+      <p className="pm-slide" aria-hidden="true">
+        La carte glisse sur le côté : la suite est à droite →
+      </p>
       <div ref={stage} className="pm-mapwrap" onClick={(e) => e.target === e.currentTarget && setSelected(null)}>
         {map.boxes.length === 0 ? (
           <StateMessage title="Rien qui tourne n'a été trouvé">
@@ -91,7 +97,10 @@ function Loaded({ map }: { map: SystemMap }) {
             map={map}
             drawn={drawn}
             selected={selected}
-            onSelect={(id) => setSelected((current) => (current === id ? null : id))}
+            onSelect={(id) => {
+              setSelected((current) => (current === id ? null : id));
+              if (map.boxes.find((b) => b.id === id)?.opens) setToast("Voir dedans arrive dans la prochaine version d'Umbra.");
+            }}
             onHint={(next, at) => setHint(next && at ? { hint: next, at: place(at) } : null)}
             onAround={(at) => {
               setHint(null);

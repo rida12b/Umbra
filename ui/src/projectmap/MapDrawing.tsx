@@ -8,6 +8,7 @@ export interface Hint {
   text: string;
   proofs: Proof[];
   guess: boolean; // « supposé »: deduced, not read in the code
+  opens?: boolean; // a click shows its inside: « clic : voir dedans → »
 }
 
 export type Pointer = MouseEvent<SVGGElement> | FocusEvent<SVGGElement>;
@@ -110,9 +111,25 @@ export function MapDrawing({ map, drawn, selected, onSelect, onHint, onAround, o
   );
 }
 
+/** The round « › » top right of a box that has an inside, and « voir dedans → » above it on hover (mock). */
+function OpenMark({ rect }: { rect: DrawnBox["rect"] }) {
+  const [mx, my] = [rect.x + rect.w - 16, rect.y + 16];
+  return (
+    <>
+      <g className="om" aria-hidden="true">
+        <circle cx={mx} cy={my} r={9} />
+        <path d={`M${mx - 2},${my - 4} L${mx + 2},${my} L${mx - 2},${my + 4}`} />
+      </g>
+      <text className="hov" x={rect.x + rect.w} y={rect.y - 9} textAnchor="end" aria-hidden="true">
+        voir dedans →
+      </text>
+    </>
+  );
+}
+
 function Box({ drawn: { box, rect }, selected, onSelect, hover }: { drawn: DrawnBox; selected: boolean; onSelect: (id: string) => void; hover: (hint: Hint) => object }) {
   const cx = rect.x + rect.w / 2;
-  const hint = { title: [box.title, box.detail].filter(Boolean).join(" · "), text: box.role, proofs: box.proofs, guess: box.inferred };
+  const hint = { title: [box.title, box.detail].filter(Boolean).join(" · "), text: box.role, proofs: box.proofs, guess: box.inferred, opens: box.opens };
   const common = {
     tabIndex: 0,
     role: "button",
@@ -148,7 +165,7 @@ function Box({ drawn: { box, rect }, selected, onSelect, hover }: { drawn: Drawn
   const detailY = titleY + 23;
   const folderY = box.detail ? detailY + 22 : titleY + 26;
   return (
-    <g className={`pm-box${dash}${selected ? " sel" : ""}`} {...common}>
+    <g className={`pm-box${dash}${box.opens ? " open" : ""}${selected ? " sel" : ""}`} {...common}>
       <rect className="b" x={rect.x} y={rect.y} width={rect.w} height={rect.h} rx={10} />
       <text className="tt" x={cx} y={titleY} textAnchor="middle">
         {box.title}
@@ -163,6 +180,7 @@ function Box({ drawn: { box, rect }, selected, onSelect, hover }: { drawn: Drawn
           {box.folder}
         </text>
       )}
+      {box.opens && <OpenMark rect={rect} />}
     </g>
   );
 }

@@ -1,9 +1,47 @@
 {
  "name": "sqlite-utils",
- "sentence": "Une commande et une bibliothèque Python, qui lit et écrit un fichier SQLite.",
+ "sentence": "Un outil en ligne de commande et une bibliothèque Python pour remplir et modifier des fichiers SQLite.",
  "branch": "main",
  "last_change": "2026-10-10",
  "boxes": [
+  {
+   "id": "actor:terminal",
+   "kind": "actor",
+   "title": "Personne",
+   "detail": "dans un terminal",
+   "folder": "",
+   "role": "Tape la commande. Supposé : déduit de la commande déclarée.",
+   "proofs": [
+    {
+     "file": "pyproject.toml",
+     "start": 72,
+     "end": 72
+    }
+   ],
+   "inferred": true,
+   "opens": false,
+   "col": 0,
+   "row": 0
+  },
+  {
+   "id": "actor:program",
+   "kind": "actor",
+   "title": "Programme Python",
+   "detail": "import sqlite_utils",
+   "folder": "",
+   "role": "Un autre programme qui utilise la bibliothèque. Supposé : déduit de ce qu'elle exporte.",
+   "proofs": [
+    {
+     "file": "sqlite_utils/__init__.py",
+     "start": 1,
+     "end": 1
+    }
+   ],
+   "inferred": true,
+   "opens": false,
+   "col": 0,
+   "row": 1
+  },
   {
    "id": "cli:sqlite-utils",
    "kind": "box",
@@ -19,6 +57,7 @@
     }
    ],
    "inferred": false,
+   "opens": true,
    "col": 1,
    "row": 0
   },
@@ -37,6 +76,7 @@
     }
    ],
    "inferred": false,
+   "opens": true,
    "col": 1,
    "row": 1
   },
@@ -60,43 +100,8 @@
     }
    ],
    "inferred": false,
+   "opens": false,
    "col": 2,
-   "row": 1
-  },
-  {
-   "id": "actor:terminal",
-   "kind": "actor",
-   "title": "Personne",
-   "detail": "dans un terminal",
-   "folder": "",
-   "role": "Tape la commande. Supposé : déduit de la commande déclarée.",
-   "proofs": [
-    {
-     "file": "pyproject.toml",
-     "start": 72,
-     "end": 72
-    }
-   ],
-   "inferred": true,
-   "col": 0,
-   "row": 0
-  },
-  {
-   "id": "actor:program",
-   "kind": "actor",
-   "title": "Programme Python",
-   "detail": "import sqlite_utils",
-   "folder": "",
-   "role": "Un autre programme qui utilise la bibliothèque. Supposé : déduit de ce qu'elle exporte.",
-   "proofs": [
-    {
-     "file": "sqlite_utils/__init__.py",
-     "start": 1,
-     "end": 1
-    }
-   ],
-   "inferred": true,
-   "col": 0,
    "row": 1
   }
  ],
@@ -239,7 +244,7 @@
    "id": "tests",
    "title": "Tests",
    "short": "tests",
-   "detail": "pytest",
+   "detail": "pytest, un fichier par commande ou presque",
    "proofs": [
     {
      "file": "tests/__init__.py",
@@ -269,10 +274,23 @@
    ]
   },
   {
+   "id": "docs",
+   "title": "Documentation",
+   "short": "docs",
+   "detail": "site de documentation",
+   "proofs": [
+    {
+     "file": "docs/",
+     "start": 0,
+     "end": 0
+    }
+   ]
+  },
+  {
    "id": "ci",
    "title": "Vérifications automatiques",
    "short": "CI",
-   "detail": "7 fichiers",
+   "detail": "7 fichiers : tests, publication",
    "proofs": [
     {
      "file": ".github/workflows/codeql-analysis.yml",
@@ -316,39 +334,6 @@
      "file": "sqlite_utils/plugins.py",
      "start": 3,
      "end": 3
-    }
-   ]
-  },
-  {
-   "id": "docs",
-   "title": "Documentation",
-   "short": "docs",
-   "detail": "19 fichiers",
-   "proofs": [
-    {
-     "file": "README.md",
-     "start": 0,
-     "end": 0
-    },
-    {
-     "file": "docs/.gitignore",
-     "start": 0,
-     "end": 0
-    },
-    {
-     "file": "docs/Makefile",
-     "start": 0,
-     "end": 0
-    },
-    {
-     "file": "docs/_static/js/custom.js",
-     "start": 0,
-     "end": 0
-    },
-    {
-     "file": "docs/_templates/base.html",
-     "start": 0,
-     "end": 0
     }
    ]
   }

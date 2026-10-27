@@ -35,6 +35,7 @@ export interface SystemBox {
   role: string;
   proofs: Proof[];
   inferred: boolean; // deduced, not read: drawn dashed, « supposé »
+  opens: boolean; // has an inside (Level 1): drawn with the « voir dedans » mark
   col: number; // placed once by the engine and stored: the map never moves
   row: number;
 }

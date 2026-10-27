@@ -30,7 +30,8 @@ FILES = {
     ),
     "api/app/orders.py": (
         "from sqlalchemy.orm import Session\n\n\ndef create_order(order, session: Session):\n"
-        "    session.add(order)\n    session.commit()\n    return order\n"
+        "    session.add(order)\n    session.commit()\n    return order\n\n\n"
+        'class Order(Base):\n    __tablename__ = "orders"\n'
     ),
     "web/Dockerfile": "FROM node:22\n",
     "web/package.json": '{\n  "name": "web",\n  "dependencies": {\n    "react": "19.0.0"\n  }\n}\n',

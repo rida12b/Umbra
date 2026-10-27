@@ -32,6 +32,7 @@ export function HintCard({ hint, at }: { hint: Hint; at: Place }) {
       ))}
       {hint.proofs.length > SHOWN_PROOFS && <div className="mono">+ {hint.proofs.length - SHOWN_PROOFS} autres</div>}
       {hint.guess && <div className="guess">Supposé : déduit, pas lu tel quel dans le code.</div>}
+      {hint.opens && <div className="hint">clic : voir dedans →</div>}
     </div>
   );
 }
@@ -76,6 +77,13 @@ export function HelpCard() {
           <rect x="2" y="2" width="18" height="12" rx="3" fill="none" stroke="currentColor" strokeWidth="1.6" strokeDasharray="4 3" />
         </svg>
         pointillés = supposé, pas lu dans le code
+      </div>
+      <div className="row">
+        <svg width="22" height="16" aria-hidden="true">
+          <circle cx="11" cy="8" r="7" fill="none" stroke="currentColor" strokeWidth="1.4" />
+          <path d="M9.5,5 L12.5,8 L9.5,11" fill="none" stroke="currentColor" strokeWidth="1.6" />
+        </svg>
+        clic sur une boîte avec ce rond : voir dedans
       </div>
       <div className="row">
         <svg width="22" height="16" aria-hidden="true">

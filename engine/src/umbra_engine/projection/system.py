@@ -14,6 +14,7 @@ from umbra_engine.projection.system_model import (
     SystemOutput,
     proof_of,
 )
+from umbra_engine.projection.system_purpose import purpose
 from umbra_engine.projection.system_units import TOOLING_SERVICE, Unit, find_units, test_service
 
 MAX_BOXES = 6  # running parts; the actors come on top (ADR-0007: ≤ 5 by default, hard max 7)
@@ -56,6 +57,9 @@ def system_map(facts: Facts, branch: str, last_change: str) -> SystemMap:
     boxes.update(externals.boxes)
     for box in others:
         boxes.setdefault(box.id, box)
+    for unit in units:
+        if unit.role == "server":
+            boxes[unit.id].role = _server_role(facts, unit, links)
     links = _actors(units, boxes) + links
     running = [b for b in boxes.values() if b.kind != "actor"]
     overflow = running[MAX_BOXES:]
@@ -67,11 +71,10 @@ def system_map(facts: Facts, branch: str, last_change: str) -> SystemMap:
     if stand_ins and "mail" not in boxes:
         catchers = ", ".join(c.object.split(":", 1)[1] for c in stand_ins)
         extra.append(("Courriel de test", catchers, _declared(stand_ins)))
-    result.around = around_items(facts, prestart, extra)
-    result.actions = sum(len(facts.signal("route", u.files)) for u in units if u.role == "server") + sum(
-        len(facts.commands(u.files)) for u in units if u.role == "cli"
-    )
-    result.sentence = _sentence(units, result.links)
+    commands = sum(len(facts.commands(u.files)) for u in units if u.role == "cli")
+    result.around = around_items(facts, prestart, extra, {u.role for u in units}, commands)
+    result.actions = sum(len(facts.signal("route", u.files)) for u in units if u.role == "server") + commands
+    result.sentence = purpose(facts, units, result.links)
     return result
 
 
@@ -95,7 +98,10 @@ def _unit_box(facts: Facts, unit: Unit) -> SystemBox:
         "library": "Le code que d'autres programmes importent.",
         "folder": "Un dossier de code : son rôle n'est pas lu dans le code (supposé).",
     }
-    return SystemBox(unit.id, "box", title, unit.detail, unit.folder, roles[unit.role], proofs, unit.inferred)
+    opens = unit.role in ("web", "server", "cli", "library")
+    return SystemBox(
+        unit.id, "box", title, unit.detail, unit.folder, roles[unit.role], proofs, unit.inferred, opens
+    )
 
 
 def _actors(units: list[Unit], boxes: dict[str, SystemBox]) -> list[SystemLink]:
@@ -179,29 +185,12 @@ def _outputs(
     return list({o.id: o for o in outputs}.values())
 
 
-def _sentence(units: list[Unit], links: list[SystemLink]) -> str:
-    """One plain sentence from the boxes found (Claude's own sentence comes with #108)."""
-    roles = [u.role for u in units]
-    if "web" in roles and "server" in roles:
-        subject, last = "Une application web et son serveur", "server"
-    elif "cli" in roles and "library" in roles:
-        python = any(f.endswith(".py") for u in units if u.role == "library" for f in u.files)
-        subject, last = f"Une commande et une bibliothèque{' Python' if python else ''}", "library"
-    else:
-        named = {"web": "Une application web", "server": "Un serveur", "cli": "Une commande",
-                 "library": "Une bibliothèque"}  # fmt: skip
-        first = next((r for r in ("server", "web", "cli", "library") if r in roles), None)
-        if first is None:
-            return f"{len(units)} parties trouvées dans les dossiers du projet." if units else ""
-        subject, last = named[first], first
-    owner = {u.id for u in units if u.role == last}
-    does = []
-    for link in links:
-        if link.source in owner and link.target.startswith("store:"):
-            does.append("écrit dans une base" if link.verb == "écrit" else "lit une base")
-        elif link.source in owner and link.target == "sqlite-file":
-            does.append(f"{link.verb} un fichier SQLite")
-        elif link.source in owner and link.target == "mail":
-            does.append("envoie des courriels")
-    does = list(dict.fromkeys(does))
-    return f"{subject}, qui {' et '.join(does)}." if does else f"{subject}."
+def _server_role(facts: Facts, unit: Unit, links: list[SystemLink]) -> str:
+    """« Reçoit les appels, vérifie qui appelle, lit et écrit la base. », from what the server does."""
+    does = ["Reçoit les appels"]
+    if facts.signal("auth", unit.files):
+        does.append("vérifie qui appelle")
+    verbs = [link.verb for link in links if link.source == unit.id and link.target.startswith("store:")]
+    if verbs:
+        does.append("lit et écrit la base" if "écrit" in verbs else "lit la base")
+    return f"{', '.join(does)}." if len(does) > 1 else "Reçoit les appels et y répond."

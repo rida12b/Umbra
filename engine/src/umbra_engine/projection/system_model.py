@@ -33,6 +33,7 @@ class SystemBox:
     role: str  # one plain sentence, on hover
     proofs: list[Proof]
     inferred: bool = False
+    opens: bool = False  # has an inside to show (Level 1, #105): drawn with the « voir dedans » mark
     col: int = 0
     row: int = 0
 
