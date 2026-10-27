@@ -180,3 +180,17 @@ def test_plain_words_only_for_a_plain_shape():
         card_routes.answer_words(["UsersPublic"], {"UserPublic", "UsersPublic"}, False)
         == "une liste de users"
     )
+
+
+def test_a_library_card_leads_with_what_others_use_most() -> None:
+    """sqlite-utils: « Reçoit » opened on DEFAULT · AlterError; the classes everyone imports come first."""
+    from umbra_engine.projection.card import _most_taken
+
+    taken = ["DEFAULT", "Database", "AlterError", "Table", "Database", "Table", "Database"]
+    assert _most_taken(taken) == ["Database", "Table", "DEFAULT", "AlterError"]
+
+
+def test_private_helpers_come_after_the_public_functions() -> None:
+    from umbra_engine.projection.card import _private
+
+    assert [_private(n) for n in ("_check_constraint_sql", "__init__", "insert_all")] == [True, False, False]

@@ -123,12 +123,23 @@ def _receives(read: InsideRead, files: list[str], text_of: TextOf) -> CardLine:
         text = text_of(claim.subject) or ""
         taken = imported_names(text, claim.line_start, claim.line_end, claim.subject.endswith(".py"))
         names += [n for n in taken if n not in modules and not n.startswith("_")]
-    names = list(dict.fromkeys(names))
+    names = _most_taken(names)
     if not names:
         return CardLine(RECEIVES, [])
     return CardLine(
         RECEIVES, [CardWord("appels à"), *_names_shown(names)], [proof_of(c) for c in importers[:PROOFS]]
     )
+
+
+def _most_taken(names: list[str]) -> list[str]:
+    """Most imported first; constants and errors after, so `Database · Table` lead, not `DEFAULT`."""
+    counted = Counter(names)
+
+    def rank(name: str) -> tuple[bool, int]:
+        minor = name.isupper() or name.endswith(("Error", "Exception", "Warning"))
+        return (minor, -counted[name])
+
+    return sorted(counted, key=rank)
 
 
 def _returns(files: list[str], text_of: TextOf) -> CardLine:
@@ -151,7 +162,7 @@ def _names_shown(names: list[str]) -> list[CardWord]:
 def _functions(
     files: list[str], definitions_of: DefinitionsOf, taken: set[tuple[str, str]]
 ) -> list[CardFunction]:
-    """Functions and methods, file by file, in line order; a function inside a function is left out."""
+    """Functions and methods, public ones first, then file and line order; nested functions left out."""
     found: list[CardFunction] = []
     for file in files:
         defined = definitions_of(file)
@@ -162,4 +173,9 @@ def _functions(
             kept = claim.object_kind in ("function", "method") and (not owner or owner in classes)
             if kept and (file, name) not in taken:
                 found.append(CardFunction(name, file, claim.line_start))
-    return found
+    return sorted(found, key=lambda f: _private(f.name.rsplit(".", 1)[-1]))  # stable: line order kept
+
+
+def _private(name: str) -> bool:
+    """`_helper` is private; `__init__` is how the class is built, so it stays with the public ones."""
+    return name.startswith("_") and not (name.startswith("__") and name.endswith("__"))
