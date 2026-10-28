@@ -1,6 +1,6 @@
 # The Explorer becomes one zoomable project map, and Claude Code draws its answers on it
 
-Status: accepted (2026-10-27, decided by Rida: "oui c nickel ca"). Supersedes ADR-0006 (factory floor). Need: `docs/need.md`.
+Status: accepted (2026-10-27, decided by Rida: "oui c nickel ca"). Supersedes ADR-0006 (factory floor). Amended by ADR-0008 (names from rules, no Claude naming call). Need: `docs/need.md`.
 
 ## Context
 

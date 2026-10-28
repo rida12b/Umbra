@@ -44,7 +44,7 @@ export function ActionsPanel({ projectId, name, onClose }: Props) {
         <div className="sub">
           {commands ? (
             <>
-              Les commandes de <span className="mono">{name}</span>, lues dans {readIn(list)}. Pas encore nommées en français.
+              Les commandes de <span className="mono">{name}</span>, lues dans {readIn(list)}. Noms en français lus dans leur nom, la commande à taper à côté. Clic : voir le chemin.
             </>
           ) : (
             "Les adresses que le serveur accepte, rangées par fichier. Noms en français lus dans le code, l'adresse exacte au survol. Clic : voir le chemin."
@@ -85,24 +85,17 @@ function Groups({ list, onPick }: { list: ActionList; onPick: (action: Action) =
               <b>{file}</b>
               <span>{said}</span>
             </div>
-            {group.kind === "commands" ? (
-              <div className="cmds">
-                {group.actions.map((action) => (
-                  <button key={action.id} type="button" title={`${file}:${action.line} — clic : voir le chemin`} onClick={() => onPick(action)}>
-                    {action.address}
-                  </button>
-                ))}
-              </div>
-            ) : (
-              group.actions.map((action) => (
-                <button key={action.id} type="button" className="act" title={`${action.verb} ${action.address}`} onClick={() => onPick(action)}>
-                  <span className="m">{action.verb}</span>
-                  {action.label ? <span className="lab">{action.label}</span> : <span className="lab mono">{shortAddress(action.address, under)}</span>}
-                  {action.label && <span className="rt">{action.address}</span>}
-                  <span className="go">chemin →</span>
-                </button>
-              ))
-            )}
+            {group.actions.map((action) => (
+              // A route: « POST Créer un item », its address on hover. A command (#108): « Créer une table »,
+              // the command as typed always beside it (it is what one types, and a phone has no hover);
+              // one no rule names shows as typed.
+              <button key={action.id} type="button" className={action.verb ? "act" : "act cmd"} title={action.verb ? `${action.verb} ${action.address}` : `${file}:${action.line}`} onClick={() => onPick(action)}>
+                {action.verb && <span className="m">{action.verb}</span>}
+                {action.label ? <span className="lab">{action.label}</span> : <span className="lab mono">{action.verb ? shortAddress(action.address, under) : action.address}</span>}
+                {action.label && <span className="rt">{action.address}</span>}
+                <span className="go">chemin →</span>
+              </button>
+            ))}
           </section>
         );
       })}

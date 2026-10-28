@@ -1,13 +1,13 @@
 """« Ce qu'on peut faire » (ADR-0007, #107): the addresses a server answers and the commands a CLI offers,
 grouped by file, read in the code (route decorators, `@group.command`), never named by a model. A route's
-French words come from `route_words`; a command keeps its name. Each file of routes gets one role word
-(« items », « comptes », « connexion », « outils », « en local seulement »)."""
+French words come from `route_words`, a command's from `command_words` (#108). Each file of routes gets one
+role word (« items », « comptes », « connexion », « outils », « en local seulement »)."""
 
 import ast
 import posixpath
 from dataclasses import dataclass, field
 
-from umbra_engine.projection import card_routes
+from umbra_engine.projection import card_routes, command_words
 from umbra_engine.projection.card_code import Mount, mounts, parse
 from umbra_engine.projection.card_routes import ORDER, TextOf, action_id
 from umbra_engine.projection.inside_words import PAGE_WORDS, STEM_TITLES, table_words
@@ -25,7 +25,7 @@ class Action:
     id: str  # the function's file and line: « backend/app/api/routes/items.py:62 »
     kind: str  # « routes » or « commands »
     verb: str  # « POST »; empty for a command
-    label: str  # « Créer un item », « Voir son profil » (`route_words`); empty when no rule names it
+    label: str  # « Créer un item » (`route_words`), « Créer une table » (`command_words`); empty: no rule
     address: str  # « /api/v1/items/ », or the command as typed: « insert »
     name: str  # the function: « create_item »
     file: str
@@ -131,8 +131,9 @@ def _commands(facts: Facts, units: list[Unit], text_of: TextOf) -> list[ActionGr
             if actions:
                 group = ActionGroup(file, COMMANDS)
                 for name, function, line in actions:
+                    words = command_words.label(name)
                     group.actions.append(
-                        Action(action_id(file, line), COMMANDS, "", "", name, function, file, line)
+                        Action(action_id(file, line), COMMANDS, "", words, name, function, file, line)
                     )
                 groups.append(group)
     return groups

@@ -144,9 +144,14 @@ def test_a_command_goes_through_the_library_and_a_guess_says_so(client, auth, ma
     found = actions(client, auth, project)
     assert found["total"] == system["actions"] == 3
     assert [a["address"] for a in found["groups"][0]["actions"]] == ["tables", "insert", "rows"]
+    assert [a["label"] for a in found["groups"][0]["actions"]] == [
+        "Lister les tables",
+        "Insérer",
+        "Lister les lignes",
+    ]  # from the command names alone (#108)
     insert = found["groups"][0]["actions"][1]
     lit = light(client, auth, project, insert["id"])
-    assert (lit["caption"], lit["inside"]) == ("insert", "library:sqlite_utils")
+    assert (lit["caption"], lit["inside"]) == ("Insérer", "library:sqlite_utils")
     steps = [(s["part"], s["note"], s["label"], s["guess"]) for s in lit["steps"]]
     assert steps[0] == (
         "stub:cli:sqlite-utils",

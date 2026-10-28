@@ -1,6 +1,6 @@
 """The sentence under the project's name: what the project is FOR, from hard signals only (no LLM,
 ADR-0007). It must add to the map, never repeat its boxes: who uses it (accounts) and what they handle
-(the tables of the code), or what a tool does to its data. Claude's own sentence comes with #108."""
+(the tables of the code), or what a tool does to its data. No model writes it (ADR-0008)."""
 
 from umbra_engine.projection.system_facts import Facts
 from umbra_engine.projection.system_model import SystemLink
