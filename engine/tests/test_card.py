@@ -175,7 +175,7 @@ def test_plain_words_for_a_plain_shape_or_common_words():
     assert card_routes.label("DELETE", "/api/v1/items/{id}") == "Supprimer un item"
     assert card_routes.label("GET", "/api/v1/users/me") == "Voir son profil"  # « me », the caller himself
     assert card_routes.label("POST", "/api/v1/login/access-token") == "Se connecter"
-    assert card_routes.label("POST", "/api/v1/things/{id}/archive") == ""  # no rule: Claude names it (#108)
+    assert card_routes.label("POST", "/api/v1/things/{id}/archive") == ""  # no rule: as typed (ADR-0008)
     assert card_routes.common_address(["/api/v1/login/x", "/api/v1/password-recovery/{e}"]) == "/api/v1/"
     assert (
         card_routes.answer_words(["UsersPublic"], {"UserPublic", "UsersPublic"}, False)

@@ -275,10 +275,9 @@ a.pm-link { display: inline-block; text-decoration: none; font-size: 13px; font-
 .pm-panel .act .go { margin-left: auto; color: var(--u-accent); font-size: 12.5px; font-weight: 600; white-space: nowrap; visibility: hidden; }
 .pm-panel .act .rt + .go { margin-left: 0; }
 .pm-panel .act:hover .rt, .pm-panel .act:focus-visible .rt { display: inline; }
+.pm-panel .act.cmd .rt { display: inline; overflow: hidden; text-overflow: ellipsis; min-width: 0; } /* a command: what one types, shown without hover (#108) */
+.pm-panel .act.cmd .lab { flex-shrink: 0; max-width: 100%; } /* on a phone the typed command gives way, not the French words */
 .pm-panel .act:hover .go, .pm-panel .act:focus-visible .go { visibility: visible; }
-.pm-panel .cmds { display: flex; flex-wrap: wrap; gap: 6px; padding: 4px 8px 16px; }
-.pm-panel .cmds button { font-family: var(--font-mono); font-size: 12.5px; border: 1px solid var(--u-line); border-radius: 6px; padding: 3px 8px; background: var(--u-raised); color: var(--u-ink); }
-.pm-panel .cmds button:hover, .pm-panel .cmds button:focus-visible { border-color: var(--u-accent); color: var(--u-accent); }
 /* #107: an action's path, lit inside a box (mock p-chemin.png) */
 .pm-caption .step { font-size: 13.5px; color: var(--u-muted); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; border-left: 1px solid var(--u-line); padding-left: 14px; }
 .pm-caption .step b { color: var(--u-accent); }

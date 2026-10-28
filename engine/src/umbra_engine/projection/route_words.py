@@ -2,8 +2,8 @@
 decorator, never written by a model. A plain shape says it all (a GET on a collection lists, on `{id}` it
 shows; a POST creates; a PUT or PATCH changes; a DELETE removes); the common words of sign-up, sign-in,
 passwords and « me » name the others. A route behind a superuser or admin dependency says « (admin) »; an
-account created with no sign-in says « sans connexion ». Anything else stays unnamed (« »): Claude names
-it in #108."""
+account created with no sign-in says « sans connexion ». Anything else stays unnamed (« »): no model names
+it (ADR-0008), the panel shows the address."""
 
 import re
 

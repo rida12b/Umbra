@@ -90,7 +90,7 @@ def common_address(addresses: list[str]) -> str:
 
 
 def label(verb: str, full: str, owned: bool = False, admin: bool = False, signed_in: bool = True) -> str:
-    """French words for a route (`route_words`); « » when no rule names it (Claude names those, #108)."""
+    """French words for a route (`route_words`); « » when no rule names it (shown as typed, ADR-0008)."""
     return route_words.label(verb, full, owned, admin, signed_in)
 
 

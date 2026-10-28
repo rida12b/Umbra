@@ -132,7 +132,7 @@ export interface CardFunction {
   line: number;
   verb: string;
   path: string;
-  label: string; // « Voir un item », « Voir son profil »; empty when no rule names it (#108)
+  label: string; // « Voir un item », « Voir son profil »; empty when no rule names it (ADR-0008)
   action: string; // a route: its id in « Ce qu'on peut faire », whose path « chemin → » lights (#107)
 }
 
@@ -141,7 +141,7 @@ export interface Action {
   id: string; // the function's file and line: « backend/app/api/routes/items.py:62 »
   kind: "routes" | "commands";
   verb: string; // « POST »; empty for a command
-  label: string; // « Créer un item », « Voir son profil »; empty when no rule names it (#108)
+  label: string; // « Créer un item », « Créer une table »; empty when no rule names it (ADR-0008)
   address: string; // « /api/v1/items/ », or the command as typed: « insert »
   name: string;
   file: string;
